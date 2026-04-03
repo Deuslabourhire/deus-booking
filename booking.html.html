@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Book a Move — Deus Labour Hire</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080b0f;color:#e8f0e8;font-family:'DM Sans',system-ui,sans-serif;min-height:100vh;padding-bottom:60px}
+.header{background:#0e1218;border-bottom:1px solid #1c2130;padding:20px;text-align:center}
+.logo{font-family:'Cormorant Garamond',serif;font-size:26px;color:#e8f0e8}
+.sub{font-size:11px;color:#6b7a6b;letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
+.container{max-width:520px;margin:0 auto;padding:28px 18px}
+.step{display:none}.step.active{display:block}
+.progress{display:flex;gap:5px;margin-bottom:28px}
+.bar{flex:1;height:3px;border-radius:2px;background:#1c2130;transition:background .4s}
+.bar.done{background:#3d8b3d}
+h2{font-family:'Cormorant Garamond',serif;font-size:22px;color:#e8f0e8;margin-bottom:6px}
+.hint{font-size:12px;color:#6b7a6b;margin-bottom:22px;line-height:1.6}
+.field{margin-bottom:15px}
+label{font-size:11px;color:#6b7a6b;display:block;margin-bottom:5px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+input,textarea{width:100%;background:#0e1218;border:1px solid #1c2130;border-radius:8px;padding:11px 13px;color:#e8f0e8;font-size:14px;outline:none;font-family:inherit;transition:border .2s}
+input:focus,textarea:focus{border-color:#3d8b3d}
+textarea{resize:vertical;min-height:72px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:6px}
+.btn-green{background:linear-gradient(135deg,#3d8b3d,#2a6b2a);color:#fff}
+.btn-green:disabled{background:#1c2130;color:#555;cursor:not-allowed}
+.btn-back{background:#121720;border:1px solid #1c2130;color:#6b7a6b;margin-bottom:10px}
+.checklist-section{margin-bottom:18px}
+.section-title{font-size:11px;color:#3d8b3d;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px}
+.check-item{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px;cursor:pointer}
+.check-item input[type=checkbox]{margin-top:3px;accent-color:#3d8b3d;width:16px;height:16px;flex-shrink:0}
+.check-label{font-size:13px;color:#e8f0e8;font-weight:500}
+.check-detail{font-size:11px;color:#6b7a6b;margin-top:2px;line-height:1.5}
+.doc-box{background:#121720;border:1px solid #1c2130;border-radius:10px;padding:14px;max-height:160px;overflow-y:auto;margin-bottom:10px;font-size:11px;color:#8a9a8a;line-height:1.8;white-space:pre-wrap;font-family:inherit}
+.agree-row{display:flex;gap:10px;align-items:flex-start;margin-bottom:18px;cursor:pointer}
+.agree-row input{margin-top:3px;accent-color:#3d8b3d;flex-shrink:0}
+.agree-text{font-size:12px;color:#6b7a6b;line-height:1.6}
+.agree-text strong{color:#e8f0e8}
+.sig-input{font-style:italic;font-size:17px!important;color:#6ec86e!important}
+.sig-note{font-size:11px;color:#6b7a6b;margin-top:6px}
+.summary-box{background:#0a1a0a;border:1px solid #2a3a2a;border-radius:10px;padding:14px;margin-bottom:20px}
+.summary-title{font-size:10px;color:#3d8b3d;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px}
+.summary-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
+.summary-key{font-size:11px;color:#6b7a6b;flex-shrink:0}
+.summary-val{font-size:12px;color:#e8f0e8;text-align:right}
+.success{text-align:center;padding:40px 20px}
+.success-icon{font-size:56px;margin-bottom:16px}
+.success h2{font-size:26px;margin-bottom:10px}
+.success p{font-size:14px;color:#6b7a6b;line-height:1.7;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="header">
+  <div style="font-size:28px;margin-bottom:6px">🚛</div>
+  <div class="logo">Deus Labour Hire</div>
+  <div class="sub">Moving &amp; Cleaning Services</div>
+</div>
+
+<div class="container">
+  <div class="progress">
+    <div class="bar done" id="b1"></div>
+    <div class="bar" id="b2"></div>
+    <div class="bar" id="b3"></div>
+    <div class="bar" id="b4"></div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="step active" id="step1">
+    <h2>Book Your Move</h2>
+    <p class="hint">Please fill in your details. All fields marked * are required.</p>
+    <div class="field"><label>Full Name *</label><input type="text" id="name" placeholder="Jane Smith"/></div>
+    <div class="field"><label>Phone Number *</label><input type="tel" id="phone" placeholder="04xx xxx xxx"/></div>
+    <div class="field"><label>Email Address *</label><input type="email" id="email" placeholder="jane@example.com"/></div>
+    <div class="row">
+      <div class="field"><label>Date *</label><input type="date" id="date"/></div>
+      <div class="field"><label>Start Time *</label><input type="time" id="startTime"/></div>
+    </div>
+    <div class="field"><label>Pick-up Address *</label><input type="text" id="pickup" placeholder="123 Current St, Suburb, State"/></div>
+    <div class="field"><label>Drop-off Address *</label><input type="text" id="dropoff" placeholder="456 New Ave, Suburb, State"/></div>
+    <div class="field"><label>Special Items / Notes</label><textarea id="notes" placeholder="High-value items over $800, heavy furniture over 100kg, stairs, lift access..."></textarea></div>
+    <button class="btn btn-green" onclick="goStep2()">Continue to Checklist →</button>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step" id="step2">
+    <h2>Pre-Move Checklist</h2>
+    <p class="hint">Please read and tick every item. This protects your belongings and helps our team prepare.</p>
+
+    <div class="checklist-section">
+      <div class="section-title">1. High-Value &amp; Heavy Items</div>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Disclosure</div><div class="check-detail">I have listed all items valued above $800 and will inform the crew before the move starts.</div></div></label>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Heavy Items</div><div class="check-detail">I confirm I have disclosed any items weighing over 100kg.</div></div></label>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Fragile Goods</div><div class="check-detail">I will identify fragile items (glass, artwork, mirrors, antiques) to the crew leader.</div></div></label>
+    </div>
+    <div class="checklist-section">
+      <div class="section-title">2. Electronics &amp; Televisions</div>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Original Packing</div><div class="check-detail">I will pack modern televisions in their original boxes where possible.</div></div></label>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Disconnection</div><div class="check-detail">All electronics will be unplugged and cables organized before the crew arrives.</div></div></label>
+    </div>
+    <div class="checklist-section">
+      <div class="section-title">3. Packing</div>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Sealed Boxes</div><div class="check-detail">All boxes are securely taped at the top and bottom.</div></div></label>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Labeling</div><div class="check-detail">Boxes are clearly marked as 'Fragile' or with the destination room.</div></div></label>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Client-Packed Items</div><div class="check-detail">I understand items packed by me are transported at my risk unless damage is caused by proven staff negligence.</div></div></label>
+    </div>
+    <div class="checklist-section">
+      <div class="section-title">4. Property Access &amp; Safety</div>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Parking</div><div class="check-detail">I will secure a parking spot for the truck as close to the entrance as possible.</div></div></label>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Clear Paths</div><div class="check-detail">I will remove rugs, doorstops or obstacles that could cause tripping.</div></div></label>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Elevators / Stairs</div><div class="check-detail">I have confirmed elevator bookings with building management and will notify the team of restricted access.</div></div></label>
+    </div>
+    <div class="checklist-section">
+      <div class="section-title">5. Essential Reminders</div>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Personal Essentials</div><div class="check-detail">I will keep jewelry, cash, passports and medications with me at all times.</div></div></label>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Final Inspection</div><div class="check-detail">I will do a final walkthrough with the team before the truck leaves.</div></div></label>
+      <label class="check-item"><input type="checkbox" class="cl"/><div><div class="check-label">Damage Reporting</div><div class="check-detail">I understand any damage must be reported with photos within 24 hours of move completion.</div></div></label>
+    </div>
+
+    <button class="btn btn-back" onclick="goStep(1)">← Back</button>
+    <button class="btn btn-green" id="btnChecklist" onclick="goStep3()" disabled>Tick all items to continue</button>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step" id="step3">
+    <h2>Sign Documents</h2>
+    <p class="hint">Please read both documents carefully, then sign with your full name.</p>
+
+    <div class="section-title" style="margin-bottom:8px">1. Terms &amp; Conditions</div>
+    <div class="doc-box">TERMS AND CONDITIONS – REMOVAL SERVICES
+
+Acceptance of Terms
+By booking or accepting our services, the client confirms that they have read, understood, and agreed to these Terms and Conditions.
+
+Duty of Care
+Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client's belongings. However, removal services involve inherent risks and minor damage may occasionally occur despite reasonable care.
+
+Client Packing Responsibility
+Items packed by the client are transported at the client's risk unless damage is directly caused by proven negligence during handling by our staff.
+
+Fragile and High-Risk Items
+Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics require special care and must be disclosed before the move.
+
+Television and Electronic Equipment
+Modern televisions are extremely fragile and may suffer internal panel damage even when handled with reasonable care. Televisions should ideally be transported in original packaging.
+
+Disclosure of High-Value Items
+Items valued above $800 must be disclosed prior to the move.
+
+Liability for Loss or Damage
+If damage occurs due to negligence during the service, liability will be assessed based on the fair market value of the item at the time of the move. Nothing in these Terms excludes the client's rights under the Australian Consumer Law.
+
+Transit Insurance
+Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited.
+
+Claims Procedure
+Any claim must be reported within 24 hours after completion of the move and include photographs and a description of the damage.
+
+Payment Terms
+Payment is due upon completion of the service unless otherwise agreed.
+
+Governing Law
+These Terms and Conditions are governed by the laws of Australia.</div>
+    <label class="agree-row"><input type="checkbox" id="agreeTC"/><span class="agree-text">I have read and agree to the <strong>Terms &amp; Conditions</strong> of Deus Labour Hire Pty Ltd.</span></label>
+
+    <div class="section-title" style="margin-bottom:8px">2. Service Agreement</div>
+    <div class="doc-box">SERVICE AGREEMENT – REMOVAL SERVICES
+
+Acceptance and Scope
+By booking or accepting our services, the client confirms they have read, understood, and agreed to these Terms and Conditions. Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client's belongings. These Terms are governed by the laws of Australia.
+
+Client Responsibilities
+Items packed by the client are transported at the client's risk unless damage is directly caused by proven negligence. The client must ensure safe access to the property. Items over 100kg must be disclosed before the move. Items valued above $800 must be disclosed before the move.
+
+Fragile and Special Items
+Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics must be disclosed before the move. Deus Labour Hire reserves the right to refuse items considered unsafe for transport.
+
+Liability and Insurance
+Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited. Any claim must be reported within 24 hours and must include photos and description of the damage. Nothing in these terms excludes the client's rights under Australian Consumer Law.
+
+Payment and Additional Fees
+Payment is due upon completion of the service unless otherwise agreed. Additional charges may apply for stairs, restricted access or long carrying distances.</div>
+    <label class="agree-row"><input type="checkbox" id="agreeAG"/><span class="agree-text">I have read and agree to the <strong>Service Agreement</strong> for Removal Services.</span></label>
+
+    <div class="field">
+      <label>Digital Signature — Type your full legal name</label>
+      <input type="text" id="signature" class="sig-input" placeholder="Your full legal name" oninput="checkSign()"/>
+      <div class="sig-note" id="sigNote"></div>
+    </div>
+
+    <button class="btn btn-back" onclick="goStep(2)">← Back</button>
+    <button class="btn btn-green" id="btnSign" onclick="goStep4()" disabled>Continue to Review →</button>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step" id="step4">
+    <h2>Review &amp; Confirm</h2>
+    <p class="hint">Please review your booking details before submitting.</p>
+    <div class="summary-box">
+      <div class="summary-title">Booking Summary</div>
+      <div id="summaryContent"></div>
+    </div>
+    <div style="background:#0a1a0a;border:1px solid #2a3a2a;border-radius:10px;padding:14px;margin-bottom:20px">
+      <div style="font-size:12px;color:#6ec86e;font-weight:600;margin-bottom:4px">✅ Documents signed digitally</div>
+      <div style="font-size:11px;color:#6b7a6b;line-height:1.6">Your signature has been recorded. You will receive a confirmation from our team shortly.</div>
+    </div>
+    <button class="btn btn-back" onclick="goStep(3)">← Back</button>
+    <button class="btn btn-green" id="btnSubmit" onclick="submitBooking()">✓ Confirm My Booking</button>
+  </div>
+
+  <!-- SUCCESS -->
+  <div class="step" id="stepDone">
+    <div class="success">
+      <div class="success-icon">🎉</div>
+      <h2>Booking Confirmed!</h2>
+      <p>Thank you! Your move has been booked with <strong>Deus Labour Hire</strong>.</p>
+      <p>Our team will be in touch shortly to confirm all details.</p>
+      <p style="margin-top:16px;font-size:13px;color:#3d8b3d">📧 deus.labour.hire@gmail.com</p>
+      <div id="confirmDetails" style="background:#121720;border:1px solid #1c2130;border-radius:10px;padding:16px;margin-top:20px;text-align:left"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://amnacoyjgdfykdfepkze.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtbmFjb3lqZ2RmeWtkZmVwa3plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxODI4MzAsImV4cCI6MjA5MDc1ODgzMH0.ma37AnfeaDdIN42TNUpt7EVoNYvT6nHQFJra-4XS_Pc';
+
+let formData = {};
+function $(id){ return document.getElementById(id); }
+
+function goStep(n){
+  document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+  const el = $('step'+n) || $('stepDone');
+  el.classList.add('active');
+  for(let i=1;i<=4;i++){ const b=$('b'+i); if(b) b.className='bar'+(i<=n?' done':''); }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function goStep2(){
+  const name=$('name').value.trim(), phone=$('phone').value.trim(), email=$('email').value.trim();
+  const date=$('date').value, time=$('startTime').value;
+  const pickup=$('pickup').value.trim(), dropoff=$('dropoff').value.trim();
+  if(!name||!phone||!email||!date||!time||!pickup||!dropoff){ alert('Please fill in all required fields (*).'); return; }
+  formData={name,phone,email,date,startTime:time,pickupAddress:pickup,dropoffAddress:dropoff,notes:$('notes').value.trim()};
+  goStep(2);
+}
+
+document.addEventListener('change',function(e){
+  if(e.target.classList.contains('cl')){
+    const all=[...document.querySelectorAll('.cl')], allDone=all.every(c=>c.checked);
+    const btn=$('btnChecklist');
+    btn.disabled=!allDone;
+    btn.textContent=allDone?'Continue to Sign Documents →':'Tick all items to continue';
+  }
+  if(e.target.id==='agreeTC'||e.target.id==='agreeAG') checkSign();
+});
+
+function goStep3(){
+  if(![...document.querySelectorAll('.cl')].every(c=>c.checked)){ alert('Please tick all checklist items.'); return; }
+  goStep(3);
+}
+
+function checkSign(){
+  const tc=$('agreeTC').checked, ag=$('agreeAG').checked, sig=$('signature').value.trim();
+  if(sig.length>2){ $('sigNote').textContent='✍ '+sig+' · '+new Date().toLocaleDateString('en-AU'); }
+  else { $('sigNote').textContent=''; }
+  $('btnSign').disabled=!(tc&&ag&&sig.length>2);
+}
+
+function goStep4(){
+  if(!$('agreeTC').checked||!$('agreeAG').checked||$('signature').value.trim().length<3){ alert('Please agree to both documents and sign with your full name.'); return; }
+  formData.signatureName=$('signature').value.trim();
+  formData.signedDate=new Date().toISOString();
+  const keys=[['Client',formData.name],['Phone',formData.phone],['Email',formData.email],['Date',formData.date],['Start Time',formData.startTime],['Pick-up',formData.pickupAddress],['Drop-off',formData.dropoffAddress]];
+  $('summaryContent').innerHTML=keys.map(([k,v])=>`<div class="summary-row"><span class="summary-key">${k}</span><span class="summary-val">${v||'—'}</span></div>`).join('');
+  if(formData.notes) $('summaryContent').innerHTML+=`<div class="summary-row"><span class="summary-key">Notes</span><span class="summary-val">${formData.notes}</span></div>`;
+  goStep(4);
+}
+
+async function submitBooking(){
+  const btn=$('btnSubmit');
+  btn.textContent='Saving...'; btn.disabled=true;
+  const booking={
+    name:formData.name, phone:formData.phone, email:formData.email,
+    date:formData.date, start_time:formData.startTime,
+    pickup_address:formData.pickupAddress, dropoff_address:formData.dropoffAddress,
+    notes:formData.notes||'', signature_name:formData.signatureName,
+    signed_date:formData.signedDate, status:'upcoming',
+    reminder_sent:false, created_at:new Date().toISOString()
+  };
+  try {
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/bookings`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=minimal'},
+      body:JSON.stringify(booking)
+    });
+    if(!res.ok) throw new Error('Save failed');
+  } catch(err){ console.error(err); }
+  document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+  $('stepDone').classList.add('active');
+  for(let i=1;i<=4;i++){ const b=$('b'+i); if(b) b.className='bar done'; }
+  $('confirmDetails').innerHTML=[['Name',booking.name],['Phone',booking.phone],['Date',booking.date],['Start',booking.start_time],['From',booking.pickup_address],['To',booking.dropoff_address]].map(([k,v])=>`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span style="color:#6b7a6b">${k}</span><span style="color:#e8f0e8;text-align:right;max-width:65%">${v}</span></div>`).join('');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+</body>
+</html>
