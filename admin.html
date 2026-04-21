@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<!-- saved from url=(0049)file:///C:/Users/jeffe/Downloads/admin%20(1).html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin — Deus Labour Hire</title>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="./Admin_files/css2" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -133,7 +133,7 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
 <div class="header">
   <div class="header-inner">
     <div class="brand">
-      <img src="https://deuslabourhire.au/wp-content/uploads/2025/11/log-Deus2.jpg" alt="Deus Labour Hire" class="logo-img" onerror="this.outerHTML='<div style=\'font-size:15px;color:#fff;font-weight:800\'>Deus Labour Hire</div>'"/>
+      <img src="./Admin_files/log-Deus2.jpg" alt="Deus Labour Hire" class="logo-img" onerror="this.outerHTML=&#39;&lt;div style=\&#39;font-size:15px;color:#fff;font-weight:800\&#39;&gt;Deus Labour Hire&lt;/div&gt;&#39;">
       <div class="brand-sub">Admin Panel</div>
     </div>
     <div class="hdr-btns">
@@ -145,10 +145,10 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
 
 <div id="loginScreen">
   <div class="login-card">
-    <img src="https://deuslabourhire.au/wp-content/uploads/2025/11/log-Deus2.jpg" alt="Deus Labour Hire" class="login-logo" onerror="this.style.display='none'"/>
+    <img src="./Admin_files/log-Deus2.jpg" alt="Deus Labour Hire" class="login-logo" onerror="this.style.display=&#39;none&#39;">
     <h2>Admin Login</h2>
     <p>Enter the password to access the panel</p>
-    <input type="password" id="passInput" placeholder="Password" onkeydown="if(event.key==='Enter')login()"/>
+    <input type="password" id="passInput" placeholder="Password" onkeydown="if(event.key===&#39;Enter&#39;)login()">
     <button class="btn-login" onclick="login()">Login →</button>
     <div class="login-err" id="loginErr">Incorrect password. Please try again.</div>
   </div>
@@ -162,10 +162,11 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
   </div>
 
   <div class="tabs">
-    <button class="tab active" onclick="switchTab('Calendar',this)">📅 Calendar</button>
-    <button class="tab" onclick="switchTab('Clients',this)">👥 Clients</button>
-    <button class="tab" onclick="switchTab('Docs',this)">📄 Docs</button>
-    <button class="tab" onclick="switchTab('Calc',this)">🧮 Calc</button>
+    <button class="tab active" onclick="switchTab(&#39;Calendar&#39;,this)">📅 Calendar</button>
+    <button class="tab" onclick="switchTab(&#39;Clients&#39;,this)">👥 Clients</button>
+    <button class="tab" onclick="switchTab(&#39;Docs&#39;,this)">📄 Docs</button>
+    <button class="tab" onclick="switchTab(&#39;Calc&#39;,this)">🧮 Calc</button>
+    <button class="tab" onclick="switchTab(&#39;Invoice&#39;,this)">🧾 Invoice</button>
   </div>
 
   <div id="tabCalendar">
@@ -180,36 +181,97 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
   </div>
 
   <div id="tabClients" style="display:none">
-    <input class="search" id="searchInput" placeholder="Search by name, email or phone..." oninput="renderClients()"/>
+    <input class="search" id="searchInput" placeholder="Search by name, email or phone..." oninput="renderClients()">
     <div id="clientList"></div>
   </div>
 
   <div id="tabDocs" style="display:none">
     <div class="doc-tab-btns">
-      <button class="doc-tab-btn active" id="docTabTC" onclick="switchDoc('tc')">Terms &amp; Conditions</button>
-      <button class="doc-tab-btn" id="docTabSA" onclick="switchDoc('sa')">Service Agreement</button>
+      <button class="doc-tab-btn active" id="docTabTC" onclick="switchDoc(&#39;tc&#39;)">Terms &amp; Conditions</button>
+      <button class="doc-tab-btn" id="docTabSA" onclick="switchDoc(&#39;sa&#39;)">Service Agreement</button>
     </div>
-    <div class="doc-view" id="docContent"></div>
+    <div class="doc-view" id="docContent">DEUS LABOUR HIRE
+Moving &amp; Cleaning Services
+Email: deus.labour.hire@gmail.com
+
+TERMS AND CONDITIONS - REMOVAL SERVICES
+
+Acceptance of Terms
+By booking or accepting our services, the client confirms that they have read, understood, and agreed to these Terms and Conditions.
+
+Duty of Care
+Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client's belongings. However, removal services involve inherent risks and minor damage may occasionally occur despite reasonable care.
+
+Condition of Goods
+The client confirms that all items provided for transport are in a condition suitable for removal unless otherwise disclosed prior to the move.
+
+Client Packing Responsibility
+Items packed by the client are transported at the client's risk unless damage is directly caused by proven negligence during handling by our staff.
+
+Fragile and High-Risk Items
+Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics require special care and must be disclosed before the move.
+
+Television and Electronic Equipment
+Modern televisions are extremely fragile and may suffer internal panel damage even when handled with reasonable care. Televisions should ideally be transported in original packaging.
+
+Disclosure of High-Value Items
+Items valued above $800 must be disclosed prior to the move.
+
+Safe Transport and Additional Trips
+If fragile items cannot be safely transported due to limited truck space, Deus Labour Hire may transport them in a separate load.
+
+Refusal to Move Unsafe Items
+Deus Labour Hire reserves the right to refuse items considered unsafe for transport.
+
+Pre-Existing Damage
+Deus Labour Hire is not responsible for items that were already damaged before the move.
+
+Liability for Loss or Damage
+If damage occurs due to negligence during the service, liability will be assessed based on the fair market value of the item at the time of the move considering age, condition and depreciation. Nothing in these Terms and Conditions excludes, restricts or modifies any rights that the client may have under the Australian Consumer Law.
+
+Transit Insurance
+Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited subject to the policy terms and conditions.
+
+Insurance Claims
+If a claim is submitted to the insurer the final decision regarding compensation will be determined by the insurance company.
+
+Claims Procedure
+Any claim must be reported within 24 hours after completion of the move and include photographs and a description of the damage.
+
+Resolution of Claims
+Resolution may include repair, replacement with the same model, similar second-hand replacement or payment of the fair market value.
+
+Access and Safety
+The client must ensure safe access to the property. Additional charges may apply for stairs or restricted access.
+
+Heavy Items
+Items over 100kg must be disclosed before the move.
+
+Payment Terms
+Payment is due upon completion of the service unless otherwise agreed.
+
+Governing Law
+These Terms and Conditions are governed by the laws of Australia.</div>
   </div>
 </div>
 
   <div id="tabCalc" style="display:none">
     <div style="font-size:16px;font-weight:700;margin-bottom:14px;color:#e8f0e8">🧮 Job Calculator</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-      <div class="field" style="margin-bottom:0"><label>Start Time</label><input type="time" id="cStart" style="padding:8px 10px;font-size:13px"/></div>
-      <div class="field" style="margin-bottom:0"><label>Finish Time</label><input type="time" id="cFinish" style="padding:8px 10px;font-size:13px"/></div>
+      <div class="field" style="margin-bottom:0"><label>Start Time</label><input type="time" id="cStart" style="padding:8px 10px;font-size:13px"></div>
+      <div class="field" style="margin-bottom:0"><label>Finish Time</label><input type="time" id="cFinish" style="padding:8px 10px;font-size:13px"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-      <div class="field" style="margin-bottom:0"><label>Rate/hr ($)</label><input type="number" id="cRate" value="150" min="0" style="padding:8px 10px;font-size:13px"/></div>
-      <div class="field" style="margin-bottom:0"><label>Call Out ($)</label><input type="number" id="cCallout" value="0" min="0" style="padding:8px 10px;font-size:13px"/></div>
+      <div class="field" style="margin-bottom:0"><label>Rate/hr ($)</label><input type="number" id="cRate" value="150" min="0" style="padding:8px 10px;font-size:13px"></div>
+      <div class="field" style="margin-bottom:0"><label>Call Out ($)</label><input type="number" id="cCallout" value="0" min="0" style="padding:8px 10px;font-size:13px"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-      <div class="field" style="margin-bottom:0"><label>Additional ($)</label><input type="number" id="cExtras" value="0" min="0" style="padding:8px 10px;font-size:13px"/></div>
-      <div class="field" style="margin-bottom:0"><label>Client Name</label><input type="text" id="cClientName" placeholder="Optional" style="padding:8px 10px;font-size:13px"/></div>
+      <div class="field" style="margin-bottom:0"><label>Additional ($)</label><input type="number" id="cExtras" value="0" min="0" style="padding:8px 10px;font-size:13px"></div>
+      <div class="field" style="margin-bottom:0"><label>Client Name</label><input type="text" id="cClientName" placeholder="Optional" style="padding:8px 10px;font-size:13px"></div>
     </div>
     <div style="background:#0e1218;border:1px solid #1c2130;border-radius:8px;padding:10px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
       <div style="font-size:12px;font-weight:500">Include GST (10%) <span id="cGSTBadge" style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;background:#3a1a1a;color:#fca5a5;margin-left:5px">OFF</span></div>
-      <input type="checkbox" id="cGST" onchange="updateCalcGST()" style="width:18px;height:18px;accent-color:#3d8b3d;cursor:pointer"/>
+      <input type="checkbox" id="cGST" onchange="updateCalcGST()" style="width:18px;height:18px;accent-color:#3d8b3d;cursor:pointer">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <button onclick="calcJob()" style="padding:11px;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#3d8b3d,#2a6b2a);color:#fff">Calculate →</button>
@@ -244,19 +306,137 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
   </div>
 </div>
 
+
+  <div id="tabInvoice" style="display:none">
+    <div style="font-size:16px;font-weight:700;margin-bottom:6px">🧾 Invoice Generator</div>
+    <p style="font-size:12px;color:#6b7a6b;margin-bottom:16px">Client data auto-fills when opened from the calendar or client list.</p>
+
+    <div class="field"><label>Invoice Number</label><input type="text" id="inv_num" value="INV001"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div class="field" style="margin-bottom:0"><label>Date</label><input type="date" id="inv_date"></div>
+      <div class="field" style="margin-bottom:0"><label>Due Date</label><input type="date" id="inv_due"></div>
+    </div>
+
+    <div style="background:#0a1a0a;border:1px solid #2a3a2a;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Bill To</div>
+      <div class="field" style="margin-bottom:8px"><label>Client Name *</label><input type="text" id="inv_client" placeholder="Full name"></div>
+      <div class="field" style="margin-bottom:8px"><label>Pick-up Address</label><input type="text" id="inv_pickup" placeholder="123 Current St, Suburb NSW"></div>
+      <div class="field" style="margin-bottom:8px"><label>Drop-off Address</label><input type="text" id="inv_dropoff" placeholder="456 New Ave, Suburb NSW"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field" style="margin-bottom:0"><label>Phone</label><input type="tel" id="inv_phone" placeholder="04xx xxx xxx"></div>
+        <div class="field" style="margin-bottom:0"><label>Email</label><input type="email" id="inv_email" placeholder="client@email.com"></div>
+      </div>
+    </div>
+
+    <div style="background:#0a1a0a;border:1px solid #2a3a2a;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Job Details</div>
+      <div class="field" style="margin-bottom:8px"><label>Description</label><textarea id="inv_desc" style="min-height:50px" placeholder="e.g. Removal service from Croydon to Bondi"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+        <div class="field" style="margin-bottom:0"><label>Start Time</label><input type="time" id="inv_start"></div>
+        <div class="field" style="margin-bottom:0"><label>Finish Time</label><input type="time" id="inv_finish"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field" style="margin-bottom:0"><label>Rate/hr ($)</label><input type="number" id="inv_rate" value="150" min="0"></div>
+        <div class="field" style="margin-bottom:0"><label>Call Out ($)</label><input type="number" id="inv_callout" value="0" min="0"></div>
+      </div>
+    </div>
+
+    <!-- Fixed Price Toggle -->
+    <div style="background:#0e1218;border:1px solid #1c2130;border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:13px;font-weight:500">Fixed Price Job</div>
+        <div style="font-size:11px;color:#6b7a6b;margin-top:2px">Enter total manually</div>
+      </div>
+      <input type="checkbox" id="inv_fixed" onchange="toggleInvFixed()" style="width:18px;height:18px;accent-color:#3d8b3d;cursor:pointer">
+    </div>
+    <div id="inv_fixed_fields" style="display:none;background:#0a1a0a;border:1px solid #2a3a2a;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div class="field" style="margin-bottom:8px"><label>Fixed Amount ($) *</label><input type="number" id="inv_fixed_amt" placeholder="e.g. 500.00" min="0" step="0.01"></div>
+      <div class="field" style="margin-bottom:0"><label>Description</label><input type="text" id="inv_fixed_desc" placeholder="Fixed price removal"></div>
+    </div>
+
+    <!-- Extras -->
+    <div style="background:#0a1a0a;border:1px solid #2a3a2a;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Additional Charges</div>
+      <div id="inv_extras"></div>
+      <button onclick="addInvExtra()" style="background:#1a3a1a;color:#86efac;border:none;border-radius:7px;padding:8px 14px;font-size:12px;cursor:pointer;font-weight:600;font-family:inherit;width:100%;margin-top:4px">+ Add Item</button>
+    </div>
+
+    <!-- GST -->
+    <div style="background:#0e1218;border:1px solid #1c2130;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:13px;font-weight:500">Include GST (10%) <span id="inv_gst_badge" style="font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;background:#3a1a1a;color:#fca5a5;margin-left:5px">OFF</span></div>
+      </div>
+      <input type="checkbox" id="inv_gst" onchange="updateInvGST()" style="width:18px;height:18px;accent-color:#3d8b3d;cursor:pointer">
+    </div>
+
+    <button onclick="generateAdminInvoice()" style="width:100%;padding:13px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#3d8b3d,#2a6b2a);color:#fff;margin-bottom:8px">Generate Invoice →</button>
+    <button onclick="resetAdminInvoice()" style="width:100%;padding:11px;border:1px solid #1c2130;border-radius:10px;font-size:13px;cursor:pointer;font-family:inherit;background:#0e1218;color:#6b7a6b">Reset</button>
+
+    <!-- Invoice Preview -->
+    <div id="inv_preview" style="display:none;margin-top:18px;background:#fff;border-radius:12px;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#f0f7f0,#e6f3e6);padding:20px 24px;border-bottom:3px solid #3d8b3d;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:#1a1a1a">DEUS LABOUR HIRE</div>
+          <div style="font-size:10px;color:#2a6b2a;letter-spacing:.1em;text-transform:uppercase;margin-top:3px">Moving &amp; Cleaning Services</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:20px;font-weight:700;color:#1a1a1a">TAX INVOICE</div>
+          <div style="font-size:12px;color:#555;margin-top:3px" id="inv_p_num"></div>
+        </div>
+      </div>
+      <div style="padding:20px 24px;color:#1a1a1a">
+        <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0eb">
+          <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">From</div>
+          <div style="font-size:14px;font-weight:700">Deus Labour Hire Pty Ltd</div>
+          <div style="font-size:11px;color:#666;line-height:1.7">Unit 10/6 Grosvenor St, Croydon NSW | ABN 62 665 081 783<br>0406 832 721 | deus.labour.hire@gmail.com</div>
+        </div>
+        <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0eb">
+          <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Bill To</div>
+          <div style="font-size:14px;font-weight:700" id="inv_p_client"></div>
+          <div style="font-size:11px;color:#666;line-height:1.7" id="inv_p_detail"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:#f8f8f5;padding:12px;border-radius:8px;margin-bottom:16px;text-align:center">
+          <div><div style="font-size:10px;color:#888;text-transform:uppercase">Date</div><div style="font-size:13px;font-weight:700" id="inv_p_date"></div></div>
+          <div><div style="font-size:10px;color:#888;text-transform:uppercase">Due</div><div style="font-size:13px;font-weight:700" id="inv_p_due"></div></div>
+          <div><div style="font-size:10px;color:#888;text-transform:uppercase">Duration</div><div style="font-size:13px;font-weight:700" id="inv_p_dur"></div></div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+          <thead><tr style="background:#f8f8f5">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">Description</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">QTY</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">Rate</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#888;text-transform:uppercase">Amount</th>
+          </tr></thead>
+          <tbody id="inv_p_items"></tbody>
+        </table>
+        <div style="margin-left:auto;width:240px;margin-bottom:16px" id="inv_p_totals"></div>
+        <div style="background:#f0f7f0;border:1px solid #c6e6c6;border-radius:8px;padding:14px;margin-bottom:14px">
+          <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Payment Information</div>
+          <div style="font-size:12px;color:#444">Account: <strong>Deus Labour Hire</strong> &nbsp;|&nbsp; BSB: <strong>062 188</strong> &nbsp;|&nbsp; Account No: <strong>1094 4013</strong><br>Reference: <strong id="inv_p_ref"></strong></div>
+        </div>
+        <div style="font-size:11px;color:#888;font-style:italic;border-top:1px solid #f0f0eb;padding-top:12px">Please note that the due date for this invoice is 7 business days from the date of the invoice. Thank you!</div>
+      </div>
+      <div style="display:flex;gap:10px;padding:14px 24px;background:#f8f8f5;border-top:1px solid #f0f0eb">
+        <button onclick="document.getElementById(&#39;inv_preview&#39;).style.display=&#39;none&#39;" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:8px;cursor:pointer;font-family:inherit;background:#fff;color:#666;font-size:13px">← Edit</button>
+        <button onclick="printAdminInvoice()" style="flex:2;padding:10px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#2a5a2a,#3d8b3d);color:#fff;font-size:13px;font-weight:600">🖨️ Print / PDF</button>
+        <button onclick="sendInvoiceEmail()" style="flex:2;padding:10px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;background:#1a3a5a;color:#93c5fd;font-size:13px;font-weight:600">📧 Send Email</button>
+      </div>
+    </div>
+  </div>
+
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <h3 id="modalTitle">Add New Job</h3>
-    <input type="hidden" id="editId"/>
-    <div class="field"><label>Full Name *</label><input id="mName" placeholder="Jane Smith"/></div>
-    <div class="field"><label>Phone *</label><input id="mPhone" placeholder="04xx xxx xxx"/></div>
-    <div class="field"><label>Email *</label><input id="mEmail" type="email" placeholder="jane@example.com"/></div>
+    <input type="hidden" id="editId">
+    <div class="field"><label>Full Name *</label><input id="mName" placeholder="Jane Smith"></div>
+    <div class="field"><label>Phone *</label><input id="mPhone" placeholder="04xx xxx xxx"></div>
+    <div class="field"><label>Email *</label><input id="mEmail" type="email" placeholder="jane@example.com"></div>
     <div class="modal-row">
-      <div class="field"><label>Date *</label><input id="mDate" type="date"/></div>
-      <div class="field"><label>Start Time *</label><input id="mTime" type="time"/></div>
+      <div class="field"><label>Date *</label><input id="mDate" type="date"></div>
+      <div class="field"><label>Start Time *</label><input id="mTime" type="time"></div>
     </div>
-    <div class="field"><label>Pick-up Address *</label><input id="mPickup"/></div>
-    <div class="field"><label>Drop-off Address *</label><input id="mDropoff"/></div>
+    <div class="field"><label>Pick-up Address *</label><input id="mPickup"></div>
+    <div class="field"><label>Drop-off Address *</label><input id="mDropoff"></div>
     <div class="field"><label>Notes</label><textarea id="mNotes"></textarea></div>
     <div class="field"><label>Status</label>
       <select id="mStatus">
@@ -483,6 +663,7 @@ function renderClients(){
           ${(isDue||isSoon)&&!b.reminder_sent?`<button class="action-btn" style="background:var(--black);color:#fff" onclick="sendReminder('${bId}')">📧 Send 10% Offer</button>`:''}
           <button class="action-btn" style="background:var(--info-bg);color:var(--info)" onclick="openEditModal('${bId}')">✏ Edit</button>
           <button class="action-btn" style="background:#1a3a1a;color:#86efac" onclick="downloadDoc('${bId}')">📄 Download</button>
+          <button class="action-btn" style="background:#1a2a3a;color:#93c5fd" onclick="createInvoice('${bId}')">🧾 Invoice</button>
           <button class="action-btn" style="background:var(--danger-bg);color:var(--danger)" onclick="deleteJob('${bId}')">🗑 Delete</button>
         </div>
       </div>
@@ -516,7 +697,7 @@ async function saveJob(){
   closeModal();renderAll();
 }
 
-function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Calendar','Clients','Docs','Calc'].forEach(t=>$('tab'+t).style.display='none');$('tab'+name).style.display='block';}
+function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Calendar','Clients','Docs','Calc','Invoice'].forEach(t=>$('tab'+t).style.display='none');$('tab'+name).style.display='block';}
 function switchDoc(name){$('docContent').textContent=name==='tc'?TERMS_TEXT:SA_TEXT;$('docTabTC').className='doc-tab-btn'+(name==='tc'?' active':'');$('docTabSA').className='doc-tab-btn'+(name==='sa'?' active':'');}
 function fmtTime(t){if(!t)return '';const[h,m]=t.split(':'),hr=parseInt(h);return `${hr>12?hr-12:hr||12}:${m} ${hr>=12?'PM':'AM'}`;}
 $('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
@@ -619,6 +800,7 @@ function openDayModal(day){
     if(b.status!=='completed')html+='<button onclick="markDone(&quot;'+bId+'&quot;);closeDayModal()" style="padding:6px 12px;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit;background:#1a3a1a;color:#86efac">✓ Complete</button>';
     html+='<button onclick="openEditModal(&quot;'+bId+'&quot;);closeDayModal()" style="padding:6px 12px;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit;background:#1e2a3a;color:#93c5fd">✏ Edit</button>';
     html+='<button onclick="downloadDoc(&quot;'+bId+'&quot;)" style="padding:6px 12px;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit;background:#1a3a1a;color:#86efac">📄 Download</button>';
+    html+='<button onclick="createInvoice(&quot;'+bId+'&quot;);closeDayModal()" style="padding:6px 12px;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit;background:#1a2a3a;color:#93c5fd">🧾 Invoice</button>';
     html+='<button onclick="deleteJob(&quot;'+bId+'&quot;);closeDayModal()" style="padding:6px 12px;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit;background:#3a0f0f;color:#fca5a5">🗑 Delete</button>';
     html+='</div></div>';
   });
@@ -704,6 +886,204 @@ function downloadDoc(id){
   document.body.appendChild(a);a.click();document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// ── INVOICE TAB ──────────────────────────────────────────────────────────────
+var invExtraCount = 0;
+
+function toggleInvFixed(){
+  var on = document.getElementById('inv_fixed').checked;
+  document.getElementById('inv_fixed_fields').style.display = on ? 'block' : 'none';
+  var jobRows = document.querySelectorAll('#tabInvoice .row');
+}
+
+function updateInvGST(){
+  var on = document.getElementById('inv_gst').checked;
+  var badge = document.getElementById('inv_gst_badge');
+  badge.textContent = on ? 'ON' : 'OFF';
+  badge.style.background = on ? '#1a3a1a' : '#3a1a1a';
+  badge.style.color = on ? '#86efac' : '#fca5a5';
+}
+
+function addInvExtra(){
+  var id = 'invex' + (invExtraCount++);
+  var div = document.createElement('div');
+  div.id = id;
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 100px 36px;gap:8px;margin-bottom:8px;align-items:center';
+  var i1 = document.createElement('input');
+  i1.type = 'text'; i1.placeholder = 'Description'; i1.id = id+'d';
+  i1.style.cssText = 'background:#0e1218;border:1px solid #1c2130;border-radius:7px;padding:8px 10px;color:#e8f0e8;font-size:13px;font-family:inherit;outline:none';
+  var i2 = document.createElement('input');
+  i2.type = 'number'; i2.placeholder = '$0'; i2.id = id+'a'; i2.min='0'; i2.step='0.01';
+  i2.style.cssText = 'background:#0e1218;border:1px solid #1c2130;border-radius:7px;padding:8px 10px;color:#e8f0e8;font-size:13px;font-family:inherit;outline:none';
+  var btn = document.createElement('button');
+  btn.textContent = '✕';
+  btn.style.cssText = 'background:#3a0f0f;color:#fca5a5;border:none;border-radius:7px;padding:8px;cursor:pointer;font-size:13px';
+  btn.addEventListener('click', function(){ div.remove(); });
+  div.appendChild(i1); div.appendChild(i2); div.appendChild(btn);
+  document.getElementById('inv_extras').appendChild(div);
+}
+
+function createInvoice(id){
+  var b = bookings.find(function(x){ return String(x.id)===String(id); });
+  if(!b) return;
+  // Switch to invoice tab
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('.tab').forEach(function(t){ if(t.textContent.includes('Invoice')) t.classList.add('active'); });
+  ['Calendar','Clients','Docs','Calc','Invoice'].forEach(function(n){ var el=$('tab'+n); if(el) el.style.display='none'; });
+  $('tabInvoice').style.display = 'block';
+  // Auto-fill data
+  document.getElementById('inv_client').value = b.name || '';
+  document.getElementById('inv_pickup').value = b.pickup_address || '';
+  document.getElementById('inv_dropoff').value = b.dropoff_address || '';
+  document.getElementById('inv_phone').value = b.phone || '';
+  document.getElementById('inv_email').value = b.email || '';
+  document.getElementById('inv_start').value = b.start_time || '';
+  document.getElementById('inv_desc').value = 'Removal service';
+  // Set date
+  if(b.date) document.getElementById('inv_date').value = b.date;
+  // Set due date (7 days later)
+  if(b.date){
+    var d = new Date(b.date+'T00:00:00');
+    d.setDate(d.getDate()+7);
+    document.getElementById('inv_due').value = d.toISOString().split('T')[0];
+  }
+  // Reset preview
+  document.getElementById('inv_preview').style.display = 'none';
+  window.scrollTo({top:0,behavior:'smooth'});
+  showToast('Client data loaded! Add finish time to generate invoice.');
+}
+
+function generateAdminInvoice(){
+  var clientName = document.getElementById('inv_client').value.trim();
+  var isFixed = document.getElementById('inv_fixed').checked;
+  var start = document.getElementById('inv_start').value;
+  var finish = document.getElementById('inv_finish').value;
+
+  if(!clientName){ showToast('Please enter client name.'); return; }
+
+  var gst = document.getElementById('inv_gst').checked;
+  var rate = parseFloat(document.getElementById('inv_rate').value)||150;
+  var callout = parseFloat(document.getElementById('inv_callout').value)||0;
+  var desc = document.getElementById('inv_desc').value.trim()||'Removal Service';
+
+  function fmtT(h,m){ return (h>12?h-12:(h||12))+':'+(m<10?'0'+m:m)+' '+(h>=12?'PM':'AM'); }
+  function fmtD(str){ if(!str)return '-'; var d=new Date(str+'T00:00:00'); return d.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}); }
+
+  var extras=[];
+  document.querySelectorAll('#inv_extras > div').forEach(function(el){
+    var d=el.querySelector('[id$="d"]'), a=el.querySelector('[id$="a"]');
+    if(d&&a){ var dv=d.value.trim(),av=parseFloat(a.value)||0; if(dv&&av>0) extras.push({desc:dv,amt:av}); }
+  });
+  var extTotal = extras.reduce(function(s,e){return s+e.amt;},0);
+
+  var subtotal, rows='', durStr='-';
+
+  if(isFixed){
+    var fixedAmt = parseFloat(document.getElementById('inv_fixed_amt').value)||0;
+    if(!fixedAmt){ showToast('Please enter fixed price amount.'); return; }
+    var fixedDesc = document.getElementById('inv_fixed_desc').value.trim()||'Removal Service — Fixed Price';
+    subtotal = fixedAmt + extTotal;
+    rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+fixedDesc+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Fixed</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+fixedAmt.toFixed(2)+'</td></tr>';
+    durStr = '—';
+  } else {
+    if(!start||!finish){ showToast('Please enter start and finish times.'); return; }
+    var sh=parseInt(start.split(':')[0]),sm=parseInt(start.split(':')[1]);
+    var fh=parseInt(finish.split(':')[0]),fm=parseInt(finish.split(':')[1]);
+    var sM=sh*60+sm,fM=fh*60+fm;
+    if(fM<sM) fM+=1440;
+    var totalMins=fM-sM, hours=totalMins/60;
+    var hrs=Math.floor(hours),mins=totalMins%60;
+    durStr = hrs>0?(mins>0?hrs+'h '+mins+'min':hrs+'h'):mins+'min';
+    var labour=hours*rate;
+    subtotal=labour+callout+extTotal;
+    rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+desc+'<br><small style="color:#888">'+fmtT(sh,sm)+' – '+fmtT(fh,fm)+'</small></td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+hours.toFixed(2)+'h</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+rate.toFixed(2)+'/hr</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+labour.toFixed(2)+'</td></tr>';
+    if(callout>0) rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Call Out Fee</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+callout.toFixed(2)+'</td></tr>';
+  }
+
+  extras.forEach(function(e){ rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+e.desc+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+e.amt.toFixed(2)+'</td></tr>'; });
+
+  var gstAmt=gst?subtotal*0.1:0, total=subtotal+gstAmt;
+
+  // Fill preview
+  var num=document.getElementById('inv_num').value;
+  document.getElementById('inv_p_num').textContent=num;
+  document.getElementById('inv_p_client').textContent=clientName;
+  document.getElementById('inv_p_date').textContent=fmtD(document.getElementById('inv_date').value);
+  document.getElementById('inv_p_due').textContent=fmtD(document.getElementById('inv_due').value);
+  document.getElementById('inv_p_dur').textContent=durStr;
+  document.getElementById('inv_p_ref').textContent=clientName.split(' ')[0].toUpperCase()+'_'+num;
+
+  var det='';
+  var pu=document.getElementById('inv_pickup').value.trim();
+  var dr=document.getElementById('inv_dropoff').value.trim();
+  var ph=document.getElementById('inv_phone').value.trim();
+  var em=document.getElementById('inv_email').value.trim();
+  if(pu) det+='From: '+pu+'<br>';
+  if(dr) det+='To: '+dr+'<br>';
+  if(ph) det+=ph+'<br>';
+  if(em) det+=em;
+  document.getElementById('inv_p_detail').innerHTML=det;
+  document.getElementById('inv_p_items').innerHTML=rows;
+
+  var totals='';
+  totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>Subtotal</span><span>$'+subtotal.toFixed(2)+'</span></div>';
+  if(gst) totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>GST (10%)</span><span>$'+gstAmt.toFixed(2)+'</span></div>';
+  totals+='<div style="display:flex;justify-content:space-between;padding:10px 0 4px;font-size:16px;font-weight:700;color:#1a1a1a;border-top:2px solid #1a1a1a;margin-top:4px"><span>TOTAL DUE</span><span>AUD $'+total.toFixed(2)+'</span></div>';
+  if(gst) totals+='<div style="font-size:11px;color:#888;text-align:right;margin-top:3px">GST included: $'+gstAmt.toFixed(2)+'</div>';
+  document.getElementById('inv_p_totals').innerHTML=totals;
+
+  document.getElementById('inv_preview').style.display='block';
+  document.getElementById('inv_preview').scrollIntoView({behavior:'smooth'});
+}
+
+function resetAdminInvoice(){
+  ['inv_client','inv_pickup','inv_dropoff','inv_phone','inv_email','inv_start','inv_finish','inv_desc'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('inv_rate').value='150';
+  document.getElementById('inv_callout').value='0';
+  document.getElementById('inv_gst').checked=false;
+  document.getElementById('inv_fixed').checked=false;
+  document.getElementById('inv_fixed_fields').style.display='none';
+  document.getElementById('inv_extras').innerHTML='';
+  document.getElementById('inv_preview').style.display='none';
+  updateInvGST();
+}
+
+function printAdminInvoice(){
+  var preview = document.getElementById('inv_preview');
+  var w = window.open('','_blank');
+  w.document.write('<html><head><title>Invoice</title><style>body{font-family:Arial,sans-serif;margin:20px}table{width:100%;border-collapse:collapse}</style></head><body>');
+  w.document.write(preview.innerHTML);
+  w.document.write('</body></html>');
+  w.document.close();
+  w.print();
+}
+
+async function sendInvoiceEmail(){
+  var email = document.getElementById('inv_email').value.trim();
+  var client = document.getElementById('inv_client').value.trim();
+  var num = document.getElementById('inv_num').value;
+  if(!email){ showToast('Please enter client email first.'); return; }
+
+  var preview = document.getElementById('inv_preview');
+  var invoiceHtml = '<div style="font-family:Arial,sans-serif;max-width:650px;margin:0 auto">'+preview.innerHTML+'</div>';
+
+  showToast('Sending email...');
+  try{
+    var res = await fetch('https://amnacoyjgdfykdfepkze.supabase.co/functions/v1/resend-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        to:email,
+        subject:'Invoice '+num+' — Deus Labour Hire',
+        invoiceHtml:invoiceHtml
+      })
+    });
+    var data = await res.json();
+    if(data.id||res.ok){ showToast('Invoice sent to '+email+' ✓'); }
+    else { throw new Error(data.message||'Failed'); }
+  }catch(e){ showToast('Error: '+e.message); }
+}
 </script>
-</body>
-</html>
+
+
+</body></html>
