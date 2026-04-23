@@ -61,8 +61,8 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
 .stat-val{font-size:28px;font-weight:800;line-height:1}
 .stat-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-top:5px;font-weight:700}
 
-.tabs{display:flex;gap:4px;background:var(--white);border-radius:11px;padding:5px;box-shadow:var(--shadow);margin-bottom:14px;border:1.5px solid var(--border)}
-.tab{flex:1;background:transparent;border:none;color:var(--text-light);border-radius:7px;padding:9px 4px;font-size:11px;cursor:pointer;font-family:inherit;text-align:center;font-weight:600;transition:all .2s}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;background:var(--white);border-radius:11px;padding:5px;box-shadow:var(--shadow);margin-bottom:14px;border:1.5px solid var(--border)}
+.tab{flex:1;min-width:calc(33% - 4px);background:transparent;border:none;color:var(--text-light);border-radius:7px;padding:9px 4px;font-size:11px;cursor:pointer;font-family:inherit;text-align:center;font-weight:600;transition:all .2s}
 .tab.active{background:var(--black);color:#fff}
 
 .search{width:100%;background:var(--white);border:1.5px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);font-size:14px;outline:none;font-family:inherit;margin-bottom:13px;transition:border .2s}
@@ -424,6 +424,77 @@ These Terms and Conditions are governed by the laws of Australia.</div>
     </div>
   </div>
 
+
+  <div id="tabDraw" style="display:none">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:11px;color:#3d8b3d;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">🚛 Deus Labour Hire</div>
+      <div style="font-family:var(--font-serif,serif);font-size:28px;font-weight:700;line-height:1.1">MONTHLY<br><span style="color:#3d8b3d">DRAW 🎁</span></div>
+      <div style="font-size:13px;color:#6b7a6b;margin-top:6px;font-style:italic">Don't Stress, We Do the Rest!</div>
+    </div>
+
+    <!-- Prize Card -->
+    <div style="background:linear-gradient(135deg,#3d8b3d,#2a5a2a);border-radius:14px;padding:18px 20px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 6px 24px rgba(61,122,42,.3)">
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:4px">🏆 Monthly Prize</div>
+        <div style="font-size:48px;font-weight:700;color:#fff;line-height:1">$100</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.65);margin-top:2px">Gift Card — End of month</div>
+      </div>
+      <div style="font-size:50px">🎁</div>
+    </div>
+
+    <!-- Load from Supabase -->
+    <button onclick="loadDrawClients()" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:#1a3a1a;color:#86efac;margin-bottom:12px">🔄 Load This Month's Clients</button>
+
+    <!-- Manual add -->
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input type="text" id="drawNameInput" placeholder="Add client name manually..." style="flex:1;background:#0e1218;border:1px solid #1c2130;border-radius:8px;padding:10px 12px;color:#e8f0e8;font-size:14px;font-family:inherit;outline:none"/>
+      <button onclick="addDrawParticipant()" style="background:#3d8b3d;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ Add</button>
+    </div>
+
+    <!-- Participants -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:11px;color:#6b7a6b;font-weight:700;text-transform:uppercase;letter-spacing:.07em">Participants</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="drawCountBadge" style="background:#1a3a1a;color:#86efac;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px">0 clients</span>
+        <button onclick="clearDrawAll()" style="background:none;border:1px solid #3a1a1a;color:#fca5a5;font-size:11px;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:inherit">Clear</button>
+      </div>
+    </div>
+    <div id="drawChips" style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;margin-bottom:18px">
+      <div style="font-size:13px;color:#6b7a6b;font-style:italic;padding:8px 0">No clients yet — load or add above 👆</div>
+    </div>
+
+    <!-- Draw Button -->
+    <button id="drawBtn" onclick="startDraw()" disabled style="width:100%;padding:18px;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#3d8b3d,#2a5a2a);color:#fff;letter-spacing:2px;text-transform:uppercase;box-shadow:0 6px 24px rgba(61,122,42,.3);opacity:.4">🎲 Draw Monthly Winner</button>
+
+    <!-- Drum Roll -->
+    <div id="drawDrum" style="display:none;background:#0e1218;border:1px solid #1c2130;border-radius:14px;padding:22px;text-align:center;margin-top:14px">
+      <div style="font-size:10px;color:#6b7a6b;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">🎰 Drawing…</div>
+      <div id="drawRolling" style="font-size:34px;font-weight:700;color:#3d8b3d;letter-spacing:2px;min-height:44px">—</div>
+    </div>
+
+    <!-- Winner -->
+    <div id="drawWinner" style="display:none;background:#0a1a0a;border:2px solid #3d8b3d;border-radius:16px;padding:28px 20px;text-align:center;margin-top:14px">
+      <div style="font-size:28px;margin-bottom:8px">🎉🎊🥳</div>
+      <div style="font-size:10px;color:#3d8b3d;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">✨ This Month's Winner ✨</div>
+      <div id="drawWinnerName" style="font-size:40px;font-weight:700;color:#e8f0e8;letter-spacing:2px;margin-bottom:14px">—</div>
+      <div style="background:#1a3a1a;border:1px solid #2a5a2a;border-radius:12px;padding:12px 20px;display:inline-block;margin-bottom:16px">
+        <div style="font-size:11px;color:#6b7a6b;margin-bottom:4px">Wins a</div>
+        <div style="font-size:28px;font-weight:700;color:#86efac">$100 Gift Card 💳</div>
+      </div>
+      <button onclick="announceDrawWinner()" style="display:block;width:100%;background:#1a3a1a;color:#86efac;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:10px">🔊 Announce Winner</button>
+      <button onclick="resetDraw()" style="display:block;width:100%;background:#0e1218;border:1px solid #1c2130;color:#6b7a6b;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;font-family:inherit">🔄 New Draw</button>
+    </div>
+
+    <!-- History -->
+    <div id="drawHistorySection" style="display:none;margin-top:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:11px;color:#6b7a6b;font-weight:700;text-transform:uppercase;letter-spacing:.07em">Previous Winners</div>
+        <button onclick="clearDrawHistory()" style="background:none;border:1px solid #3a1a1a;color:#fca5a5;font-size:11px;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:inherit">🗑 Clear History</button>
+      </div>
+      <div id="drawHistList" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+  </div>
+
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <h3 id="modalTitle">Add New Job</h3>
@@ -697,7 +768,7 @@ async function saveJob(){
   closeModal();renderAll();
 }
 
-function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Calendar','Clients','Docs','Calc','Invoice'].forEach(t=>$('tab'+t).style.display='none');$('tab'+name).style.display='block';}
+function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Calendar','Clients','Docs','Calc','Invoice','Draw'].forEach(t=>$('tab'+t).style.display='none');$('tab'+name).style.display='block';}
 function switchDoc(name){$('docContent').textContent=name==='tc'?TERMS_TEXT:SA_TEXT;$('docTabTC').className='doc-tab-btn'+(name==='tc'?' active':'');$('docTabSA').className='doc-tab-btn'+(name==='sa'?' active':'');}
 function fmtTime(t){if(!t)return '';const[h,m]=t.split(':'),hr=parseInt(h);return `${hr>12?hr-12:hr||12}:${m} ${hr>=12?'PM':'AM'}`;}
 $('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
@@ -929,7 +1000,7 @@ function createInvoice(id){
   // Switch to invoice tab
   document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
   document.querySelectorAll('.tab').forEach(function(t){ if(t.textContent.includes('Invoice')) t.classList.add('active'); });
-  ['Calendar','Clients','Docs','Calc','Invoice'].forEach(function(n){ var el=$('tab'+n); if(el) el.style.display='none'; });
+  ['Calendar','Clients','Docs','Calc','Invoice','Draw'].forEach(function(n){ var el=$('tab'+n); if(el) el.style.display='none'; });
   $('tabInvoice').style.display = 'block';
   // Auto-fill data
   document.getElementById('inv_client').value = b.name || '';
@@ -1083,6 +1154,165 @@ async function sendInvoiceEmail(){
     else { throw new Error(data.message||'Failed'); }
   }catch(e){ showToast('Error: '+e.message); }
 }
+
+// ── MONTHLY DRAW ──────────────────────────────────────────────────────────────
+var drawParticipants = JSON.parse(localStorage.getItem('deus_draw_p') || '[]');
+var drawHistory = JSON.parse(localStorage.getItem('deus_draw_h') || '[]');
+var drawDrawing = false;
+var drawCurrentWinner = '';
+
+function saveDrawData(){
+  localStorage.setItem('deus_draw_p', JSON.stringify(drawParticipants));
+  localStorage.setItem('deus_draw_h', JSON.stringify(drawHistory));
+}
+
+function renderDraw(){
+  var chips = document.getElementById('drawChips');
+  var badge = document.getElementById('drawCountBadge');
+  var btn = document.getElementById('drawBtn');
+  if(!chips) return;
+  badge.textContent = drawParticipants.length + (drawParticipants.length===1?' client':' clients');
+  btn.disabled = drawParticipants.length < 2 || drawDrawing;
+  btn.style.opacity = (drawParticipants.length < 2 || drawDrawing) ? '0.4' : '1';
+  if(!drawParticipants.length){
+    chips.innerHTML = '<div style="font-size:13px;color:#6b7a6b;font-style:italic;padding:8px 0">No clients yet — load or add above 👆</div>';
+    return;
+  }
+  chips.innerHTML = drawParticipants.map(function(p,i){
+    return '<div style="display:flex;align-items:center;gap:7px;background:#0e1218;border:1px solid #1c2130;border-radius:30px;padding:6px 12px;font-size:13px;font-weight:700;color:#e8f0e8">'+
+      p+'<button onclick="removeDrawParticipant('+i+')" style="background:none;border:none;color:#6b7a6b;cursor:pointer;font-size:14px;padding:0;line-height:1">✕</button></div>';
+  }).join('');
+  renderDrawHistory();
+}
+
+function renderDrawHistory(){
+  var sec = document.getElementById('drawHistorySection');
+  var list = document.getElementById('drawHistList');
+  if(!sec||!list) return;
+  if(!drawHistory.length){ sec.style.display='none'; return; }
+  sec.style.display = 'block';
+  var medals = ['🥇','🥈','🥉'];
+  list.innerHTML = [...drawHistory].reverse().map(function(h,i){
+    return '<div style="background:#0e1218;border:1px solid #1c2130;border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px">'+
+      '<span>'+medals[i]||'🎖️'+'</span>'+
+      '<span style="font-weight:700;color:#86efac">'+h.name+'</span>'+
+      '<span style="color:#6b7a6b;font-size:11px">'+h.date+'</span></div>';
+  }).join('');
+}
+
+async function loadDrawClients(){
+  showToast("Loading clients for this month...");
+  var now = new Date();
+  var y = now.getFullYear(), m = now.getMonth()+1;
+  var from = y+'-'+(m<10?'0'+m:m)+'-01';
+  var last = new Date(y, m, 0).getDate();
+  var to = y+'-'+(m<10?'0'+m:m)+'-'+(last<10?'0'+last:last);
+  try{
+    var res = await fetch(SUPABASE_URL+'/rest/v1/bookings?date=gte.'+from+'&date=lte.'+to+'&status=eq.completed&select=name,status',{
+      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+    });
+    var data = await res.json();
+    if(!Array.isArray(data)||!data.length){ showToast('No clients found for this month.'); return; }
+    var names = data.map(function(b){ return b.name; });
+    // Add unique names only
+    names.forEach(function(n){
+      if(n && drawParticipants.indexOf(n)===-1) drawParticipants.push(n);
+    });
+    saveDrawData();
+    renderDraw();
+    showToast(names.length+' completed jobs this month! ✓');
+  }catch(e){
+    showToast('Error loading clients.');
+  }
+}
+
+function addDrawParticipant(){
+  var inp = document.getElementById('drawNameInput');
+  var name = inp.value.trim();
+  if(!name) return;
+  drawParticipants.push(name);
+  saveDrawData(); renderDraw();
+  inp.value=''; inp.focus();
+}
+
+function removeDrawParticipant(i){
+  drawParticipants.splice(i,1);
+  saveDrawData(); renderDraw();
+}
+
+function clearDrawAll(){
+  if(!drawParticipants.length||!confirm('Clear all participants?')) return;
+  drawParticipants=[];
+  saveDrawData(); renderDraw();
+  document.getElementById('drawWinner').style.display='none';
+  document.getElementById('drawDrum').style.display='none';
+}
+
+function clearDrawHistory(){
+  if(!confirm('Delete all draw history?')) return;
+  drawHistory=[];
+  saveDrawData(); renderDrawHistory();
+}
+
+function startDraw(){
+  if(drawParticipants.length<2||drawDrawing) return;
+  drawDrawing=true;
+  document.getElementById('drawBtn').disabled=true;
+  document.getElementById('drawBtn').style.opacity='0.4';
+  document.getElementById('drawWinner').style.display='none';
+  document.getElementById('drawDrum').style.display='block';
+
+  var rolling = document.getElementById('drawRolling');
+  var elapsed=0, duration=3200;
+  var iv = setInterval(function(){
+    rolling.textContent = drawParticipants[Math.floor(Math.random()*drawParticipants.length)];
+    elapsed+=90;
+    if(elapsed>=duration){
+      clearInterval(iv);
+      drawCurrentWinner = drawParticipants[Math.floor(Math.random()*drawParticipants.length)];
+      rolling.textContent = drawCurrentWinner;
+      setTimeout(function(){
+        document.getElementById('drawDrum').style.display='none';
+        document.getElementById('drawWinnerName').textContent=drawCurrentWinner;
+        document.getElementById('drawWinner').style.display='block';
+        var now=new Date();
+        drawHistory.push({name:drawCurrentWinner,date:now.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'})});
+        saveDrawData(); renderDrawHistory();
+        drawDrawing=false;
+        setTimeout(announceDrawWinner,600);
+      },450);
+    }
+  },90);
+}
+
+function announceDrawWinner(){
+  if(!drawCurrentWinner||!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  var msg=new SpeechSynthesisUtterance();
+  msg.text='And the winner of this month one hundred dollar gift card is... '+drawCurrentWinner+'! Congratulations! Thank you for choosing Deus Labour Hire!';
+  msg.lang='en-AU'; msg.rate=0.88; msg.pitch=1.05; msg.volume=1;
+  var voices=window.speechSynthesis.getVoices();
+  var v=voices.find(function(v){return v.lang.startsWith('en-AU');})||voices.find(function(v){return v.lang.startsWith('en');});
+  if(v) msg.voice=v;
+  window.speechSynthesis.speak(msg);
+}
+
+function resetDraw(){
+  document.getElementById('drawWinner').style.display='none';
+  window.speechSynthesis&&window.speechSynthesis.cancel();
+  drawDrawing=false; drawCurrentWinner='';
+  renderDraw();
+}
+
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&document.activeElement===document.getElementById('drawNameInput')) addDrawParticipant();
+});
+
+window.speechSynthesis&&window.speechSynthesis.getVoices();
+window.speechSynthesis&&(window.speechSynthesis.onvoiceschanged=function(){ window.speechSynthesis.getVoices(); });
+
+// Init draw on load
+setTimeout(function(){ renderDraw(); renderDrawHistory(); }, 500);
 </script>
 
 
