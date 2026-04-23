@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<!-- saved from url=(0049)file:///C:/Users/jeffe/Downloads/admin%20(1).html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Deus Labour Hire</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --black:#111111;
+  --dark:#1c1c1c;
+  --green:#22b022;
+  --green-dark:#1a8a1a;
+  --orange-light:#fdf3e0;
+  --bg:#f5f5f5;
+  --white:#ffffff;
+  --text:#111111;
+  --text-mid:#555555;
+  --text-light:#999999;
+  --border:#e0e0e0;
+  --success:#1a7a4a;
+  --success-bg:#edf7f1;
+  --warn:#b45309;
+  --warn-bg:#fffbeb;
+  --danger:#c0392b;
+  --danger-bg:#fef2f2;
+  --info-bg:#eff6ff;
+  --info:#1d4ed8;
+  --shadow:0 2px 10px rgba(0,0,0,0.07);
+  --shadow-card:0 4px 22px rgba(0,0,0,0.10);
+}
+body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,sans-serif;min-height:100vh}
+
+.header{background:var(--black);position:sticky;top:0;z-index:200}
+.header-inner{max-width:960px;margin:0 auto;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+.brand{display:flex;align-items:center;gap:12px}
+.logo-img{height:36px;width:auto}
+.brand-sub{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:.09em;text-transform:uppercase;margin-top:2px}
+.hdr-btns{display:flex;gap:8px}
+.btn{padding:9px 16px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;letter-spacing:.02em}
+.btn-primary{background:var(--green);color:#fff}
+.btn-primary:hover{background:var(--green-dark)}
+.btn-outline{background:transparent;border:1.5px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6)}
+.btn-outline:hover{border-color:rgba(255,255,255,0.5);color:#fff}
+
+#loginScreen{display:flex;align-items:center;justify-content:center;min-height:90vh;padding:20px}
+.login-card{background:var(--white);border-radius:18px;box-shadow:var(--shadow-card);padding:36px 30px;width:100%;max-width:380px;text-align:center}
+.login-logo{height:56px;margin:0 auto 18px;display:block}
+.login-card h2{font-size:20px;font-weight:800;color:var(--black);margin-bottom:6px}
+.login-card p{font-size:13px;color:var(--text-mid);margin-bottom:22px}
+.login-card input{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;outline:none;font-family:inherit;margin-bottom:12px;transition:border .2s}
+.login-card input:focus{border-color:var(--black)}
+.btn-login{width:100%;padding:13px;border:none;border-radius:10px;background:var(--black);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .2s}
+.btn-login:hover{background:var(--dark)}
+.login-err{font-size:12px;color:var(--danger);margin-top:10px;display:none;font-weight:500}
+
+#app{display:none;max-width:960px;margin:0 auto;padding:0 16px 60px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:18px 0 14px}
+.stat{background:var(--white);border-radius:12px;padding:16px;text-align:center;box-shadow:var(--shadow);border:1.5px solid var(--border)}
+.stat-val{font-size:28px;font-weight:800;line-height:1}
+.stat-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-top:5px;font-weight:700}
+
+.tabs{display:flex;flex-wrap:wrap;gap:4px;background:var(--white);border-radius:11px;padding:5px;box-shadow:var(--shadow);margin-bottom:14px;border:1.5px solid var(--border)}
+.tab{flex:1;min-width:calc(33% - 4px);background:transparent;border:none;color:var(--text-light);border-radius:7px;padding:9px 4px;font-size:11px;cursor:pointer;font-family:inherit;text-align:center;font-weight:600;transition:all .2s}
+.tab.active{background:var(--black);color:#fff}
+
+.search{width:100%;background:var(--white);border:1.5px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);font-size:14px;outline:none;font-family:inherit;margin-bottom:13px;transition:border .2s}
+.search:focus{border-color:var(--black)}
+
+.card{background:var(--white);border:1.5px solid var(--border);border-radius:13px;overflow:hidden;margin-bottom:9px;box-shadow:var(--shadow);transition:box-shadow .2s}
+.card:hover{box-shadow:var(--shadow-card)}
+.card-header{padding:14px 15px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.avatar{width:38px;height:38px;border-radius:50%;background:var(--black);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.card-name{font-size:14px;color:var(--text);font-weight:700;margin-left:11px}
+.card-meta{font-size:11px;color:var(--text-mid);margin-top:2px;margin-left:11px}
+.badge{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;white-space:nowrap}
+.card-body{border-top:1.5px solid var(--border);padding:14px 15px;display:none;background:rgba(245,245,245,0.5)}
+.card-body.open{display:block}
+
+.info-box{background:var(--white);border:1px solid var(--border);border-radius:9px;padding:12px 13px;margin-bottom:9px}
+.info-title{font-size:10px;color:var(--text-light);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;font-weight:700}
+.info-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:5px}
+.info-key{font-size:11px;color:var(--text-mid);flex-shrink:0}
+.info-val{font-size:12px;color:var(--text);text-align:right;word-break:break-all;font-weight:600}
+
+.action-btns{display:flex;gap:7px;flex-wrap:wrap;margin-top:2px}
+.action-btn{padding:7px 12px;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-weight:700;font-family:inherit;transition:filter .2s}
+.action-btn:hover{filter:brightness(0.92)}
+
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.cal-nav h3{font-size:18px;font-weight:800;color:var(--black)}
+.cal-nav-btn{background:var(--white);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:7px 13px;cursor:pointer;font-size:16px;transition:all .2s}
+.cal-nav-btn:hover{background:var(--black);color:#fff;border-color:var(--black)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-day-label{text-align:center;font-size:10px;color:var(--text-light);padding:4px 0;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.cal-cell{min-height:56px;border-radius:7px;padding:5px;background:var(--white);border:1.5px solid transparent}
+.cal-cell.today{border-color:var(--green);background:var(--green-light)}
+.cal-cell.empty{background:transparent}
+.cal-num{font-size:11px;text-align:right;color:var(--text-light);font-weight:600}
+.cal-cell.today .cal-num{color:var(--green-dark);font-weight:800}
+.cal-event{font-size:9px;border-radius:4px;padding:2px 4px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.cal-jobs{margin-top:16px;border-top:1.5px solid var(--border);padding-top:13px}
+.cal-job-row{padding:10px 0;border-bottom:1px solid var(--border)}
+.cal-job-row:last-child{border-bottom:none}
+
+.doc-tab-btns{display:flex;gap:6px;margin-bottom:13px}
+.doc-tab-btn{flex:1;padding:10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;border:1.5px solid var(--border);background:var(--white);color:var(--text-mid)}
+.doc-tab-btn.active{background:var(--black);color:#fff;border-color:var(--black)}
+.doc-view{background:var(--white);border:1.5px solid var(--border);border-radius:11px;padding:18px;font-size:12px;color:var(--text-mid);line-height:1.8;white-space:pre-wrap;max-height:500px;overflow-y:auto;font-family:inherit}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(17,17,17,0.65);z-index:500;align-items:center;justify-content:center;padding:14px;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--white);border-radius:18px;width:100%;max-width:500px;max-height:92vh;overflow-y:auto;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,0.25)}
+.modal h3{font-size:18px;font-weight:800;color:var(--black);margin-bottom:18px}
+.field{margin-bottom:13px}
+.field label{font-size:10px;font-weight:700;color:var(--text-mid);display:block;margin-bottom:5px;letter-spacing:.07em;text-transform:uppercase}
+.field input,.field textarea,.field select{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:14px;outline:none;font-family:inherit;transition:border .2s}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--black)}
+.field textarea{resize:vertical;min-height:58px}
+.modal-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modal-btns{display:flex;gap:10px;margin-top:8px}
+.modal-btns .btn-cancel{flex:1;padding:12px;background:var(--bg);border:1.5px solid var(--border);color:var(--text-mid);font-weight:700;border-radius:9px}
+.modal-btns .btn-save{flex:2;padding:12px;background:var(--black);color:#fff;font-weight:700;border-radius:9px;border:none;cursor:pointer;font-family:inherit}
+.modal-btns .btn-save:hover{background:var(--dark)}
+
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:var(--black);color:#fff;border-radius:10px;padding:10px 20px;z-index:2000;font-size:13px;font-weight:600;box-shadow:var(--shadow-card);display:none;white-space:nowrap;border:1px solid rgba(232,160,32,0.4)}
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="brand">
+      <img src="./logo.png" alt="Deus Labour Hire" class="logo-img" onerror="this.outerHTML=&#39;&lt;div style=\&#39;font-size:15px;color:#fff;font-weight:800\&#39;&gt;Deus Labour Hire&lt;/div&gt;&#39;">
+      <div class="brand-sub">Admin Panel</div>
+    </div>
+    <div class="hdr-btns">
+      <button class="btn btn-primary" onclick="openAddModal()">+ Add Job</button>
+      <button class="btn btn-outline" onclick="logout()">Logout</button>
+    </div>
+  </div>
+</div>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <img src="./logo.png" alt="Deus Labour Hire" class="login-logo" onerror="this.style.display=&#39;none&#39;">
+    <h2>Admin Login</h2>
+    <p>Enter the password to access the panel</p>
+    <input type="password" id="passInput" placeholder="Password" onkeydown="if(event.key===&#39;Enter&#39;)login()">
+    <button class="btn-login" onclick="login()">Login →</button>
+    <div class="login-err" id="loginErr">Incorrect password. Please try again.</div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="stats">
+    <div class="stat"><div class="stat-val" style="color:var(--info)" id="statUpcoming">0</div><div class="stat-lbl" style="color:var(--info)">Upcoming</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--success)" id="statDone">0</div><div class="stat-lbl" style="color:var(--success)">Completed</div></div>
+    <div class="stat" id="statRemBox"><div class="stat-val" id="statRem" style="color:var(--text-light)">0</div><div class="stat-lbl" id="statRemLbl" style="color:var(--text-light)">Reminders</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab(&#39;Calendar&#39;,this)">📅 Calendar</button>
+    <button class="tab" onclick="switchTab(&#39;Clients&#39;,this)">👥 Clients</button>
+    <button class="tab" onclick="switchTab(&#39;Docs&#39;,this)">📄 Docs</button>
+    <button class="tab" onclick="switchTab(&#39;Calc&#39;,this)">🧮 Calc</button>
+    <button class="tab" onclick="switchTab(&#39;Invoice&#39;,this)">🧾 Invoice</button>
+    <button class="tab" onclick="switchTab('Draw',this)">🎁 Draw</button>
+  </div>
+
+  <div id="tabCalendar">
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="calNav(-1)">‹</button>
+      <h3 id="calTitle"></h3>
+      <button class="cal-nav-btn" onclick="calNav(1)">›</button>
+    </div>
+    <div class="cal-grid" id="calDayLabels"></div>
+    <div class="cal-grid" id="calCells" style="margin-top:3px"></div>
+    <div class="cal-jobs" id="calJobs"></div>
+  </div>
+
+  <div id="tabClients" style="display:none">
+    <input class="search" id="searchInput" placeholder="Search by name, email or phone..." oninput="renderClients()">
+    <div id="clientList"></div>
+  </div>
+
+  <div id="tabDocs" style="display:none">
+    <div class="doc-tab-btns">
+      <button class="doc-tab-btn active" id="docTabTC" onclick="switchDoc(&#39;tc&#39;)">Terms &amp; Conditions</button>
+      <button class="doc-tab-btn" id="docTabSA" onclick="switchDoc(&#39;sa&#39;)">Service Agreement</button>
+    </div>
+    <div class="doc-view" id="docContent">DEUS LABOUR HIRE
+Moving &amp; Cleaning Services
+Email: deus.labour.hire@gmail.com
+
+TERMS AND CONDITIONS - REMOVAL SERVICES
+
+Acceptance of Terms
+By booking or accepting our services, the client confirms that they have read, understood, and agreed to these Terms and Conditions.
+
+Duty of Care
+Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client's belongings. However, removal services involve inherent risks and minor damage may occasionally occur despite reasonable care.
+
+Condition of Goods
+The client confirms that all items provided for transport are in a condition suitable for removal unless otherwise disclosed prior to the move.
+
+Client Packing Responsibility
+Items packed by the client are transported at the client's risk unless damage is directly caused by proven negligence during handling by our staff.
+
+Fragile and High-Risk Items
+Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics require special care and must be disclosed before the move.
+
+Television and Electronic Equipment
+Modern televisions are extremely fragile and may suffer internal panel damage even when handled with reasonable care. Televisions should ideally be transported in original packaging.
+
+Disclosure of High-Value Items
+Items valued above $800 must be disclosed prior to the move.
+
+Safe Transport and Additional Trips
+If fragile items cannot be safely transported due to limited truck space, Deus Labour Hire may transport them in a separate load.
+
+Refusal to Move Unsafe Items
+Deus Labour Hire reserves the right to refuse items considered unsafe for transport.
+
+Pre-Existing Damage
+Deus Labour Hire is not responsible for items that were already damaged before the move.
+
+Liability for Loss or Damage
+If damage occurs due to negligence during the service, liability will be assessed based on the fair market value of the item at the time of the move considering age, condition and depreciation. Nothing in these Terms and Conditions excludes, restricts or modifies any rights that the client may have under the Australian Consumer Law.
+
+Transit Insurance
+Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited subject to the policy terms and conditions.
+
+Insurance Claims
+If a claim is submitted to the insurer the final decision regarding compensation will be determined by the insurance company.
+
+Claims Procedure
+Any claim must be reported within 24 hours after completion of the move and include photographs and a description of the damage.
+
+Resolution of Claims
+Resolution may include repair, replacement with the same model, similar second-hand replacement or payment of the fair market value.
+
+Access and Safety
+The client must ensure safe access to the property. Additional charges may apply for stairs or restricted access.
+
+Heavy Items
+Items over 100kg must be disclosed before the move.
+
+Payment Terms
+Payment is due upon completion of the service unless otherwise agreed.
+
+Governing Law
+These Terms and Conditions are governed by the laws of Australia.</div>
+  </div>
+</div>
+
+  <div id="tabCalc" style="display:none">
+    <div style="font-size:16px;font-weight:700;margin-bottom:14px;color:#e8f0e8">🧮 Job Calculator</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div class="field" style="margin-bottom:0"><label>Start Time</label><input type="time" id="cStart" style="padding:8px 10px;font-size:13px"></div>
+      <div class="field" style="margin-bottom:0"><label>Finish Time</label><input type="time" id="cFinish" style="padding:8px 10px;font-size:13px"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div class="field" style="margin-bottom:0"><label>Rate/hr ($)</label><input type="number" id="cRate" value="150" min="0" style="padding:8px 10px;font-size:13px"></div>
+      <div class="field" style="margin-bottom:0"><label>Call Out ($)</label><input type="number" id="cCallout" value="0" min="0" style="padding:8px 10px;font-size:13px"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div class="field" style="margin-bottom:0"><label>Additional ($)</label><input type="number" id="cExtras" value="0" min="0" style="padding:8px 10px;font-size:13px"></div>
+      <div class="field" style="margin-bottom:0"><label>Client Name</label><input type="text" id="cClientName" placeholder="Optional" style="padding:8px 10px;font-size:13px"></div>
+    </div>
+    <div style="background:#0e1218;border:1px solid #1c2130;border-radius:8px;padding:10px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:12px;font-weight:500">Include GST (10%) <span id="cGSTBadge" style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;background:#3a1a1a;color:#fca5a5;margin-left:5px">OFF</span></div>
+      <input type="checkbox" id="cGST" onchange="updateCalcGST()" style="width:18px;height:18px;accent-color:#3d8b3d;cursor:pointer">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="calcJob()" style="padding:11px;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#3d8b3d,#2a6b2a);color:#fff">Calculate →</button>
+      <button onclick="resetCalc()" style="padding:11px;border:1px solid #1c2130;border-radius:9px;font-size:13px;cursor:pointer;font-family:inherit;background:#0e1218;color:#6b7a6b">Reset</button>
+    </div>
+    <div id="calcResult" style="display:none;background:#0e1218;border:1px solid #3d8b3d;border-radius:12px;padding:14px;margin-top:14px">
+      <div style="font-size:10px;color:#3d8b3d;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px">Result</div>
+      <div id="calcDuration" style="background:#1a3a1a;color:#86efac;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;display:inline-block;margin-bottom:10px"></div>
+      <div id="calcRows"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 3px;border-top:1px solid #2a3a2a;margin-top:6px">
+        <span style="font-size:13px;font-weight:700;color:#e8f0e8">TOTAL</span>
+        <span id="calcTotal" style="font-size:22px;color:#6ec86e;font-weight:700"></span>
+      </div>
+      <div id="calcGSTNote" style="font-size:10px;color:#6b7a6b;text-align:right;margin-top:3px"></div>
+      <div style="background:#121720;border:1px solid #1c2130;border-radius:8px;padding:11px;margin-top:11px">
+        <div style="font-size:10px;color:#6b7a6b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">WhatsApp Message</div>
+        <div id="calcMsg" style="font-size:11px;line-height:1.7;white-space:pre-wrap;color:#e8f0e8"></div>
+        <button onclick="copyCalcMsg()" style="width:100%;background:#1e3a1e;color:#86efac;border:none;border-radius:7px;padding:7px;font-size:11px;cursor:pointer;font-weight:600;font-family:inherit;margin-top:8px">📋 Copy Message</button>
+      </div>
+    </div>
+  </div>
+
+
+<!-- Day Jobs Modal -->
+<div id="dayModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:600;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)" onclick="if(event.target===this)closeDayModal()">
+  <div style="background:#0e1218;border:1px solid #1c2130;border-radius:16px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.7)">
+    <div style="padding:18px 18px 0;display:flex;justify-content:space-between;align-items:center">
+      <div id="dayModalTitle" style="font-family:var(--font-serif,serif);font-size:18px;font-weight:700"></div>
+      <button onclick="closeDayModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7a6b;line-height:1">×</button>
+    </div>
+    <div id="dayModalContent" style="padding:14px 18px 20px"></div>
+  </div>
+</div>
+
+
+  <div id="tabInvoice" style="display:none">
+    <div style="font-size:16px;font-weight:700;margin-bottom:6px">🧾 Invoice Generator</div>
+    <p style="font-size:12px;color:#6b7a6b;margin-bottom:16px">Client data auto-fills when opened from the calendar or client list.</p>
+
+    <div class="field"><label>Invoice Number</label><input type="text" id="inv_num" value="INV001"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div class="field" style="margin-bottom:0"><label>Date</label><input type="date" id="inv_date"></div>
+      <div class="field" style="margin-bottom:0"><label>Due Date</label><input type="date" id="inv_due"></div>
+    </div>
+
+    <div style="background:#0a1a0a;border:1px solid #2a3a2a;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Bill To</div>
+      <div class="field" style="margin-bottom:8px"><label>Client Name *</label><input type="text" id="inv_client" placeholder="Full name"></div>
+      <div class="field" style="margin-bottom:8px"><label>Pick-up Address</label><input type="text" id="inv_pickup" placeholder="123 Current St, Suburb NSW"></div>
+      <div class="field" style="margin-bottom:8px"><label>Drop-off Address</label><input type="text" id="inv_dropoff" placeholder="456 New Ave, Suburb NSW"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field" style="margin-bottom:0"><label>Phone</label><input type="tel" id="inv_phone" placeholder="04xx xxx xxx"></div>
+        <div class="field" style="margin-bottom:0"><label>Email</label><input type="email" id="inv_email" placeholder="client@email.com"></div>
+      </div>
+    </div>
+
+    <div style="background:#0a1a0a;border:1px solid #2a3a2a;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Job Details</div>
+      <div class="field" style="margin-bottom:8px"><label>Description</label><textarea id="inv_desc" style="min-height:50px" placeholder="e.g. Removal service from Croydon to Bondi"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+        <div class="field" style="margin-bottom:0"><label>Start Time</label><input type="time" id="inv_start"></div>
+        <div class="field" style="margin-bottom:0"><label>Finish Time</label><input type="time" id="inv_finish"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field" style="margin-bottom:0"><label>Rate/hr ($)</label><input type="number" id="inv_rate" value="150" min="0"></div>
+        <div class="field" style="margin-bottom:0"><label>Call Out ($)</label><input type="number" id="inv_callout" value="0" min="0"></div>
+      </div>
+    </div>
+
+    <!-- Fixed Price Toggle -->
+    <div style="background:#0e1218;border:1px solid #1c2130;border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:13px;font-weight:500">Fixed Price Job</div>
+        <div style="font-size:11px;color:#6b7a6b;margin-top:2px">Enter total manually</div>
+      </div>
+      <input type="checkbox" id="inv_fixed" onchange="toggleInvFixed()" style="width:18px;height:18px;accent-color:#3d8b3d;cursor:pointer">
+    </div>
+    <div id="inv_fixed_fields" style="display:none;background:#0a1a0a;border:1px solid #2a3a2a;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div class="field" style="margin-bottom:8px"><label>Fixed Amount ($) *</label><input type="number" id="inv_fixed_amt" placeholder="e.g. 500.00" min="0" step="0.01"></div>
+      <div class="field" style="margin-bottom:0"><label>Description</label><input type="text" id="inv_fixed_desc" placeholder="Fixed price removal"></div>
+    </div>
+
+    <!-- Extras -->
+    <div style="background:#0a1a0a;border:1px solid #2a3a2a;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Additional Charges</div>
+      <div id="inv_extras"></div>
+      <button onclick="addInvExtra()" style="background:#1a3a1a;color:#86efac;border:none;border-radius:7px;padding:8px 14px;font-size:12px;cursor:pointer;font-weight:600;font-family:inherit;width:100%;margin-top:4px">+ Add Item</button>
+    </div>
+
+    <!-- GST -->
+    <div style="background:#0e1218;border:1px solid #1c2130;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:13px;font-weight:500">Include GST (10%) <span id="inv_gst_badge" style="font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;background:#3a1a1a;color:#fca5a5;margin-left:5px">OFF</span></div>
+      </div>
+      <input type="checkbox" id="inv_gst" onchange="updateInvGST()" style="width:18px;height:18px;accent-color:#3d8b3d;cursor:pointer">
+    </div>
+
+    <button onclick="generateAdminInvoice()" style="width:100%;padding:13px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#3d8b3d,#2a6b2a);color:#fff;margin-bottom:8px">Generate Invoice →</button>
+    <button onclick="resetAdminInvoice()" style="width:100%;padding:11px;border:1px solid #1c2130;border-radius:10px;font-size:13px;cursor:pointer;font-family:inherit;background:#0e1218;color:#6b7a6b">Reset</button>
+
+    <!-- Invoice Preview -->
+    <div id="inv_preview" style="display:none;margin-top:18px;background:#fff;border-radius:12px;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#f0f7f0,#e6f3e6);padding:20px 24px;border-bottom:3px solid #3d8b3d;display:flex;justify-content:space-between;align-items:center;gap:14px">
+        <div style="display:flex;align-items:center;gap:14px">
+          <img src="./logo.png" alt="Deus Labour Hire" style="height:64px;width:auto;flex-shrink:0" onerror="this.style.display='none'">
+          <div>
+            <div style="font-size:18px;font-weight:700;color:#1a1a1a">DEUS LABOUR HIRE</div>
+            <div style="font-size:10px;color:#2a6b2a;letter-spacing:.1em;text-transform:uppercase;margin-top:3px">Moving &amp; Cleaning Services</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:20px;font-weight:700;color:#1a1a1a">TAX INVOICE</div>
+          <div style="font-size:12px;color:#555;margin-top:3px" id="inv_p_num"></div>
+        </div>
+      </div>
+      <div style="padding:20px 24px;color:#1a1a1a">
+        <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0eb">
+          <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">From</div>
+          <div style="font-size:14px;font-weight:700">Deus Labour Hire Pty Ltd</div>
+          <div style="font-size:11px;color:#666;line-height:1.7">Unit 10/6 Grosvenor St, Croydon NSW | ABN 62 665 081 783<br>0406 832 721 | deus.labour.hire@gmail.com</div>
+        </div>
+        <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0eb">
+          <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Bill To</div>
+          <div style="font-size:14px;font-weight:700" id="inv_p_client"></div>
+          <div style="font-size:11px;color:#666;line-height:1.7" id="inv_p_detail"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:#f8f8f5;padding:12px;border-radius:8px;margin-bottom:16px;text-align:center">
+          <div><div style="font-size:10px;color:#888;text-transform:uppercase">Date</div><div style="font-size:13px;font-weight:700" id="inv_p_date"></div></div>
+          <div><div style="font-size:10px;color:#888;text-transform:uppercase">Due</div><div style="font-size:13px;font-weight:700" id="inv_p_due"></div></div>
+          <div><div style="font-size:10px;color:#888;text-transform:uppercase">Duration</div><div style="font-size:13px;font-weight:700" id="inv_p_dur"></div></div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+          <thead><tr style="background:#f8f8f5">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">Description</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">QTY</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">Rate</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#888;text-transform:uppercase">Amount</th>
+          </tr></thead>
+          <tbody id="inv_p_items"></tbody>
+        </table>
+        <div style="margin-left:auto;width:240px;margin-bottom:16px" id="inv_p_totals"></div>
+        <div style="background:#f0f7f0;border:1px solid #c6e6c6;border-radius:8px;padding:14px;margin-bottom:14px">
+          <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Payment Information</div>
+          <div style="font-size:12px;color:#444">Account: <strong>Deus Labour Hire</strong> &nbsp;|&nbsp; BSB: <strong>062 188</strong> &nbsp;|&nbsp; Account No: <strong>1094 4013</strong><br>Reference: <strong id="inv_p_ref"></strong></div>
+        </div>
+        <div style="font-size:11px;color:#888;font-style:italic;border-top:1px solid #f0f0eb;padding-top:12px">Please note that the due date for this invoice is 7 business days from the date of the invoice. Thank you!</div>
+      </div>
+      <div style="display:flex;gap:10px;padding:14px 24px;background:#f8f8f5;border-top:1px solid #f0f0eb">
+        <button onclick="document.getElementById(&#39;inv_preview&#39;).style.display=&#39;none&#39;" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:8px;cursor:pointer;font-family:inherit;background:#fff;color:#666;font-size:13px">← Edit</button>
+        <button onclick="printAdminInvoice()" style="flex:2;padding:10px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#2a5a2a,#3d8b3d);color:#fff;font-size:13px;font-weight:600">🖨️ Print / PDF</button>
+        <button onclick="sendInvoiceEmail()" style="flex:2;padding:10px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;background:#1a3a5a;color:#93c5fd;font-size:13px;font-weight:600">📧 Send Email</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="tabDraw" style="display:none">
+    <div style="text-align:center;margin-bottom:20px">
+      <img src="./logo.png" alt="Deus Labour Hire" style="max-width:180px;width:60%;height:auto;margin:0 auto 14px;display:block;background:#fff;padding:10px;border-radius:12px" onerror="this.style.display='none'">
+      <div style="font-size:11px;color:#3d8b3d;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">🚛 Deus Labour Hire</div>
+      <div style="font-family:var(--font-serif,serif);font-size:28px;font-weight:700;line-height:1.1">MONTHLY<br><span style="color:#3d8b3d">DRAW 🎁</span></div>
+      <div style="font-size:13px;color:#6b7a6b;margin-top:6px;font-style:italic">Don't Stress, We Do the Rest!</div>
+    </div>
+
+    <!-- Prize Card -->
+    <div style="background:linear-gradient(135deg,#3d8b3d,#2a5a2a);border-radius:14px;padding:18px 20px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 6px 24px rgba(61,122,42,.3)">
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:4px">🏆 Monthly Prize</div>
+        <div style="font-size:48px;font-weight:700;color:#fff;line-height:1">$100</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.65);margin-top:2px">Gift Card — End of month</div>
+      </div>
+      <div style="font-size:50px">🎁</div>
+    </div>
+
+    <!-- Load from Supabase -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <div>
+        <label style="font-size:10px;color:#6b7a6b;display:block;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Draw Month</label>
+        <select id="drawMonth" style="width:100%;background:#0e1218;border:1px solid #1c2130;border-radius:8px;padding:9px 10px;color:#e8f0e8;font-size:13px;font-family:inherit;outline:none">
+          <option value="1">January</option>
+          <option value="2">February</option>
+          <option value="3">March</option>
+          <option value="4">April</option>
+          <option value="5">May</option>
+          <option value="6">June</option>
+          <option value="7">July</option>
+          <option value="8">August</option>
+          <option value="9">September</option>
+          <option value="10">October</option>
+          <option value="11">November</option>
+          <option value="12">December</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:10px;color:#6b7a6b;display:block;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Year</label>
+        <input type="number" id="drawYear" style="width:100%;background:#0e1218;border:1px solid #1c2130;border-radius:8px;padding:9px 10px;color:#e8f0e8;font-size:13px;font-family:inherit;outline:none" min="2024" max="2030"/>
+      </div>
+    </div>
+    <button onclick="loadDrawClients()" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:#1a3a1a;color:#86efac;margin-bottom:12px">🔄 Load Clients for Selected Month</button>
+
+    <!-- Manual add -->
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input type="text" id="drawNameInput" placeholder="Add client name manually..." style="flex:1;background:#0e1218;border:1px solid #1c2130;border-radius:8px;padding:10px 12px;color:#e8f0e8;font-size:14px;font-family:inherit;outline:none"/>
+      <button onclick="addDrawParticipant()" style="background:#3d8b3d;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ Add</button>
+    </div>
+
+    <!-- Participants -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:11px;color:#6b7a6b;font-weight:700;text-transform:uppercase;letter-spacing:.07em">Participants</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="drawCountBadge" style="background:#1a3a1a;color:#86efac;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px">0 clients</span>
+        <button onclick="clearDrawAll()" style="background:none;border:1px solid #3a1a1a;color:#fca5a5;font-size:11px;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:inherit">Clear</button>
+      </div>
+    </div>
+    <div id="drawChips" style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;margin-bottom:18px">
+      <div style="font-size:13px;color:#6b7a6b;font-style:italic;padding:8px 0">No clients yet — load or add above 👆</div>
+    </div>
+
+    <!-- Draw Button -->
+    <button id="drawBtn" onclick="startDraw()" disabled style="width:100%;padding:18px;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#3d8b3d,#2a5a2a);color:#fff;letter-spacing:2px;text-transform:uppercase;box-shadow:0 6px 24px rgba(61,122,42,.3);opacity:.4">🎲 Draw Monthly Winner</button>
+
+    <!-- Drum Roll -->
+    <div id="drawDrum" style="display:none;background:#0e1218;border:1px solid #1c2130;border-radius:14px;padding:22px;text-align:center;margin-top:14px">
+      <div style="font-size:10px;color:#6b7a6b;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">🎰 Drawing…</div>
+      <div id="drawRolling" style="font-size:34px;font-weight:700;color:#3d8b3d;letter-spacing:2px;min-height:44px">—</div>
+    </div>
+
+    <!-- Winner -->
+    <div id="drawWinner" style="display:none;background:#0a1a0a;border:2px solid #3d8b3d;border-radius:16px;padding:28px 20px;text-align:center;margin-top:14px">
+      <div style="font-size:28px;margin-bottom:8px">🎉🎊🥳</div>
+      <div style="font-size:10px;color:#3d8b3d;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">✨ This Month's Winner ✨</div>
+      <div id="drawWinnerName" style="font-size:40px;font-weight:700;color:#e8f0e8;letter-spacing:2px;margin-bottom:6px">—</div>
+      <div id="drawWinnerMonth" style="font-size:13px;color:#3d8b3d;font-weight:600;margin-bottom:14px;letter-spacing:.05em"></div>
+      <div style="background:#1a3a1a;border:1px solid #2a5a2a;border-radius:12px;padding:12px 20px;display:inline-block;margin-bottom:16px">
+        <div style="font-size:11px;color:#6b7a6b;margin-bottom:4px">Wins a</div>
+        <div style="font-size:28px;font-weight:700;color:#86efac">$100 Gift Card 💳</div>
+      </div>
+      <button onclick="announceDrawWinner()" style="display:block;width:100%;background:#1a3a1a;color:#86efac;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:10px">🔊 Announce Winner</button>
+      <button onclick="resetDraw()" style="display:block;width:100%;background:#0e1218;border:1px solid #1c2130;color:#6b7a6b;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;font-family:inherit">🔄 New Draw</button>
+    </div>
+
+    <!-- History -->
+    <div id="drawHistorySection" style="display:none;margin-top:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:11px;color:#6b7a6b;font-weight:700;text-transform:uppercase;letter-spacing:.07em">Previous Winners</div>
+        <button onclick="clearDrawHistory()" style="background:none;border:1px solid #3a1a1a;color:#fca5a5;font-size:11px;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:inherit">🗑 Clear History</button>
+      </div>
+      <div id="drawHistList" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+  </div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">Add New Job</h3>
+    <input type="hidden" id="editId">
+    <div class="field"><label>Full Name *</label><input id="mName" placeholder="Jane Smith"></div>
+    <div class="field"><label>Phone *</label><input id="mPhone" placeholder="04xx xxx xxx"></div>
+    <div class="field"><label>Email *</label><input id="mEmail" type="email" placeholder="jane@example.com"></div>
+    <div class="modal-row">
+      <div class="field"><label>Date *</label><input id="mDate" type="date"></div>
+      <div class="field"><label>Start Time *</label><input id="mTime" type="time"></div>
+    </div>
+    <div class="field"><label>Pick-up Address *</label><input id="mPickup"></div>
+    <div class="field"><label>Drop-off Address *</label><input id="mDropoff"></div>
+    <div class="field"><label>Notes</label><textarea id="mNotes"></textarea></div>
+    <div class="field"><label>Status</label>
+      <select id="mStatus">
+        <option value="upcoming">Upcoming</option>
+        <option value="completed">Completed</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveJob()">Save Job</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://amnacoyjgdfykdfepkze.supabase.co'; // DEMO MODE - no connection
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtbmFjb3lqZ2RmeWtkZmVwa3plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxODI4MzAsImV4cCI6MjA5MDc1ODgzMH0.ma37AnfeaDdIN42TNUpt7EVoNYvT6nHQFJra-4XS_Pc';
+const ADMIN_HASH='53c685d8f106035c02f94b6e85faecdf888b146e46f9eb8dda03f314aa6ca9c4';
+
+let bookings=[],calDate=new Date();
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const TERMS_TEXT=`DEUS LABOUR HIRE
+Moving & Cleaning Services
+Email: deus.labour.hire@gmail.com
+
+TERMS AND CONDITIONS - REMOVAL SERVICES
+
+Acceptance of Terms
+By booking or accepting our services, the client confirms that they have read, understood, and agreed to these Terms and Conditions.
+
+Duty of Care
+Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client's belongings. However, removal services involve inherent risks and minor damage may occasionally occur despite reasonable care.
+
+Condition of Goods
+The client confirms that all items provided for transport are in a condition suitable for removal unless otherwise disclosed prior to the move.
+
+Client Packing Responsibility
+Items packed by the client are transported at the client's risk unless damage is directly caused by proven negligence during handling by our staff.
+
+Fragile and High-Risk Items
+Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics require special care and must be disclosed before the move.
+
+Television and Electronic Equipment
+Modern televisions are extremely fragile and may suffer internal panel damage even when handled with reasonable care. Televisions should ideally be transported in original packaging.
+
+Disclosure of High-Value Items
+Items valued above $800 must be disclosed prior to the move.
+
+Safe Transport and Additional Trips
+If fragile items cannot be safely transported due to limited truck space, Deus Labour Hire may transport them in a separate load.
+
+Refusal to Move Unsafe Items
+Deus Labour Hire reserves the right to refuse items considered unsafe for transport.
+
+Pre-Existing Damage
+Deus Labour Hire is not responsible for items that were already damaged before the move.
+
+Liability for Loss or Damage
+If damage occurs due to negligence during the service, liability will be assessed based on the fair market value of the item at the time of the move considering age, condition and depreciation. Nothing in these Terms and Conditions excludes, restricts or modifies any rights that the client may have under the Australian Consumer Law.
+
+Transit Insurance
+Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited subject to the policy terms and conditions.
+
+Insurance Claims
+If a claim is submitted to the insurer the final decision regarding compensation will be determined by the insurance company.
+
+Claims Procedure
+Any claim must be reported within 24 hours after completion of the move and include photographs and a description of the damage.
+
+Resolution of Claims
+Resolution may include repair, replacement with the same model, similar second-hand replacement or payment of the fair market value.
+
+Access and Safety
+The client must ensure safe access to the property. Additional charges may apply for stairs or restricted access.
+
+Heavy Items
+Items over 100kg must be disclosed before the move.
+
+Payment Terms
+Payment is due upon completion of the service unless otherwise agreed.
+
+Governing Law
+These Terms and Conditions are governed by the laws of Australia.`;
+const SA_TEXT=`DEUS LABOUR HIRE
+Moving & Cleaning Services
+Email: deus.labour.hire@gmail.com
+
+SERVICE AGREEMENT - REMOVAL SERVICES
+
+Acceptance and Scope
+By booking or accepting our services, the client confirms they have read, understood, and agreed to these Terms and Conditions. Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client's belongings. Removal services involve inherent risks and minor damage may occasionally occur despite reasonable care. These Terms are governed by the laws of Australia.
+
+Client Responsibilities
+Items packed by the client are transported at the client's risk unless damage is directly caused by proven negligence. The client confirms all goods are suitable for removal unless disclosed prior to the move. The client must ensure safe access to the property. Items over 100kg must be disclosed before the move. Items valued above $800 must be disclosed before the move.
+
+Fragile and Special Items
+Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics must be disclosed before the move. Modern televisions are extremely fragile and may suffer internal panel damage even when handled with reasonable care and should ideally be transported in original packaging. If fragile items cannot be safely transported due to limited truck space, Deus Labour Hire may transport them in a separate load. Deus Labour Hire reserves the right to refuse items considered unsafe for transport.
+
+Liability and Insurance
+Deus Labour Hire is not responsible for items that were already damaged before the move. If damage occurs due to negligence, liability will be assessed based on the fair market value of the item considering age, condition and depreciation. Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited subject to policy terms. Any claim must be reported within 24 hours and must include photos and description of the damage. Nothing in these terms excludes the client's rights under Australian Consumer Law.
+
+Payment and Additional Fees
+Payment is due upon completion of the service unless otherwise agreed. Additional charges may apply for stairs, restricted access or long carrying distances.
+
+Company Representative: Deus Labour Hire Pty Ltd`;
+
+function $(id){return document.getElementById(id);}
+function showToast(msg,dur=3000){const el=$('toast');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',dur);}
+
+async function hashPassword(p){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
+
+async function login(){
+  const pw=$('passInput').value;
+  const h=await hashPassword(pw);
+  if(h===ADMIN_HASH){$('loginScreen').style.display='none';$('app').style.display='block';loadBookings();}
+  else{$('loginErr').style.display='block';$('passInput').value='';}
+}
+function logout(){$('loginScreen').style.display='flex';$('app').style.display='none';$('passInput').value='';}
+
+
+
+
+async function loadBookings(){
+  try{
+    const res=await fetch(SUPABASE_URL+'/rest/v1/bookings?order=date.desc',{headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
+    const data=await res.json();
+    bookings=Array.isArray(data)?data:[];
+  }catch(e){bookings=[];showToast('Could not connect to database.',4000);}
+  renderAll();
+}
+
+async function saveToSupabase(data,id){
+  if(!SUPABASE_URL)return null;
+  var url=id?(SUPABASE_URL+'/rest/v1/bookings?id=eq.'+id):(SUPABASE_URL+'/rest/v1/bookings');
+  var method=id?'PATCH':'POST';
+  var headers={'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=representation'};
+  try{var res=await fetch(url,{method:method,headers:headers,body:JSON.stringify(data)});var d=await res.json();return Array.isArray(d)?d[0]:d;}catch(e){return null;}
+}
+
+function renderAll(){updateStats();renderCalendar();renderClients();$('docContent').textContent=TERMS_TEXT;}
+
+function updateStats(){
+  const up=bookings.filter(b=>b.status==='upcoming').length;
+  const done=bookings.filter(b=>b.status==='completed').length;
+  const rem=bookings.filter(b=>{const d=new Date(b.date);d.setFullYear(d.getFullYear()+1);return !b.reminder_sent&&new Date()>=d;}).length;
+  $('statUpcoming').textContent=up;$('statDone').textContent=done;$('statRem').textContent=rem;
+  const box=$('statRemBox');
+  if(rem>0){box.style.background='rgba(192,57,43,0.05)';$('statRem').style.color='var(--danger)';$('statRemLbl').style.color='var(--danger)';}
+  else{box.style.background='';$('statRem').style.color='var(--text-light)';$('statRemLbl').style.color='var(--text-light)';}
+  $('statRemLbl').textContent=rem>0?'Need Reminder':'Reminders';
+}
+
+function calNav(dir){calDate=new Date(calDate.getFullYear(),calDate.getMonth()+dir);renderCalendar();}
+function renderCalendar(){
+  const y=calDate.getFullYear(),m=calDate.getMonth();
+  $('calTitle').textContent=MONTHS[m]+' '+y;
+  const firstDay=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate(),today=new Date();
+  const byDay={};
+  bookings.forEach(b=>{const d=new Date(b.date);if(d.getFullYear()===y&&d.getMonth()===m){const dd=d.getDate();byDay[dd]=byDay[dd]||[];byDay[dd].push(b);}});
+  $('calDayLabels').innerHTML=['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>`<div class="cal-day-label">${d}</div>`).join('');
+  let html='';
+  for(let i=0;i<firstDay;i++)html+=`<div class="cal-cell empty"></div>`;
+  for(let d=1;d<=days;d++){
+    const isToday=today.getDate()===d&&today.getMonth()===m&&today.getFullYear()===y;
+    const events=byDay[d]||[];
+    var cellClick=events.length>0?'openDayModal('+d+')':'';
+    var cellCursor=events.length>0?'pointer':'default';
+    html+='<div class="cal-cell'+(isToday?' today':'')+'" style="cursor:'+cellCursor+'" '+(cellClick?'onclick="'+cellClick+'"':'')+'>'+
+          '<div class="cal-num">'+d+'</div>'+
+          events.map(function(e){return '<div class="cal-event" style="background:'+(e.status==='completed'?'var(--success-bg)':'var(--info-bg)')+';color:'+(e.status==='completed'?'var(--success)':'var(--info)')+'">'+fmtTime(e.start_time)+' '+(e.name||'').split(' ')[0]+'</div>';}).join('')+
+          '</div>';
+  }
+  $('calCells').innerHTML=html;
+  const jobsList=Object.entries(byDay);
+  if(!jobsList.length){$('calJobs').innerHTML='<div style="font-size:13px;color:var(--text-light);text-align:center;padding:20px 0">No jobs this month.</div>';return;}
+  let jhtml=`<div style="font-size:10px;color:var(--text-light);margin-bottom:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700">Jobs This Month</div>`;
+  jobsList.sort((a,b)=>+a[0]-+b[0]).forEach(([day,list])=>{list.forEach(b=>{
+    const sc=b.status==='completed'?'var(--success)':b.status==='cancelled'?'var(--danger)':'var(--info)';
+    const sb=b.status==='completed'?'var(--success-bg)':b.status==='cancelled'?'var(--danger-bg)':'var(--info-bg)';
+    jhtml+=`<div class="cal-job-row"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:13px;font-weight:700">${b.name}</div><div style="font-size:11px;color:var(--green-dark);font-weight:700;margin-top:2px">${fmtTime(b.start_time)} · ${MONTHS[m]} ${day}</div><div style="font-size:11px;color:var(--text-mid);margin-top:2px">From: ${b.pickup_address}</div><div style="font-size:11px;color:var(--text-mid)">To: ${b.dropoff_address}</div></div><span class="badge" style="background:${sb};color:${sc}">${b.status}</span></div></div>`;
+  });});
+  $('calJobs').innerHTML=jhtml;
+}
+
+function renderClients(){
+  const q=($('searchInput')?$('searchInput').value:'').toLowerCase();
+  const filtered=bookings.filter(b=>(b.name||'').toLowerCase().includes(q)||(b.email||'').toLowerCase().includes(q)||(b.phone||'').includes(q));
+  if(!filtered.length){$('clientList').innerHTML='<div style="text-align:center;color:var(--text-light);padding:40px 0;font-size:13px">No clients found</div>';return;}
+  $('clientList').innerHTML=filtered.map(b=>{
+    const rd=new Date(b.date);rd.setFullYear(rd.getFullYear()+1);
+    const daysLeft=Math.ceil((rd-new Date())/86400000),isDue=daysLeft<=0,isSoon=daysLeft>0&&daysLeft<=30;
+    const initials=(b.name||'?').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+    let remBadge='';
+    if(b.reminder_sent)remBadge=`<span class="badge" style="background:var(--success-bg);color:var(--success)">SENT ✓</span>`;
+    else if(isDue)remBadge=`<span class="badge" style="background:var(--danger-bg);color:var(--danger)">REMIND</span>`;
+    else if(isSoon)remBadge=`<span class="badge" style="background:var(--warn-bg);color:var(--warn)">${daysLeft}d</span>`;
+    const sc=b.status==='completed'?'var(--success)':b.status==='cancelled'?'var(--danger)':'var(--info)';
+    const sb=b.status==='completed'?'var(--success-bg)':b.status==='cancelled'?'var(--danger-bg)':'var(--info-bg)';
+    const bId=String(b.id);
+    return `<div class="card">
+      <div class="card-header" onclick="toggleCard('${bId}')">
+        <div style="display:flex;align-items:center">
+          <div class="avatar">${initials}</div>
+          <div><div class="card-name">${b.name}</div><div class="card-meta">${b.date} · ${fmtTime(b.start_time)} · ${b.phone||b.email||''}</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px">${remBadge}<span class="badge" style="background:${sb};color:${sc}">${b.status}</span><span style="color:var(--text-light);font-size:12px;margin-left:4px" id="chev_${bId}">▼</span></div>
+      </div>
+      <div class="card-body" id="body_${bId}">
+        <div class="info-box"><div class="info-title">Job Details</div>
+          ${[['📅 Date',b.date],['🕐 Start',fmtTime(b.start_time)],['📍 Pick-up',b.pickup_address],['🏁 Drop-off',b.dropoff_address],['📞 Phone',b.phone||'—'],['✉ Email',b.email||'—']].map(([k,v])=>`<div class="info-row"><span class="info-key">${k}</span><span class="info-val">${v||'—'}</span></div>`).join('')}
+          ${b.notes?`<div class="info-row"><span class="info-key">📝 Notes</span><span class="info-val">${b.notes}</span></div>`:''}
+        </div>
+        <div class="info-box"><div class="info-title">Documents</div>
+          ${b.signature_name?`<div style="font-size:13px;color:var(--success);font-style:italic;font-weight:700">✍ ${b.signature_name}</div><div style="font-size:11px;color:var(--text-mid);margin-top:3px">T&C + Service Agreement · ${(b.signed_date||'').split('T')[0]||'—'}</div>`:`<div style="font-size:12px;color:var(--danger);font-weight:600">⚠ Not yet signed</div>`}
+        </div>
+        <div class="info-box"><div class="info-title">1-Year Reminder</div>
+          <div style="font-size:12px;font-weight:600;color:${isDue?'var(--danger)':isSoon?'var(--warn)':'var(--text-mid)'}">
+            ${b.reminder_sent?'✓ 10% discount offer sent':isDue?'⚡ Overdue — send now!':isSoon?`Due in ${daysLeft} days`:`Scheduled: ${rd.toDateString()}`}
+          </div>
+        </div>
+        <div class="action-btns">
+          ${b.status!=='completed'?`<button class="action-btn" style="background:var(--success-bg);color:var(--success)" onclick="markDone('${bId}')">✓ Mark Completed</button>`:''}
+          ${(isDue||isSoon)&&!b.reminder_sent?`<button class="action-btn" style="background:var(--black);color:#fff" onclick="sendReminder('${bId}')">📧 Send 10% Offer</button>`:''}
+          <button class="action-btn" style="background:var(--info-bg);color:var(--info)" onclick="openEditModal('${bId}')">✏ Edit</button>
+          <button class="action-btn" style="background:#1a3a1a;color:#86efac" onclick="downloadDoc('${bId}')">📄 Download</button>
+          <button class="action-btn" style="background:#1a2a3a;color:#93c5fd" onclick="createInvoice('${bId}')">🧾 Invoice</button>
+          <button class="action-btn" style="background:var(--danger-bg);color:var(--danger)" onclick="deleteJob('${bId}')">🗑 Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleCard(id){const body=$('body_'+id),chev=$('chev_'+id);if(!body||!chev)return;const open=body.classList.toggle('open');chev.textContent=open?'▲':'▼';}
+async function markDone(id){bookings=bookings.map(b=>String(b.id)===String(id)?{...b,status:'completed'}:b);await saveToSupabase({status:'completed'},id);renderAll();showToast('Job marked as completed ✓');}
+async function sendReminder(id){bookings=bookings.map(b=>String(b.id)===String(id)?{...b,reminder_sent:true}:b);await saveToSupabase({reminder_sent:true},id);const b=bookings.find(b=>String(b.id)===String(id));renderAll();showToast(`Reminder sent to ${b?b.name:'client'} ✓`);}
+async function deleteJob(id){if(!confirm('Delete this booking? This cannot be undone.'))return;bookings=bookings.filter(b=>String(b.id)!==String(id));if(SUPABASE_URL)await fetch(SUPABASE_URL+'/rest/v1/bookings?id=eq.'+id,{method:'DELETE',headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});renderAll();showToast('Booking deleted.');}
+
+function openAddModal(){$('modalTitle').textContent='Add New Job';$('editId').value='';['mName','mPhone','mEmail','mDate','mTime','mPickup','mDropoff','mNotes'].forEach(id=>$(id).value='');$('mStatus').value='upcoming';$('modalOverlay').classList.add('open');}
+function openEditModal(id){const b=bookings.find(b=>String(b.id)===String(id));if(!b)return;$('modalTitle').textContent='Edit Booking';$('editId').value=String(id);$('mName').value=b.name||'';$('mPhone').value=b.phone||'';$('mEmail').value=b.email||'';$('mDate').value=b.date||'';$('mTime').value=b.start_time||'';$('mPickup').value=b.pickup_address||'';$('mDropoff').value=b.dropoff_address||'';$('mNotes').value=b.notes||'';$('mStatus').value=b.status||'upcoming';$('modalOverlay').classList.add('open');}
+function closeModal(){$('modalOverlay').classList.remove('open');}
+
+async function saveJob(){
+  const name=$('mName').value.trim(),phone=$('mPhone').value.trim(),email=$('mEmail').value.trim(),date=$('mDate').value,time=$('mTime').value,pickup=$('mPickup').value.trim(),dropoff=$('mDropoff').value.trim();
+  if(!name||!phone||!email||!date||!time||!pickup||!dropoff){showToast('Please fill in all required fields.');return;}
+  const data={name,phone,email,date,start_time:time,pickup_address:pickup,dropoff_address:dropoff,notes:$('mNotes').value.trim(),status:$('mStatus').value};
+  const editId=$('editId').value;
+  try{
+    if(editId){bookings=bookings.map(b=>String(b.id)===String(editId)?{...b,...data}:b);await saveToSupabase(data,editId);showToast('Booking updated ✓');}
+    else{
+      var newB={...data,id:Date.now(),signature_name:'(admin added)',signed_date:new Date().toISOString().split('T')[0],reminder_sent:false,created_at:new Date().toISOString()};
+      if(SUPABASE_URL){const saved=await saveToSupabase(newB,null);if(saved&&saved.id)newB=saved;}
+      bookings=[newB,...bookings];
+      showToast('New job added ✓');
+    }
+  }catch(e){showToast('Error saving. Please try again.',4000);return;}
+  closeModal();renderAll();
+}
+
+function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Calendar','Clients','Docs','Calc','Invoice','Draw'].forEach(t=>$('tab'+t).style.display='none');$('tab'+name).style.display='block';}
+function switchDoc(name){$('docContent').textContent=name==='tc'?TERMS_TEXT:SA_TEXT;$('docTabTC').className='doc-tab-btn'+(name==='tc'?' active':'');$('docTabSA').className='doc-tab-btn'+(name==='sa'?' active':'');}
+function fmtTime(t){if(!t)return '';const[h,m]=t.split(':'),hr=parseInt(h);return `${hr>12?hr-12:hr||12}:${m} ${hr>=12?'PM':'AM'}`;}
+$('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
+$('docContent').textContent=TERMS_TEXT;
+
+function updateCalcGST(){
+  var on=document.getElementById('cGST').checked;
+  var b=document.getElementById('cGSTBadge');
+  b.textContent=on?'ON':'OFF';
+  b.style.background=on?'#1a3a1a':'#3a1a1a';
+  b.style.color=on?'#86efac':'#fca5a5';
+}
+function calcJob(){
+  var start=document.getElementById('cStart').value;
+  var finish=document.getElementById('cFinish').value;
+  var rate=parseFloat(document.getElementById('cRate').value)||150;
+  var callout=parseFloat(document.getElementById('cCallout').value)||0;
+  var extras=parseFloat(document.getElementById('cExtras').value)||0;
+  var clientName=document.getElementById('cClientName').value.trim();
+  var gst=document.getElementById('cGST').checked;
+  if(!start||!finish){alert('Please enter both start and finish times.');return;}
+  var sp=start.split(':'),fp=finish.split(':');
+  var sh=parseInt(sp[0]),sm=parseInt(sp[1]),fh=parseInt(fp[0]),fm=parseInt(fp[1]);
+  var sM=sh*60+sm,fM=fh*60+fm;
+  if(fM<sM)fM+=1440;
+  var totalMins=fM-sM,hours=totalMins/60;
+  var labour=hours*rate,subtotal=labour+callout+extras;
+  var gstAmt=gst?subtotal*0.1:0,total=subtotal+gstAmt;
+  var hrs=Math.floor(totalMins/60),mins=totalMins%60;
+  var durStr=hrs>0?(mins>0?hrs+'h '+mins+'min':hrs+'h'):mins+'min';
+  function fmtT(h,m){return (h>12?h-12:(h||12))+':'+('0'+m).slice(-2)+' '+(h>=12?'PM':'AM');}
+  document.getElementById('calcDuration').textContent='Duration: '+durStr;
+  var rows='';
+  rows+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #2a3a2a"><span style="font-size:12px;color:#9aaa9a">Hours</span><span style="font-size:13px;font-weight:600;color:#e8f0e8">'+hours.toFixed(2)+'h</span></div>';
+  rows+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #2a3a2a"><span style="font-size:12px;color:#9aaa9a">Labour ($'+rate+'/hr)</span><span style="font-size:13px;font-weight:600;color:#e8f0e8">$'+labour.toFixed(2)+'</span></div>';
+  if(callout>0)rows+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #2a3a2a"><span style="font-size:12px;color:#9aaa9a">Call Out Fee</span><span style="font-size:13px;font-weight:600;color:#e8f0e8">$'+callout.toFixed(2)+'</span></div>';
+  if(extras>0)rows+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #2a3a2a"><span style="font-size:12px;color:#9aaa9a">Additional</span><span style="font-size:13px;font-weight:600;color:#e8f0e8">$'+extras.toFixed(2)+'</span></div>';
+  rows+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #2a3a2a"><span style="font-size:12px;color:#9aaa9a">Subtotal</span><span style="font-size:13px;font-weight:600;color:#e8f0e8">$'+subtotal.toFixed(2)+'</span></div>';
+  if(gst)rows+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #2a3a2a"><span style="font-size:12px;color:#9aaa9a">GST (10%)</span><span style="font-size:13px;font-weight:600;color:#6ec86e">$'+gstAmt.toFixed(2)+'</span></div>';
+  document.getElementById('calcRows').innerHTML=rows;
+  document.getElementById('calcTotal').textContent='$'+total.toFixed(2);
+  document.getElementById('calcGSTNote').textContent=gst?'GST included: $'+gstAmt.toFixed(2):'GST not included';
+  var today=new Date().toLocaleDateString('en-AU');
+  var msg='Hi'+(clientName?' '+clientName.split(' ')[0]:'')+'! \n\nInvoice from Deus Labour Hire:\n\n';
+  msg+='Date: '+today+'\nStart: '+fmtT(sh,sm)+'\nFinish: '+fmtT(fh,fm)+'\nDuration: '+durStr+'\n\n';
+  msg+='Labour ('+hours.toFixed(2)+'h x $'+rate+'): $'+labour.toFixed(2)+'\n';
+  if(callout>0)msg+='Call Out Fee: $'+callout.toFixed(2)+'\n';
+  if(extras>0)msg+='Additional: $'+extras.toFixed(2)+'\n';
+  msg+='Subtotal: $'+subtotal.toFixed(2)+'\n';
+  if(gst)msg+='GST (10%): $'+gstAmt.toFixed(2)+'\n';
+  msg+='\nTOTAL: $'+total.toFixed(2)+(gst?' (inc. GST)':'')+'\n\nPayment due upon completion.\nThank you for choosing Deus Labour Hire!';
+  document.getElementById('calcMsg').textContent=msg;
+  document.getElementById('calcResult').style.display='block';
+  document.getElementById('calcResult').scrollIntoView({behavior:'smooth'});
+}
+function resetCalc(){
+  ['cClientName','cStart','cFinish'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('cRate').value='150';
+  document.getElementById('cCallout').value='0';
+  document.getElementById('cExtras').value='0';
+  document.getElementById('cGST').checked=false;
+  updateCalcGST();
+  document.getElementById('calcResult').style.display='none';
+}
+function copyCalcMsg(){
+  var text=document.getElementById('calcMsg').textContent;
+  navigator.clipboard.writeText(text).then(function(){
+    var btns=document.querySelectorAll('#tabCalc button');
+    var btn=btns[btns.length-1];
+    btn.textContent='Copied!';
+    setTimeout(function(){btn.textContent='Copy Message';},2000);
+  });
+}
+
+function openDayModal(day){
+  var y=calDate.getFullYear(),m=calDate.getMonth();
+  var jobs=bookings.filter(function(b){
+    var d=new Date(b.date);
+    return d.getFullYear()===y&&d.getMonth()===m&&d.getDate()===day;
+  });
+  if(!jobs.length)return;
+  document.getElementById('dayModalTitle').textContent=MONTHS[m]+' '+day+', '+y+' — '+jobs.length+' Job'+(jobs.length>1?'s':'');
+  var html='';
+  jobs.forEach(function(b){
+    var sc=b.status==='completed'?'#86efac':b.status==='cancelled'?'#fca5a5':'#93c5fd';
+    var sb=b.status==='completed'?'#1a3a1a':b.status==='cancelled'?'#3a0f0f':'#0f2040';
+    var bId=String(b.id);
+    html+='<div style="background:#121720;border:1px solid #1c2130;border-radius:10px;padding:14px;margin-bottom:10px">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">';
+    html+='<div style="font-size:15px;font-weight:700">'+b.name+'</div>';
+    html+='<span style="font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;background:'+sb+';color:'+sc+'">'+b.status+'</span>';
+    html+='</div>';
+    html+='<div style="font-size:12px;color:#6b7a6b;margin-bottom:4px">🕐 Start: <span style="color:#e8f0e8">'+fmtTime(b.start_time)+'</span></div>';
+    html+='<div style="font-size:12px;color:#6b7a6b;margin-bottom:4px">📍 Pick-up: <span style="color:#e8f0e8">'+b.pickup_address+'</span></div>';
+    html+='<div style="font-size:12px;color:#6b7a6b;margin-bottom:4px">🏁 Drop-off: <span style="color:#e8f0e8">'+b.dropoff_address+'</span></div>';
+    html+='<div style="font-size:12px;color:#6b7a6b;margin-bottom:10px">📞 Phone: <span style="color:#e8f0e8">'+b.phone+'</span></div>';
+    if(b.notes)html+='<div style="font-size:11px;color:#9aaa9a;margin-bottom:10px;background:#0a0c12;padding:8px;border-radius:6px">📝 '+b.notes+'</div>';
+    if(b.signature_name)html+='<div style="font-size:11px;color:#6ec86e;margin-bottom:10px">✍ Signed: '+b.signature_name+'</div>';
+    html+='<div style="display:flex;gap:7px;flex-wrap:wrap">';
+    if(b.status!=='completed')html+='<button onclick="markDone(&quot;'+bId+'&quot;);closeDayModal()" style="padding:6px 12px;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit;background:#1a3a1a;color:#86efac">✓ Complete</button>';
+    html+='<button onclick="openEditModal(&quot;'+bId+'&quot;);closeDayModal()" style="padding:6px 12px;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit;background:#1e2a3a;color:#93c5fd">✏ Edit</button>';
+    html+='<button onclick="downloadDoc(&quot;'+bId+'&quot;)" style="padding:6px 12px;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit;background:#1a3a1a;color:#86efac">📄 Download</button>';
+    html+='<button onclick="createInvoice(&quot;'+bId+'&quot;);closeDayModal()" style="padding:6px 12px;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit;background:#1a2a3a;color:#93c5fd">🧾 Invoice</button>';
+    html+='<button onclick="deleteJob(&quot;'+bId+'&quot;);closeDayModal()" style="padding:6px 12px;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit;background:#3a0f0f;color:#fca5a5">🗑 Delete</button>';
+    html+='</div></div>';
+  });
+  document.getElementById('dayModalContent').innerHTML=html;
+  document.getElementById('dayModal').style.display='flex';
+}
+
+function closeDayModal(){
+  document.getElementById('dayModal').style.display='none';
+}
+
+function downloadDoc(id){
+  var b=bookings.find(function(x){return String(x.id)===String(id);});
+  if(!b){alert('Client not found.');return;}
+  var signDate=b.signed_date?new Date(b.signed_date).toLocaleDateString('en-AU'):'-';
+  var signTime=b.signed_date?new Date(b.signed_date).toLocaleTimeString('en-AU'):'-';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Signed Documents - '+b.name+'</title>';
+  html+='<style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;padding:20px;color:#111}';
+  html+='.header{text-align:center;border-bottom:3px solid #3d8b3d;padding-bottom:20px;margin-bottom:30px}';
+  html+='.logo{font-size:24px;font-weight:700;color:#3d8b3d}';
+  html+='h2{color:#3d8b3d;margin-top:28px;margin-bottom:10px;border-bottom:1px solid #eee;padding-bottom:6px}';
+  html+='h3{color:#2a6b2a;margin-top:18px;margin-bottom:5px}p{margin-bottom:8px;line-height:1.6}';
+  html+='.info-box{background:#f5f5f5;border:1px solid #ddd;border-radius:8px;padding:16px;margin:20px 0}';
+  html+='.info-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;font-size:14px}';
+  html+='.info-row:last-child{border:none}';
+  html+='.sig-box{border:2px solid #3d8b3d;border-radius:8px;padding:18px;margin-top:30px;background:#f9fff9}';
+  html+='.sig-name{font-size:24px;font-style:italic;color:#2a6b2a;margin:10px 0;font-family:Georgia,serif}';
+  html+='.footer{margin-top:40px;text-align:center;font-size:12px;color:#666;border-top:1px solid #ddd;padding-top:16px}';
+  html+='</style></head><body>';
+  html+='<div class="header"><div class="logo">DEUS LABOUR HIRE</div>';
+  html+='<div style="color:#666;margin-top:4px;font-size:14px">Moving &amp; Cleaning Services</div>';
+  html+='<div style="color:#666;font-size:13px">deus.labour.hire@gmail.com | 0406 832 721</div></div>';
+  html+='<h2>SIGNED SERVICE DOCUMENTS</h2>';
+  html+='<div class="info-box">';
+  html+='<div class="info-row"><span><strong>Client Name</strong></span><span>'+b.name+'</span></div>';
+  html+='<div class="info-row"><span><strong>Phone</strong></span><span>'+(b.phone||'-')+'</span></div>';
+  html+='<div class="info-row"><span><strong>Email</strong></span><span>'+(b.email||'-')+'</span></div>';
+  html+='<div class="info-row"><span><strong>Move Date</strong></span><span>'+(b.date||'-')+'</span></div>';
+  html+='<div class="info-row"><span><strong>Start Time</strong></span><span>'+(b.start_time||'-')+'</span></div>';
+  html+='<div class="info-row"><span><strong>Pick-up</strong></span><span>'+(b.pickup_address||'-')+'</span></div>';
+  html+='<div class="info-row"><span><strong>Drop-off</strong></span><span>'+(b.dropoff_address||'-')+'</span></div>';
+  if(b.notes)html+='<div class="info-row"><span><strong>Notes</strong></span><span>'+b.notes+'</span></div>';
+  html+='</div>';
+  html+='<h2>TERMS AND CONDITIONS</h2>';
+  html+='<h3>Acceptance of Terms</h3><p>By booking or accepting our services, the client confirms that they have read, understood, and agreed to these Terms and Conditions.</p>';
+  html+='<h3>Duty of Care</h3><p>Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client&#39;s belongings. However, removal services involve inherent risks and minor damage may occasionally occur despite reasonable care.</p>';
+  html+='<h3>Condition of Goods</h3><p>The client confirms that all items provided for transport are in a condition suitable for removal unless otherwise disclosed prior to the move.</p>';
+  html+='<h3>Client Packing Responsibility</h3><p>Items packed by the client are transported at the client&#39;s risk unless damage is directly caused by proven negligence during handling by our staff.</p>';
+  html+='<h3>Fragile and High-Risk Items</h3><p>Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics require special care and must be disclosed before the move.</p>';
+  html+='<h3>Television and Electronic Equipment</h3><p>Modern televisions are extremely fragile and may suffer internal panel damage even when handled with reasonable care. Televisions should ideally be transported in original packaging.</p>';
+  html+='<h3>Disclosure of High-Value Items</h3><p>Items valued above $800 must be disclosed prior to the move.</p>';
+  html+='<h3>Safe Transport and Additional Trips</h3><p>If fragile items cannot be safely transported due to limited truck space, Deus Labour Hire may transport them in a separate load.</p>';
+  html+='<h3>Refusal to Move Unsafe Items</h3><p>Deus Labour Hire reserves the right to refuse items considered unsafe for transport.</p>';
+  html+='<h3>Pre-Existing Damage</h3><p>Deus Labour Hire is not responsible for items that were already damaged before the move.</p>';
+  html+='<h3>Liability for Loss or Damage</h3><p>If damage occurs due to negligence during the service, liability will be assessed based on the fair market value of the item at the time of the move considering age, condition and depreciation. Nothing in these Terms and Conditions excludes, restricts or modifies any rights that the client may have under the Australian Consumer Law.</p>';
+  html+='<h3>Transit Insurance</h3><p>Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited subject to the policy terms and conditions.</p>';
+  html+='<h3>Insurance Claims</h3><p>If a claim is submitted to the insurer the final decision regarding compensation will be determined by the insurance company.</p>';
+  html+='<h3>Claims Procedure</h3><p>Any claim must be reported within 24 hours after completion of the move and include photographs and a description of the damage.</p>';
+  html+='<h3>Resolution of Claims</h3><p>Resolution may include repair, replacement with the same model, similar second-hand replacement or payment of the fair market value.</p>';
+  html+='<h3>Access and Safety</h3><p>The client must ensure safe access to the property. Additional charges may apply for stairs or restricted access.</p>';
+  html+='<h3>Heavy Items</h3><p>Items over 100kg must be disclosed before the move.</p>';
+  html+='<h3>Payment Terms</h3><p>Payment is due upon completion of the service unless otherwise agreed.</p>';
+  html+='<h3>Governing Law</h3><p>These Terms and Conditions are governed by the laws of Australia.</p>';
+  html+='<h2>SERVICE AGREEMENT</h2>';
+  html+='<h3>Acceptance and Scope</h3><p>By booking or accepting our services, the client confirms they have read, understood, and agreed to these Terms and Conditions. Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client&#39;s belongings. These Terms are governed by the laws of Australia.</p>';
+  html+='<h3>Client Responsibilities</h3><p>Items packed by the client are transported at the client&#39;s risk unless damage is directly caused by proven negligence. The client must ensure safe access to the property. Items over 100kg must be disclosed. Items valued above $800 must be disclosed.</p>';
+  html+='<h3>Fragile and Special Items</h3><p>Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics must be disclosed before the move. Deus Labour Hire reserves the right to refuse items considered unsafe for transport.</p>';
+  html+='<h3>Liability and Insurance</h3><p>Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited. Any claim must be reported within 24 hours. Nothing in these terms excludes the client&#39;s rights under Australian Consumer Law.</p>';
+  html+='<h3>Payment and Additional Fees</h3><p>Payment is due upon completion of the service unless otherwise agreed. Additional charges may apply for stairs, restricted access or long carrying distances.</p>';
+  html+='<div class="sig-box">';
+  html+='<div style="font-weight:700;font-size:15px;margin-bottom:8px;color:#2a6b2a">DIGITAL SIGNATURE</div>';
+  html+='<div class="sig-name">'+(b.signature_name||'Not signed')+'</div>';
+  html+='<div style="font-size:13px;color:#555;margin-top:8px">Signed on: '+signDate+' at '+signTime+'</div>';
+  html+='<div style="font-size:12px;color:#777;margin-top:6px">By signing, the client confirms they have read and agreed to all Terms &amp; Conditions and the Service Agreement above.</div>';
+  html+='</div>';
+  html+='<div class="footer"><strong>Deus Labour Hire Pty Ltd</strong><br>deus.labour.hire@gmail.com | 0406 832 721<br>Document generated: '+new Date().toLocaleDateString('en-AU')+'</div>';
+  html+='</body></html>';
+  var blob=new Blob([html],{type:'text/html'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='SignedDocuments_'+b.name.replace(/ /g,'_')+'_'+b.date+'.html';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── INVOICE TAB ──────────────────────────────────────────────────────────────
+var invExtraCount = 0;
+
+function toggleInvFixed(){
+  var on = document.getElementById('inv_fixed').checked;
+  document.getElementById('inv_fixed_fields').style.display = on ? 'block' : 'none';
+  var jobRows = document.querySelectorAll('#tabInvoice .row');
+}
+
+function updateInvGST(){
+  var on = document.getElementById('inv_gst').checked;
+  var badge = document.getElementById('inv_gst_badge');
+  badge.textContent = on ? 'ON' : 'OFF';
+  badge.style.background = on ? '#1a3a1a' : '#3a1a1a';
+  badge.style.color = on ? '#86efac' : '#fca5a5';
+}
+
+function addInvExtra(){
+  var id = 'invex' + (invExtraCount++);
+  var div = document.createElement('div');
+  div.id = id;
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 100px 36px;gap:8px;margin-bottom:8px;align-items:center';
+  var i1 = document.createElement('input');
+  i1.type = 'text'; i1.placeholder = 'Description'; i1.id = id+'d';
+  i1.style.cssText = 'background:#0e1218;border:1px solid #1c2130;border-radius:7px;padding:8px 10px;color:#e8f0e8;font-size:13px;font-family:inherit;outline:none';
+  var i2 = document.createElement('input');
+  i2.type = 'number'; i2.placeholder = '$0'; i2.id = id+'a'; i2.min='0'; i2.step='0.01';
+  i2.style.cssText = 'background:#0e1218;border:1px solid #1c2130;border-radius:7px;padding:8px 10px;color:#e8f0e8;font-size:13px;font-family:inherit;outline:none';
+  var btn = document.createElement('button');
+  btn.textContent = '✕';
+  btn.style.cssText = 'background:#3a0f0f;color:#fca5a5;border:none;border-radius:7px;padding:8px;cursor:pointer;font-size:13px';
+  btn.addEventListener('click', function(){ div.remove(); });
+  div.appendChild(i1); div.appendChild(i2); div.appendChild(btn);
+  document.getElementById('inv_extras').appendChild(div);
+}
+
+function createInvoice(id){
+  var b = bookings.find(function(x){ return String(x.id)===String(id); });
+  if(!b) return;
+  // Switch to invoice tab
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('.tab').forEach(function(t){ if(t.textContent.includes('Invoice')) t.classList.add('active'); });
+  ['Calendar','Clients','Docs','Calc','Invoice','Draw'].forEach(function(n){ var el=$('tab'+n); if(el) el.style.display='none'; });
+  $('tabInvoice').style.display = 'block';
+  // Auto-fill data
+  document.getElementById('inv_client').value = b.name || '';
+  document.getElementById('inv_pickup').value = b.pickup_address || '';
+  document.getElementById('inv_dropoff').value = b.dropoff_address || '';
+  document.getElementById('inv_phone').value = b.phone || '';
+  document.getElementById('inv_email').value = b.email || '';
+  document.getElementById('inv_start').value = b.start_time || '';
+  document.getElementById('inv_desc').value = 'Removal service';
+  // Set date
+  if(b.date) document.getElementById('inv_date').value = b.date;
+  // Set due date (7 days later)
+  if(b.date){
+    var d = new Date(b.date+'T00:00:00');
+    d.setDate(d.getDate()+7);
+    document.getElementById('inv_due').value = d.toISOString().split('T')[0];
+  }
+  // Reset preview
+  document.getElementById('inv_preview').style.display = 'none';
+  window.scrollTo({top:0,behavior:'smooth'});
+  showToast('Client data loaded! Add finish time to generate invoice.');
+}
+
+function generateAdminInvoice(){
+  var clientName = document.getElementById('inv_client').value.trim();
+  var isFixed = document.getElementById('inv_fixed').checked;
+  var start = document.getElementById('inv_start').value;
+  var finish = document.getElementById('inv_finish').value;
+
+  if(!clientName){ showToast('Please enter client name.'); return; }
+
+  var gst = document.getElementById('inv_gst').checked;
+  var rate = parseFloat(document.getElementById('inv_rate').value)||150;
+  var callout = parseFloat(document.getElementById('inv_callout').value)||0;
+  var desc = document.getElementById('inv_desc').value.trim()||'Removal Service';
+
+  function fmtT(h,m){ return (h>12?h-12:(h||12))+':'+(m<10?'0'+m:m)+' '+(h>=12?'PM':'AM'); }
+  function fmtD(str){ if(!str)return '-'; var d=new Date(str+'T00:00:00'); return d.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}); }
+
+  var extras=[];
+  document.querySelectorAll('#inv_extras > div').forEach(function(el){
+    var d=el.querySelector('[id$="d"]'), a=el.querySelector('[id$="a"]');
+    if(d&&a){ var dv=d.value.trim(),av=parseFloat(a.value)||0; if(dv&&av>0) extras.push({desc:dv,amt:av}); }
+  });
+  var extTotal = extras.reduce(function(s,e){return s+e.amt;},0);
+
+  var subtotal, rows='', durStr='-';
+
+  if(isFixed){
+    var fixedAmt = parseFloat(document.getElementById('inv_fixed_amt').value)||0;
+    if(!fixedAmt){ showToast('Please enter fixed price amount.'); return; }
+    var fixedDesc = document.getElementById('inv_fixed_desc').value.trim()||'Removal Service — Fixed Price';
+    subtotal = fixedAmt + extTotal;
+    rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+fixedDesc+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Fixed</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+fixedAmt.toFixed(2)+'</td></tr>';
+    durStr = '—';
+  } else {
+    if(!start||!finish){ showToast('Please enter start and finish times.'); return; }
+    var sh=parseInt(start.split(':')[0]),sm=parseInt(start.split(':')[1]);
+    var fh=parseInt(finish.split(':')[0]),fm=parseInt(finish.split(':')[1]);
+    var sM=sh*60+sm,fM=fh*60+fm;
+    if(fM<sM) fM+=1440;
+    var totalMins=fM-sM, hours=totalMins/60;
+    var hrs=Math.floor(hours),mins=totalMins%60;
+    durStr = hrs>0?(mins>0?hrs+'h '+mins+'min':hrs+'h'):mins+'min';
+    var labour=hours*rate;
+    subtotal=labour+callout+extTotal;
+    rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+desc+'<br><small style="color:#888">'+fmtT(sh,sm)+' – '+fmtT(fh,fm)+'</small></td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+hours.toFixed(2)+'h</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+rate.toFixed(2)+'/hr</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+labour.toFixed(2)+'</td></tr>';
+    if(callout>0) rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Call Out Fee</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+callout.toFixed(2)+'</td></tr>';
+  }
+
+  extras.forEach(function(e){ rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+e.desc+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+e.amt.toFixed(2)+'</td></tr>'; });
+
+  var gstAmt=gst?subtotal*0.1:0, total=subtotal+gstAmt;
+
+  // Fill preview
+  var num=document.getElementById('inv_num').value;
+  document.getElementById('inv_p_num').textContent=num;
+  document.getElementById('inv_p_client').textContent=clientName;
+  document.getElementById('inv_p_date').textContent=fmtD(document.getElementById('inv_date').value);
+  document.getElementById('inv_p_due').textContent=fmtD(document.getElementById('inv_due').value);
+  document.getElementById('inv_p_dur').textContent=durStr;
+  document.getElementById('inv_p_ref').textContent=clientName.split(' ')[0].toUpperCase()+'_'+num;
+
+  var det='';
+  var pu=document.getElementById('inv_pickup').value.trim();
+  var dr=document.getElementById('inv_dropoff').value.trim();
+  var ph=document.getElementById('inv_phone').value.trim();
+  var em=document.getElementById('inv_email').value.trim();
+  if(pu) det+='From: '+pu+'<br>';
+  if(dr) det+='To: '+dr+'<br>';
+  if(ph) det+=ph+'<br>';
+  if(em) det+=em;
+  document.getElementById('inv_p_detail').innerHTML=det;
+  document.getElementById('inv_p_items').innerHTML=rows;
+
+  var totals='';
+  totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>Subtotal</span><span>$'+subtotal.toFixed(2)+'</span></div>';
+  if(gst) totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>GST (10%)</span><span>$'+gstAmt.toFixed(2)+'</span></div>';
+  totals+='<div style="display:flex;justify-content:space-between;padding:10px 0 4px;font-size:16px;font-weight:700;color:#1a1a1a;border-top:2px solid #1a1a1a;margin-top:4px"><span>TOTAL DUE</span><span>AUD $'+total.toFixed(2)+'</span></div>';
+  if(gst) totals+='<div style="font-size:11px;color:#888;text-align:right;margin-top:3px">GST included: $'+gstAmt.toFixed(2)+'</div>';
+  document.getElementById('inv_p_totals').innerHTML=totals;
+
+  document.getElementById('inv_preview').style.display='block';
+  document.getElementById('inv_preview').scrollIntoView({behavior:'smooth'});
+}
+
+function resetAdminInvoice(){
+  ['inv_client','inv_pickup','inv_dropoff','inv_phone','inv_email','inv_start','inv_finish','inv_desc'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('inv_rate').value='150';
+  document.getElementById('inv_callout').value='0';
+  document.getElementById('inv_gst').checked=false;
+  document.getElementById('inv_fixed').checked=false;
+  document.getElementById('inv_fixed_fields').style.display='none';
+  document.getElementById('inv_extras').innerHTML='';
+  document.getElementById('inv_preview').style.display='none';
+  updateInvGST();
+}
+
+function printAdminInvoice(){
+  var preview = document.getElementById('inv_preview');
+  // Substitui src relativo por URL absoluta no GitHub Pages (necessário pq janela nova não herda base path)
+  var LOGO_URL = 'https://deuslabourhire.github.io/deus-booking/logo.png';
+  var html = preview.innerHTML.replace(/src="\.\/logo\.png"/g, 'src="'+LOGO_URL+'"');
+  var w = window.open('','_blank');
+  w.document.write('<html><head><title>Invoice</title><style>body{font-family:Arial,sans-serif;margin:20px}table{width:100%;border-collapse:collapse}</style></head><body>');
+  w.document.write(html);
+  w.document.write('</body></html>');
+  w.document.close();
+  w.print();
+}
+
+async function sendInvoiceEmail(){
+  var email = document.getElementById('inv_email').value.trim();
+  var client = document.getElementById('inv_client').value.trim();
+  var num = document.getElementById('inv_num').value;
+  if(!email){ showToast('Please enter client email first.'); return; }
+
+  var preview = document.getElementById('inv_preview');
+  // Logo precisa ser URL absoluta no email pq clientes não tem o contexto do GitHub Pages
+  var LOGO_URL = 'https://deuslabourhire.github.io/deus-booking/logo.png';
+  var previewHtml = preview.innerHTML.replace(/src="\.\/logo\.png"/g, 'src="'+LOGO_URL+'"');
+  var invoiceHtml = '<div style="font-family:Arial,sans-serif;max-width:650px;margin:0 auto">'+previewHtml+'</div>';
+
+  showToast('Sending email...');
+  try{
+    var res = await fetch('https://amnacoyjgdfykdfepkze.supabase.co/functions/v1/resend-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        to:email,
+        subject:'Invoice '+num+' — Deus Labour Hire',
+        invoiceHtml:invoiceHtml
+      })
+    });
+    var data = await res.json();
+    if(data.id||res.ok){ showToast('Invoice sent to '+email+' ✓'); }
+    else { throw new Error(data.message||'Failed'); }
+  }catch(e){ showToast('Error: '+e.message); }
+}
+
+// ── MONTHLY DRAW ──────────────────────────────────────────────────────────────
+var drawParticipants = JSON.parse(localStorage.getItem('deus_draw_p') || '[]');
+var drawHistory = JSON.parse(localStorage.getItem('deus_draw_h') || '[]');
+var drawDrawing = false;
+var drawCurrentWinner = '';
+
+function saveDrawData(){
+  localStorage.setItem('deus_draw_p', JSON.stringify(drawParticipants));
+  localStorage.setItem('deus_draw_h', JSON.stringify(drawHistory));
+}
+
+function renderDraw(){
+  var chips = document.getElementById('drawChips');
+  var badge = document.getElementById('drawCountBadge');
+  var btn = document.getElementById('drawBtn');
+  if(!chips) return;
+  badge.textContent = drawParticipants.length + (drawParticipants.length===1?' client':' clients');
+  btn.disabled = drawParticipants.length < 2 || drawDrawing;
+  btn.style.opacity = (drawParticipants.length < 2 || drawDrawing) ? '0.4' : '1';
+  if(!drawParticipants.length){
+    chips.innerHTML = '<div style="font-size:13px;color:#6b7a6b;font-style:italic;padding:8px 0">No clients yet — load or add above 👆</div>';
+    return;
+  }
+  chips.innerHTML = drawParticipants.map(function(p,i){
+    return '<div style="display:flex;align-items:center;gap:7px;background:#0e1218;border:1px solid #1c2130;border-radius:30px;padding:6px 12px;font-size:13px;font-weight:700;color:#e8f0e8">'+
+      p+'<button onclick="removeDrawParticipant('+i+')" style="background:none;border:none;color:#6b7a6b;cursor:pointer;font-size:14px;padding:0;line-height:1">✕</button></div>';
+  }).join('');
+  renderDrawHistory();
+}
+
+function renderDrawHistory(){
+  var sec = document.getElementById('drawHistorySection');
+  var list = document.getElementById('drawHistList');
+  if(!sec||!list) return;
+  if(!drawHistory.length){ sec.style.display='none'; return; }
+  sec.style.display = 'block';
+  var medals = ['🥇','🥈','🥉'];
+  list.innerHTML = [...drawHistory].reverse().map(function(h,i){
+    return '<div style="background:#0e1218;border:1px solid #1c2130;border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px">'+
+      '<span>'+medals[i]||'🎖️'+'</span>'+
+      '<span style="font-weight:700;color:#86efac">'+h.name+'</span>'+
+      '<span style="color:#6b7a6b;font-size:11px">'+h.date+'</span></div>';
+  }).join('');
+}
+
+async function loadDrawClients(){
+  showToast("Loading clients for this month...");
+  var selMonth = document.getElementById('drawMonth');
+  var selYear = document.getElementById('drawYear');
+  var m = parseInt(selMonth.value);
+  var y = parseInt(selYear.value);
+  var from = y+'-'+(m<10?'0'+m:m)+'-01';
+  var last = new Date(y, m, 0).getDate();
+  var to = y+'-'+(m<10?'0'+m:m)+'-'+(last<10?'0'+last:last);
+  try{
+    var res = await fetch(SUPABASE_URL+'/rest/v1/bookings?date=gte.'+from+'&date=lte.'+to+'&status=eq.completed&select=name,status',{
+      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+    });
+    var data = await res.json();
+    if(!Array.isArray(data)||!data.length){ showToast('No clients found for this month.'); return; }
+    var names = data.map(function(b){ return b.name; });
+    // Add unique names only
+    names.forEach(function(n){
+      if(n && drawParticipants.indexOf(n)===-1) drawParticipants.push(n);
+    });
+    saveDrawData();
+    renderDraw();
+    showToast(names.length+' completed jobs this month! ✓');
+  }catch(e){
+    showToast('Error loading clients.');
+  }
+}
+
+function addDrawParticipant(){
+  var inp = document.getElementById('drawNameInput');
+  var name = inp.value.trim();
+  if(!name) return;
+  drawParticipants.push(name);
+  saveDrawData(); renderDraw();
+  inp.value=''; inp.focus();
+}
+
+function removeDrawParticipant(i){
+  drawParticipants.splice(i,1);
+  saveDrawData(); renderDraw();
+}
+
+function clearDrawAll(){
+  if(!drawParticipants.length||!confirm('Clear all participants?')) return;
+  drawParticipants=[];
+  saveDrawData(); renderDraw();
+  document.getElementById('drawWinner').style.display='none';
+  document.getElementById('drawDrum').style.display='none';
+}
+
+function clearDrawHistory(){
+  if(!confirm('Delete all draw history?')) return;
+  drawHistory=[];
+  saveDrawData(); renderDrawHistory();
+}
+
+function startDraw(){
+  if(drawParticipants.length<2||drawDrawing) return;
+  drawDrawing=true;
+  document.getElementById('drawBtn').disabled=true;
+  document.getElementById('drawBtn').style.opacity='0.4';
+  document.getElementById('drawWinner').style.display='none';
+  document.getElementById('drawDrum').style.display='block';
+
+  var rolling = document.getElementById('drawRolling');
+  var elapsed=0, duration=3200;
+  var iv = setInterval(function(){
+    rolling.textContent = drawParticipants[Math.floor(Math.random()*drawParticipants.length)];
+    elapsed+=90;
+    if(elapsed>=duration){
+      clearInterval(iv);
+      drawCurrentWinner = drawParticipants[Math.floor(Math.random()*drawParticipants.length)];
+      rolling.textContent = drawCurrentWinner;
+      setTimeout(function(){
+        document.getElementById('drawDrum').style.display='none';
+        document.getElementById('drawWinnerName').textContent=drawCurrentWinner;
+        document.getElementById('drawWinner').style.display='block';
+        var now=new Date();
+        var months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+        var selM=parseInt(document.getElementById('drawMonth').value);
+        var selY=parseInt(document.getElementById('drawYear').value);
+        var monthStr=months[selM-1]+' '+selY;
+        document.getElementById('drawWinnerMonth').textContent='Winner of '+monthStr;
+        drawHistory.push({name:drawCurrentWinner,date:now.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}),month:monthStr});
+        saveDrawData(); renderDrawHistory();
+        drawDrawing=false;
+        setTimeout(announceDrawWinner,600);
+      },450);
+    }
+  },90);
+}
+
+function announceDrawWinner(){
+  if(!drawCurrentWinner||!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  var msg=new SpeechSynthesisUtterance();
+  msg.text='And the winner of this month one hundred dollar gift card is... '+drawCurrentWinner+'! Congratulations! Thank you for choosing Deus Labour Hire!';
+  msg.lang='en-AU'; msg.rate=0.88; msg.pitch=1.05; msg.volume=1;
+  var voices=window.speechSynthesis.getVoices();
+  var v=voices.find(function(v){return v.lang.startsWith('en-AU');})||voices.find(function(v){return v.lang.startsWith('en');});
+  if(v) msg.voice=v;
+  window.speechSynthesis.speak(msg);
+}
+
+function resetDraw(){
+  document.getElementById('drawWinner').style.display='none';
+  window.speechSynthesis&&window.speechSynthesis.cancel();
+  drawDrawing=false; drawCurrentWinner='';
+  renderDraw();
+}
+
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&document.activeElement===document.getElementById('drawNameInput')) addDrawParticipant();
+});
+
+window.speechSynthesis&&window.speechSynthesis.getVoices();
+window.speechSynthesis&&(window.speechSynthesis.onvoiceschanged=function(){ window.speechSynthesis.getVoices(); });
+
+// Init draw on load
+setTimeout(function(){
+  var now = new Date();
+  var selM = document.getElementById('drawMonth');
+  var selY = document.getElementById('drawYear');
+  if(selM) selM.value = now.getMonth()+1;
+  if(selY) selY.value = now.getFullYear();
+  renderDraw(); renderDrawHistory();
+}, 500);
+</script>
+
+
+</body></html>
