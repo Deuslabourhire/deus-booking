@@ -395,8 +395,7 @@ Company Representative: Deus Labour Hire Pty Ltd</div>
 </div>
 
 <script>
-const SUPABASE_URL='https://amnacoyjgdfykdfepkze.supabase.co';
-const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtbmFjb3lqZ2RmeWtkZmVwa3plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxODI4MzAsImV4cCI6MjA5MDc1ODgzMH0.ma37AnfeaDdIN42TNUpt7EVoNYvT6nHQFJra-4XS_Pc';
+const EDGE_FUNCTION_URL='https://amnacoyjgdfykdfepkze.supabase.co/functions/v1/create-booking';
 
 let formData={};
 const TOTAL_CHECKS=14;
@@ -476,18 +475,19 @@ function goStep4(){
 async function submitBooking(){
   const btn=$('btnSubmit');
   btn.textContent='Submitting...';btn.disabled=true;
-  const booking={name:formData.name,phone:formData.phone,email:formData.email,date:formData.date,start_time:formData.startTime,pickup_address:formData.pickupAddress,dropoff_address:formData.dropoffAddress,notes:formData.notes||'',signature_name:formData.signatureName,signed_date:formData.signedDate,status:'upcoming',reminder_sent:false,created_at:new Date().toISOString()};
+  const booking={name:formData.name,phone:formData.phone,email:formData.email,date:formData.date,startTime:formData.startTime,pickupAddress:formData.pickupAddress,dropoffAddress:formData.dropoffAddress,notes:formData.notes||'',signatureName:formData.signatureName,signedDate:formData.signedDate};
   let saved=false;
   try{
-    const res=await fetch(`${SUPABASE_URL}/rest/v1/bookings`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=minimal'},body:JSON.stringify(booking)});
-    if(res.ok||res.status===201)saved=true;
-    else{const txt=await res.text();console.error('Supabase error:',res.status,txt);}
+    const res=await fetch(EDGE_FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(booking)});
+    const result=await res.json();
+    if(res.ok&&result.success)saved=true;
+    else console.error('create-booking error:',res.status,result);
   }catch(err){console.error('Network error:',err);}
   if(!saved){btn.textContent='✓ Confirm My Booking';btn.disabled=false;showToast('Could not save. Please try again or contact us via WhatsApp.',5000);return;}
   document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
   $('stepDone').classList.add('active');
   for(let i=1;i<=4;i++){const b=$('b'+i);if(b)b.className='bar done';}
-  $('confirmDetails').innerHTML=[['Name',booking.name],['Phone',booking.phone],['Date',booking.date],['Start',booking.start_time],['From',booking.pickup_address],['To',booking.dropoff_address]].map(([k,v])=>`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span style="color:var(--text-mid)">${k}</span><span style="color:var(--text);font-weight:600;text-align:right;max-width:65%">${v}</span></div>`).join('');
+  $('confirmDetails').innerHTML=[['Name',booking.name],['Phone',booking.phone],['Date',booking.date],['Start',booking.startTime],['From',booking.pickupAddress],['To',booking.dropoffAddress]].map(([k,v])=>`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span style="color:var(--text-mid)">${k}</span><span style="color:var(--text);font-weight:600;text-align:right;max-width:65%">${v}</span></div>`).join('');
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
