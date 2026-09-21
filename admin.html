@@ -147,10 +147,11 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
   <div class="login-card">
     <img src="./logo.png" alt="Deus Labour Hire" class="login-logo" onerror="this.style.display=&#39;none&#39;">
     <h2>Admin Login</h2>
-    <p>Enter the password to access the panel</p>
-    <input type="password" id="passInput" placeholder="Password" onkeydown="if(event.key===&#39;Enter&#39;)login()">
+    <p>Sign in with your admin account</p>
+    <input type="email" id="emailInput" placeholder="Email" autocomplete="username" onkeydown="if(event.key===&#39;Enter&#39;)login()">
+    <input type="password" id="passInput" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key===&#39;Enter&#39;)login()">
     <button class="btn-login" onclick="login()">Login →</button>
-    <div class="login-err" id="loginErr">Incorrect password. Please try again.</div>
+    <div class="login-err" id="loginErr">Invalid email, password, or access level. Please try again.</div>
   </div>
 </div>
 
@@ -552,10 +553,11 @@ These Terms and Conditions are governed by the laws of Australia.</div>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SUPABASE_URL='https://amnacoyjgdfykdfepkze.supabase.co'; // DEMO MODE - no connection
+const SUPABASE_URL='https://amnacoyjgdfykdfepkze.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtbmFjb3lqZ2RmeWtkZmVwa3plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxODI4MzAsImV4cCI6MjA5MDc1ODgzMH0.ma37AnfeaDdIN42TNUpt7EVoNYvT6nHQFJra-4XS_Pc';
-const ADMIN_HASH='53c685d8f106035c02f94b6e85faecdf888b146e46f9eb8dda03f314aa6ca9c4';
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let bookings=[],calDate=new Date();
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -647,34 +649,31 @@ Company Representative: Deus Labour Hire Pty Ltd`;
 function $(id){return document.getElementById(id);}
 function showToast(msg,dur=3000){const el=$('toast');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',dur);}
 
-async function hashPassword(p){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
-
-async function login(){
-  const pw=$('passInput').value;
-  const h=await hashPassword(pw);
-  if(h===ADMIN_HASH){$('loginScreen').style.display='none';$('app').style.display='block';loadBookings();}
-  else{$('loginErr').style.display='block';$('passInput').value='';}
+async function requireAdmin(){
+  const {data:{session}}=await db.auth.getSession();
+  if(!session||!session.user)return false;
+  const {data:role,error}=await db.from('user_roles').select('role').eq('user_id',session.user.id).single();
+  if(error||!role||role.role!=='admin'){await db.auth.signOut();return false;}
+  return true;
 }
-function logout(){$('loginScreen').style.display='flex';$('app').style.display='none';$('passInput').value='';}
-
-
-
+async function login(){
+  const email=$('emailInput').value.trim(),password=$('passInput').value;
+  $('loginErr').style.display='none';
+  if(!email||!password){$('loginErr').textContent='Please enter your email and password.';$('loginErr').style.display='block';return;}
+  const {data,error}=await db.auth.signInWithPassword({email,password});
+  if(error||!data.user){$('loginErr').textContent='Invalid email or password. Please try again.';$('loginErr').style.display='block';$('passInput').value='';return;}
+  const {data:role,error:roleError}=await db.from('user_roles').select('role').eq('user_id',data.user.id).single();
+  if(roleError||!role||role.role!=='admin'){await db.auth.signOut();$('loginErr').textContent='Access denied. This account is not an admin.';$('loginErr').style.display='block';$('passInput').value='';return;}
+  $('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();
+}
+async function logout(){await db.auth.signOut();$('loginScreen').style.display='flex';$('app').style.display='none';$('passInput').value='';$('emailInput').value='';$('loginErr').style.display='none';}
+async function restoreSession(){if(await requireAdmin()){$('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();}else{$('loginScreen').style.display='flex';$('app').style.display='none';}}
 
 async function loadBookings(){
-  try{
-    const res=await fetch(SUPABASE_URL+'/rest/v1/bookings?order=date.desc',{headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
-    const data=await res.json();
-    bookings=Array.isArray(data)?data:[];
-  }catch(e){bookings=[];showToast('Could not connect to database.',4000);}
-  renderAll();
+  try{const {data,error}=await db.from('bookings').select('*').order('date',{ascending:false});if(error)throw error;bookings=Array.isArray(data)?data:[];}catch(e){bookings=[];showToast('Could not connect to database.',4000);}renderAll();
 }
-
 async function saveToSupabase(data,id){
-  if(!SUPABASE_URL)return null;
-  var url=id?(SUPABASE_URL+'/rest/v1/bookings?id=eq.'+id):(SUPABASE_URL+'/rest/v1/bookings');
-  var method=id?'PATCH':'POST';
-  var headers={'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=representation'};
-  try{var res=await fetch(url,{method:method,headers:headers,body:JSON.stringify(data)});var d=await res.json();return Array.isArray(d)?d[0]:d;}catch(e){return null;}
+  try{if(id){const {data:row,error}=await db.from('bookings').update(data).eq('id',id).select().single();if(error)throw error;return row;}const {data:row,error}=await db.from('bookings').insert(data).select().single();if(error)throw error;return row;}catch(e){console.error('Supabase save error:',e);return null;}
 }
 
 function renderAll(){updateStats();renderCalendar();renderClients();$('docContent').textContent=TERMS_TEXT;}
@@ -774,7 +773,7 @@ function renderClients(){
 function toggleCard(id){const body=$('body_'+id),chev=$('chev_'+id);if(!body||!chev)return;const open=body.classList.toggle('open');chev.textContent=open?'▲':'▼';}
 async function markDone(id){bookings=bookings.map(b=>String(b.id)===String(id)?{...b,status:'completed'}:b);await saveToSupabase({status:'completed'},id);renderAll();showToast('Job marked as completed ✓');}
 async function sendReminder(id){bookings=bookings.map(b=>String(b.id)===String(id)?{...b,reminder_sent:true}:b);await saveToSupabase({reminder_sent:true},id);const b=bookings.find(b=>String(b.id)===String(id));renderAll();showToast(`Reminder sent to ${b?b.name:'client'} ✓`);}
-async function deleteJob(id){if(!confirm('Delete this booking? This cannot be undone.'))return;bookings=bookings.filter(b=>String(b.id)!==String(id));if(SUPABASE_URL)await fetch(SUPABASE_URL+'/rest/v1/bookings?id=eq.'+id,{method:'DELETE',headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});renderAll();showToast('Booking deleted.');}
+async function deleteJob(id){if(!confirm('Delete this booking? This cannot be undone.'))return;try{const {error}=await db.from('bookings').delete().eq('id',id);if(error)throw error;bookings=bookings.filter(b=>String(b.id)!==String(id));renderAll();showToast('Booking deleted.');}catch(e){showToast('Error deleting booking.',4000);}}
 
 function openAddModal(){$('modalTitle').textContent='Add New Job';$('editId').value='';['mName','mPhone','mEmail','mDate','mTime','mPickup','mDropoff','mNotes'].forEach(id=>$(id).value='');$('mStatus').value='upcoming';$('modalOverlay').classList.add('open');}
 function openEditModal(id){const b=bookings.find(b=>String(b.id)===String(id));if(!b)return;$('modalTitle').textContent='Edit Booking';$('editId').value=String(id);$('mName').value=b.name||'';$('mPhone').value=b.phone||'';$('mEmail').value=b.email||'';$('mDate').value=b.date||'';$('mTime').value=b.start_time||'';$('mPickup').value=b.pickup_address||'';$('mDropoff').value=b.dropoff_address||'';$('mNotes').value=b.notes||'';$('mStatus').value=b.status||'upcoming';$('modalOverlay').classList.add('open');}
@@ -1245,10 +1244,9 @@ async function loadDrawClients(){
   var last = new Date(y, m, 0).getDate();
   var to = y+'-'+(m<10?'0'+m:m)+'-'+(last<10?'0'+last:last);
   try{
-    var res = await fetch(SUPABASE_URL+'/rest/v1/bookings?date=gte.'+from+'&date=lte.'+to+'&status=eq.completed&select=name,status',{
-      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
-    });
-    var data = await res.json();
+    var result = await db.from('bookings').select('name,status').gte('date',from).lte('date',to).eq('status','completed');
+    if(result.error) throw result.error;
+    var data = result.data;
     if(!Array.isArray(data)||!data.length){ showToast('No clients found for this month.'); return; }
     var names = data.map(function(b){ return b.name; });
     // Add unique names only
@@ -1362,6 +1360,8 @@ setTimeout(function(){
   if(selY) selY.value = now.getFullYear();
   renderDraw(); renderDrawHistory();
 }, 500);
+
+restoreSession();
 </script>
 
 
