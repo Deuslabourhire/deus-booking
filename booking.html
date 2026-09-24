@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<!-- saved from url=(0051)file:///C:/Users/jeffe/Downloads/booking%20(2).html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Book a Move — Deus Labour Hire</title>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="./Book a Move — Deus Labour Hire 7_files/css2" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -136,7 +136,7 @@ textarea{resize:vertical;min-height:78px}
   <div class="header-inner">
     <div style="display:flex;align-items:center;gap:12px">
       <div style="width:42px;height:42px;background:var(--green);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <svg width="23" height="23" viewBox="0 0 24 24" fill="#111111"><path d="M1 3h15v13H1zM16 8h6l3 3v5h-9V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        <svg width="23" height="23" viewBox="0 0 24 24" fill="#111111"><path d="M1 3h15v13H1zM16 8h6l3 3v5h-9V8z"></path><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
       </div>
       <div>
         <div style="font-size:17px;color:#fff;font-weight:800;letter-spacing:.01em">Deus Labour Hire</div>
@@ -169,17 +169,17 @@ textarea{resize:vertical;min-height:78px}
       <div class="step-tag">Step 1 of 4</div>
       <div class="step-title">Book Your Move</div>
       <p class="step-hint">Fill in your details below. All fields marked * are required. We'll confirm your booking shortly.</p>
-      <div class="field" id="f-name"><label class="field-label">Full Name *</label><input type="text" id="name" placeholder="Jane Smith" autocomplete="name"/><div class="field-error">Please enter your full name.</div></div>
+      <div class="field" id="f-name"><label class="field-label">Full Name *</label><input type="text" id="name" placeholder="Jane Smith" autocomplete="name"><div class="field-error">Please enter your full name.</div></div>
       <div class="field-row">
-        <div class="field" id="f-phone"><label class="field-label">Phone *</label><input type="tel" id="phone" placeholder="04xx xxx xxx" autocomplete="tel"/><div class="field-error">Enter a valid phone number.</div></div>
-        <div class="field" id="f-email"><label class="field-label">Email *</label><input type="email" id="email" placeholder="jane@email.com" autocomplete="email"/><div class="field-error">Enter a valid email.</div></div>
+        <div class="field" id="f-phone"><label class="field-label">Phone *</label><input type="tel" id="phone" placeholder="04xx xxx xxx" autocomplete="tel"><div class="field-error">Enter a valid phone number.</div></div>
+        <div class="field" id="f-email"><label class="field-label">Email *</label><input type="email" id="email" placeholder="jane@email.com" autocomplete="email"><div class="field-error">Enter a valid email.</div></div>
       </div>
       <div class="field-row">
-        <div class="field" id="f-date"><label class="field-label">Move Date *</label><input type="date" id="date"/><div class="field-error">Select a date.</div></div>
-        <div class="field" id="f-time"><label class="field-label">Start Time *</label><input type="time" id="startTime"/><div class="field-error">Select a time.</div></div>
+        <div class="field" id="f-date"><label class="field-label">Move Date *</label><input type="date" id="date"><div class="field-error">Select a date.</div></div>
+        <div class="field" id="f-time"><label class="field-label">Start Time *</label><input type="time" id="startTime"><div class="field-error">Select a time.</div></div>
       </div>
-      <div class="field" id="f-pickup"><label class="field-label">Pick-up Address *</label><input type="text" id="pickup" placeholder="123 Current St, Suburb NSW 2000" autocomplete="street-address"/><div class="field-error">Enter pick-up address.</div></div>
-      <div class="field" id="f-dropoff"><label class="field-label">Drop-off Address *</label><input type="text" id="dropoff" placeholder="456 New Ave, Suburb NSW 2000"/><div class="field-error">Enter drop-off address.</div></div>
+      <div class="field" id="f-pickup"><label class="field-label">Pick-up Address *</label><input type="text" id="pickup" placeholder="123 Current St, Suburb NSW 2000" autocomplete="street-address"><div class="field-error">Enter pick-up address.</div></div>
+      <div class="field" id="f-dropoff"><label class="field-label">Drop-off Address *</label><input type="text" id="dropoff" placeholder="456 New Ave, Suburb NSW 2000"><div class="field-error">Enter drop-off address.</div></div>
       <div class="field"><label class="field-label">Special Items / Notes</label><textarea id="notes" placeholder="High-value items over $800, heavy furniture, stairs, lift access..."></textarea></div>
       <button class="btn btn-primary" onclick="goStep2()">Continue to Checklist →</button>
     </div>
@@ -195,36 +195,36 @@ textarea{resize:vertical;min-height:78px}
 
       <div class="checklist-section">
         <div class="section-label">High-Value &amp; Heavy Items</div>
-        <label class="check-item" id="ci0"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Disclosure of valuable items</div><div class="check-detail">I have listed all items valued above $800 and will inform the crew before the move starts.</div></div></label>
-        <label class="check-item" id="ci1"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Heavy items disclosed</div><div class="check-detail">I confirm I have disclosed any items weighing over 100kg.</div></div></label>
-        <label class="check-item" id="ci2"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Fragile goods identified</div><div class="check-detail">I will identify fragile items (glass, artwork, mirrors, antiques) to the crew leader.</div></div></label>
+        <label class="check-item" id="ci0"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Disclosure of valuable items</div><div class="check-detail">I have listed all items valued above $800 and will inform the crew before the move starts.</div></div></label>
+        <label class="check-item" id="ci1"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Heavy items disclosed</div><div class="check-detail">I confirm I have disclosed any items weighing over 100kg.</div></div></label>
+        <label class="check-item" id="ci2"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Fragile goods identified</div><div class="check-detail">I will identify fragile items (glass, artwork, mirrors, antiques) to the crew leader.</div></div></label>
       </div>
       <div class="checklist-section">
         <div class="section-label">Electronics &amp; Televisions</div>
-        <label class="check-item" id="ci3"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Original packaging used</div><div class="check-detail">I will pack modern televisions in their original boxes where possible.</div></div></label>
-        <label class="check-item" id="ci4"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Electronics disconnected</div><div class="check-detail">All electronics will be unplugged and cables organized before the crew arrives.</div></div></label>
+        <label class="check-item" id="ci3"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Original packaging used</div><div class="check-detail">I will pack modern televisions in their original boxes where possible.</div></div></label>
+        <label class="check-item" id="ci4"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Electronics disconnected</div><div class="check-detail">All electronics will be unplugged and cables organized before the crew arrives.</div></div></label>
       </div>
       <div class="checklist-section">
         <div class="section-label">Packing</div>
-        <label class="check-item" id="ci5"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Boxes sealed</div><div class="check-detail">All boxes are securely taped at the top and bottom.</div></div></label>
-        <label class="check-item" id="ci6"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Boxes labeled</div><div class="check-detail">Boxes are clearly marked as 'Fragile' or with the destination room.</div></div></label>
-        <label class="check-item" id="ci7"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Client-packed items understood</div><div class="check-detail">I understand items packed by me are transported at my risk unless damage is caused by proven staff negligence.</div></div></label>
+        <label class="check-item" id="ci5"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Boxes sealed</div><div class="check-detail">All boxes are securely taped at the top and bottom.</div></div></label>
+        <label class="check-item" id="ci6"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Boxes labeled</div><div class="check-detail">Boxes are clearly marked as 'Fragile' or with the destination room.</div></div></label>
+        <label class="check-item" id="ci7"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Client-packed items understood</div><div class="check-detail">I understand items packed by me are transported at my risk unless damage is caused by proven staff negligence.</div></div></label>
       </div>
       <div class="checklist-section">
         <div class="section-label">Property Access &amp; Safety</div>
-        <label class="check-item" id="ci8"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Parking arranged</div><div class="check-detail">I will secure a parking spot for the truck as close to the entrance as possible.</div></div></label>
-        <label class="check-item" id="ci9"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Clear paths</div><div class="check-detail">I will remove rugs, doorstops or obstacles that could cause tripping.</div></div></label>
-        <label class="check-item" id="ci10"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Elevator / stairs confirmed</div><div class="check-detail">I have confirmed elevator bookings with building management and will notify the team of restricted access.</div></div></label>
+        <label class="check-item" id="ci8"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Parking arranged</div><div class="check-detail">I will secure a parking spot for the truck as close to the entrance as possible.</div></div></label>
+        <label class="check-item" id="ci9"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Clear paths</div><div class="check-detail">I will remove rugs, doorstops or obstacles that could cause tripping.</div></div></label>
+        <label class="check-item" id="ci10"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Elevator / stairs confirmed</div><div class="check-detail">I have confirmed elevator bookings with building management and will notify the team of restricted access.</div></div></label>
       </div>
       <div class="checklist-section">
         <div class="section-label">Essential Reminders</div>
-        <label class="check-item" id="ci11"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Keep valuables on you</div><div class="check-detail">I will keep jewelry, cash, passports and medications with me at all times.</div></div></label>
-        <label class="check-item" id="ci12"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Final inspection</div><div class="check-detail">I will do a final walkthrough with the team before the truck leaves.</div></div></label>
-        <label class="check-item" id="ci13"><input type="checkbox" class="cl" onchange="onCheck(this)"/><div><div class="check-label">Damage reporting understood</div><div class="check-detail">I understand any damage must be reported with photos within 24 hours of move completion.</div></div></label>
+        <label class="check-item" id="ci11"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Keep valuables on you</div><div class="check-detail">I will keep jewelry, cash, passports and medications with me at all times.</div></div></label>
+        <label class="check-item" id="ci12"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Final inspection</div><div class="check-detail">I will do a final walkthrough with the team before the truck leaves.</div></div></label>
+        <label class="check-item" id="ci13"><input type="checkbox" class="cl" onchange="onCheck(this)"><div><div class="check-label">Damage reporting understood</div><div class="check-detail">I understand any damage must be reported with photos within 24 hours of move completion.</div></div></label>
       </div>
 
       <button class="btn btn-back" onclick="goStep(1)">← Back</button>
-      <button class="btn btn-primary" id="btnChecklist" onclick="goStep3()" disabled>Confirm all items to continue</button>
+      <button class="btn btn-primary" id="btnChecklist" onclick="goStep3()" disabled="">Confirm all items to continue</button>
     </div>
   </div>
 
@@ -241,19 +241,19 @@ textarea{resize:vertical;min-height:78px}
 Moving &amp; Cleaning Services
 Email: deus.labour.hire@gmail.com
 
-TERMS AND CONDITIONS &#8211; REMOVAL SERVICES
+TERMS AND CONDITIONS – REMOVAL SERVICES
 
 Acceptance of Terms
 By booking or accepting our services, the client confirms that they have read, understood, and agreed to these Terms and Conditions.
 
 Duty of Care
-Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client&#39;s belongings. However, removal services involve inherent risks and minor damage may occasionally occur despite reasonable care.
+Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client's belongings. However, removal services involve inherent risks and minor damage may occasionally occur despite reasonable care.
 
 Condition of Goods
 The client confirms that all items provided for transport are in a condition suitable for removal unless otherwise disclosed prior to the move.
 
 Client Packing Responsibility
-Items packed by the client are transported at the client&#39;s risk unless damage is directly caused by proven negligence during handling by our staff.
+Items packed by the client are transported at the client's risk unless damage is directly caused by proven negligence during handling by our staff.
 
 Fragile and High-Risk Items
 Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics require special care and must be disclosed before the move.
@@ -306,7 +306,7 @@ These Terms and Conditions are governed by the laws of Australia.</div>
             <div class="agree-btn-text">I have read and agree to the <strong>Terms &amp; Conditions</strong> of Deus Labour Hire Pty Ltd.</div>
           </div>
         </button>
-        <input type="checkbox" id="agreeTC" style="display:none"/>
+        <input type="checkbox" id="agreeTC" style="display:none">
       </div>
 
       <div class="divider"></div>
@@ -317,19 +317,19 @@ These Terms and Conditions are governed by the laws of Australia.</div>
 Moving &amp; Cleaning Services
 Email: deus.labour.hire@gmail.com
 
-SERVICE AGREEMENT &#8211; REMOVAL SERVICES
+SERVICE AGREEMENT – REMOVAL SERVICES
 
 Acceptance and Scope
-By booking or accepting our services, the client confirms they have read, understood, and agreed to these Terms and Conditions. Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client&#39;s belongings. Removal services involve inherent risks and minor damage may occasionally occur despite reasonable care. These Terms are governed by the laws of Australia.
+By booking or accepting our services, the client confirms they have read, understood, and agreed to these Terms and Conditions. Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client's belongings. Removal services involve inherent risks and minor damage may occasionally occur despite reasonable care. These Terms are governed by the laws of Australia.
 
 Client Responsibilities
-Items packed by the client are transported at the client&#39;s risk unless damage is directly caused by proven negligence. The client confirms all goods are suitable for removal unless disclosed prior to the move. The client must ensure safe access to the property. Items over 100kg must be disclosed before the move. Items valued above $800 must be disclosed before the move.
+Items packed by the client are transported at the client's risk unless damage is directly caused by proven negligence. The client confirms all goods are suitable for removal unless disclosed prior to the move. The client must ensure safe access to the property. Items over 100kg must be disclosed before the move. Items valued above $800 must be disclosed before the move.
 
 Fragile and Special Items
 Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics must be disclosed before the move. Modern televisions are extremely fragile and may suffer internal panel damage even when handled with reasonable care and should ideally be transported in original packaging. If fragile items cannot be safely transported due to limited truck space, Deus Labour Hire may transport them in a separate load. Deus Labour Hire reserves the right to refuse items considered unsafe for transport.
 
 Liability and Insurance
-Deus Labour Hire is not responsible for items that were already damaged before the move. If damage occurs due to negligence, liability will be assessed based on the fair market value of the item considering age, condition and depreciation. Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited subject to policy terms. Any claim must be reported within 24 hours and must include photos and description of the damage. Nothing in these terms excludes the client&#39;s rights under Australian Consumer Law.
+Deus Labour Hire is not responsible for items that were already damaged before the move. If damage occurs due to negligence, liability will be assessed based on the fair market value of the item considering age, condition and depreciation. Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited subject to policy terms. Any claim must be reported within 24 hours and must include photos and description of the damage. Nothing in these terms excludes the client's rights under Australian Consumer Law.
 
 Payment and Additional Fees
 Payment is due upon completion of the service unless otherwise agreed. Additional charges may apply for stairs, restricted access or long carrying distances.
@@ -342,17 +342,17 @@ Company Representative: Deus Labour Hire Pty Ltd</div>
             <div class="agree-btn-text">I have read and agree to the <strong>Service Agreement</strong> for Removal Services.</div>
           </div>
         </button>
-        <input type="checkbox" id="agreeAG" style="display:none"/>
+        <input type="checkbox" id="agreeAG" style="display:none">
       </div>
 
       <div class="sig-wrap">
         <div class="sig-label">Digital Signature — Type your full legal name</div>
-        <input type="text" id="signature" class="sig-input" placeholder="Your full legal name" oninput="checkSign()" autocomplete="name"/>
+        <input type="text" id="signature" class="sig-input" placeholder="Your full legal name" oninput="checkSign()" autocomplete="name">
         <div class="sig-note" id="sigNote"></div>
       </div>
 
       <button class="btn btn-back" style="margin-top:16px" onclick="goStep(2)">← Back</button>
-      <button class="btn btn-primary" id="btnSign" onclick="goStep4()" disabled>Continue to Review →</button>
+      <button class="btn btn-primary" id="btnSign" onclick="goStep4()" disabled="">Continue to Review →</button>
     </div>
   </div>
 
@@ -379,7 +379,7 @@ Company Representative: Deus Labour Hire Pty Ltd</div>
   <div class="step" id="stepDone">
     <div class="card">
       <div class="success-wrap">
-        <div class="success-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <div class="success-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
         <h2>Booking Confirmed!</h2>
         <p>Thank you! Your move has been booked with <strong>Deus Labour Hire</strong>.</p>
         <p>Jefferson and the team will be in touch shortly to confirm all details.</p>
@@ -398,6 +398,7 @@ Company Representative: Deus Labour Hire Pty Ltd</div>
 const EDGE_FUNCTION_URL='https://amnacoyjgdfykdfepkze.supabase.co/functions/v1/create-booking';
 
 let formData={};
+const quoteIdFromUrl = new URLSearchParams(window.location.search).get('quote_id') || null;
 const TOTAL_CHECKS=14;
 
 function $(id){return document.getElementById(id);}
@@ -475,7 +476,7 @@ function goStep4(){
 async function submitBooking(){
   const btn=$('btnSubmit');
   btn.textContent='Submitting...';btn.disabled=true;
-  const booking={name:formData.name,phone:formData.phone,email:formData.email,date:formData.date,startTime:formData.startTime,pickupAddress:formData.pickupAddress,dropoffAddress:formData.dropoffAddress,notes:formData.notes||'',signatureName:formData.signatureName,signedDate:formData.signedDate};
+  const booking={name:formData.name,phone:formData.phone,email:formData.email,date:formData.date,startTime:formData.startTime,pickupAddress:formData.pickupAddress,dropoffAddress:formData.dropoffAddress,notes:formData.notes||'',signatureName:formData.signatureName,signedDate:formData.signedDate,quoteId:quoteIdFromUrl};
   let saved=false;
   try{
     const res=await fetch(EDGE_FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(booking)});
@@ -566,5 +567,6 @@ function downloadSignedDoc(){
   URL.revokeObjectURL(url);
 }
 </script>
-</body>
-</html>
+
+
+</body></html>
