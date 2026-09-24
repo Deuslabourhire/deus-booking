@@ -398,6 +398,7 @@ Company Representative: Deus Labour Hire Pty Ltd</div>
 const EDGE_FUNCTION_URL='https://amnacoyjgdfykdfepkze.supabase.co/functions/v1/create-booking';
 
 let formData={};
+const quoteIdFromUrl = new URLSearchParams(window.location.search).get('quote_id') || null;
 const TOTAL_CHECKS=14;
 
 function $(id){return document.getElementById(id);}
@@ -475,7 +476,7 @@ function goStep4(){
 async function submitBooking(){
   const btn=$('btnSubmit');
   btn.textContent='Submitting...';btn.disabled=true;
-  const booking={name:formData.name,phone:formData.phone,email:formData.email,date:formData.date,startTime:formData.startTime,pickupAddress:formData.pickupAddress,dropoffAddress:formData.dropoffAddress,notes:formData.notes||'',signatureName:formData.signatureName,signedDate:formData.signedDate};
+  const booking={name:formData.name,phone:formData.phone,email:formData.email,date:formData.date,startTime:formData.startTime,pickupAddress:formData.pickupAddress,dropoffAddress:formData.dropoffAddress,notes:formData.notes||'',signatureName:formData.signatureName,signedDate:formData.signedDate,quoteId:quoteIdFromUrl};
   let saved=false;
   try{
     const res=await fetch(EDGE_FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(booking)});
