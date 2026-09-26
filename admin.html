@@ -456,6 +456,16 @@ These Terms and Conditions are governed by the laws of Australia.</div>
     <div id="inv_payments" style="display:none;margin-top:18px;background:#fff;border-radius:12px;padding:20px 24px">
       <div style="font-size:13px;font-weight:700;color:#1a1a1a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Payments</div>
       <div id="inv_payments_body"></div>
+
+      <!-- Step 10N: View Payment Details — read-only (SELECT only, already-fetched data, no write of any kind) -->
+      <div id="inv_payment_detail" style="display:none;margin-top:12px;padding:16px;background:#f8f8f5;border-radius:8px;border:1px solid #eee">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:700;color:#1a1a1a;text-transform:uppercase;letter-spacing:.06em">Payment Details</div>
+          <button type="button" onclick="hidePaymentDetail()" style="border:none;background:none;color:#888;cursor:pointer;font-size:13px;font-family:inherit">✕ Close</button>
+        </div>
+        <div id="inv_payment_detail_body"></div>
+      </div>
+
       <button id="btnAddPayment" type="button" onclick="showAddPaymentForm()" style="display:none;margin-top:10px;padding:9px 16px;border:1.5px solid #3d8b3d;border-radius:8px;cursor:pointer;font-family:inherit;background:#fff;color:#2a6b2a;font-size:13px;font-weight:600">+ Add Payment</button>
 
       <!-- Step 10M: Add Payment form (hidden by default; opened only for a saved, non-draft, non-cancelled invoice) -->
@@ -1332,6 +1342,8 @@ function resetAdminInvoice(){
   if(invPay){ invPay.style.display='none'; document.getElementById('inv_payments_body').innerHTML=''; }
   // Step 10M: any invoice-context change (open a different invoice, create new, cancel, manual Reset) must close/reset Add Payment
   hideAddPaymentForm();
+  // Step 10N: same reasoning — a payment detail view from a previous invoice's payments must not linger visible
+  hidePaymentDetail();
   currentInvoiceBookingId = null;
   currentInvoiceCustomerId = null;
   lastInvoiceCalc = null;
@@ -1382,8 +1394,9 @@ function renderInvoicePaymentsBody(paymentsRows, totalAmount){
       +'<th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">Reference</th>'
       +'<th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">Status</th>'
       +'</tr></thead><tbody>';
-    rows.forEach(function(p){
-      html += '<tr>'
+    rows.forEach(function(p, idx){
+      // Step 10N: row opens a read-only detail view (showPaymentDetail) — index into the SAME rows array cached by loadInvoicePayments
+      html += '<tr onclick="showPaymentDetail('+idx+')" style="cursor:pointer" title="View payment details">'
         +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(p.paid_at ? String(p.paid_at).slice(0,10) : '-')+'</td>'
         +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+Number(p.amount||0).toFixed(2)+'</td>'
         +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(p.method||'-')+'</td>'
@@ -1398,20 +1411,71 @@ function renderInvoicePaymentsBody(paymentsRows, totalAmount){
   return html;
 }
 
+var lastLoadedPaymentsRows = []; // Step 10N: cache of the exact rows last rendered, so a row click can show details with no extra query
+
 async function loadInvoicePayments(invoiceId, totalAmount){
   var section = document.getElementById('inv_payments');
   var body = document.getElementById('inv_payments_body');
   if(!section || !body) return;
   section.style.display = 'block';
   body.innerHTML = '<div style="font-size:13px;color:#888">Loading payments…</div>';
+  hidePaymentDetail(); // any detail view from a previous invoice's payments is now stale — close it before loading the new list
   try{
-    var res = await db.from('payments').select('amount,method,reference,status,paid_at').eq('invoice_id', invoiceId).order('paid_at', {ascending:true});
+    // Step 10N added id/notes/created_at/updated_at to this SELECT (read-only) so View Details has data to show without a second query
+    var res = await db.from('payments').select('id,amount,method,reference,status,paid_at,notes,created_at,updated_at').eq('invoice_id', invoiceId).order('paid_at', {ascending:true});
     if(res.error) throw res.error;
-    body.innerHTML = renderInvoicePaymentsBody(res.data || [], totalAmount);
+    lastLoadedPaymentsRows = res.data || [];
+    body.innerHTML = renderInvoicePaymentsBody(lastLoadedPaymentsRows, totalAmount);
   }catch(e){
     // Fallback state — never claim a $0.00 total when we don't actually know it (that would be a false confirmation, not an empty result)
+    lastLoadedPaymentsRows = [];
     body.innerHTML = '<div style="font-size:13px;color:#b23b3b">Could not load payments for this invoice right now.</div>';
   }
+}
+
+// Step 10N: View Payment Details — read-only, uses the rows already fetched by loadInvoicePayments (no INSERT/UPDATE/DELETE, no extra query)
+function emptyDash(v){
+  return (v === null || v === undefined || String(v).trim() === '') ? '—' : String(v);
+}
+
+// Renders a timestamptz value in the viewer's local time, from the ISO string Supabase returns (already timezone-aware,
+// so new Date() + toLocaleString() never shifts the calendar day the way slicing/re-parsing a bare date string could).
+function formatPaymentDateTime(iso){
+  if(!iso) return '—';
+  var d = new Date(iso);
+  if(isNaN(d.getTime())) return '—';
+  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function renderPaymentDetailBody(p){
+  if(!p) return '<div style="font-size:13px;color:#888">Payment not found.</div>';
+  var rowStyle = 'display:flex;justify-content:space-between;gap:16px;padding:7px 0;font-size:13px;color:#333;border-bottom:1px solid #f0f0eb';
+  var labelStyle = 'color:#888';
+  var html = '';
+  html += '<div style="'+rowStyle+'"><span style="'+labelStyle+'">Payment ID</span><span style="text-align:right;word-break:break-all;max-width:65%">'+emptyDash(p.id)+'</span></div>';
+  html += '<div style="'+rowStyle+'"><span style="'+labelStyle+'">Amount</span><span>$'+Number(p.amount||0).toFixed(2)+'</span></div>';
+  html += '<div style="'+rowStyle+'"><span style="'+labelStyle+'">Method</span><span>'+emptyDash(p.method)+'</span></div>';
+  html += '<div style="'+rowStyle+'"><span style="'+labelStyle+'">Reference</span><span style="text-align:right;word-break:break-word;max-width:65%">'+emptyDash(p.reference)+'</span></div>';
+  html += '<div style="'+rowStyle+'"><span style="'+labelStyle+'">Status</span><span>'+emptyDash(p.status)+'</span></div>';
+  html += '<div style="'+rowStyle+'"><span style="'+labelStyle+'">Paid At</span><span>'+formatPaymentDateTime(p.paid_at)+'</span></div>';
+  html += '<div style="'+rowStyle+'"><span style="'+labelStyle+'">Notes</span><span style="text-align:right;word-break:break-word;max-width:65%">'+emptyDash(p.notes)+'</span></div>';
+  html += '<div style="'+rowStyle+'"><span style="'+labelStyle+'">Created At</span><span>'+formatPaymentDateTime(p.created_at)+'</span></div>';
+  html += '<div style="'+rowStyle+';border-bottom:none"><span style="'+labelStyle+'">Updated At</span><span>'+formatPaymentDateTime(p.updated_at)+'</span></div>';
+  return html;
+}
+
+function showPaymentDetail(index){
+  var p = lastLoadedPaymentsRows[index];
+  var panel = document.getElementById('inv_payment_detail');
+  var body = document.getElementById('inv_payment_detail_body');
+  if(!panel || !body) return;
+  body.innerHTML = renderPaymentDetailBody(p);
+  panel.style.display = 'block';
+}
+
+function hidePaymentDetail(){
+  var panel = document.getElementById('inv_payment_detail');
+  if(panel) panel.style.display = 'none';
 }
 
 // Step 10M: Add Payment
