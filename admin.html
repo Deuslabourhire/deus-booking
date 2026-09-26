@@ -756,6 +756,11 @@ async function loadBookings(){
   try{const {data,error}=await db.from('bookings').select('*').order('date',{ascending:false});if(error)throw error;bookings=Array.isArray(data)?data:[];}catch(e){bookings=[];showToast('Could not connect to database.',4000);}renderAll();
 }
 
+// Step 10O: invoice_id -> array of {amount,status} payment rows for the invoices currently in invoicesListCache.
+// null (not []) means the payments query failed — renderInvoicesList() must show a safe fallback, never a false $0.00.
+var invoicesPaymentsCache = {};
+var invoicesPaymentsCacheFailed = false;
+
 async function loadInvoicesList(){
   var body = document.getElementById('invoicesListBody');
   if(body) body.textContent = 'Loading…';
@@ -766,9 +771,31 @@ async function loadInvoicesList(){
       .limit(50);
     if(error) throw error;
     invoicesListCache = Array.isArray(data) ? data : [];
+
+    // Step 10O: one extra SELECT for ALL payments of the loaded invoices at once (no N+1) — invoice_id/amount/status only
+    invoicesPaymentsCache = {};
+    invoicesPaymentsCacheFailed = false;
+    var ids = invoicesListCache.map(function(inv){ return inv.id; });
+    if(ids.length){
+      try{
+        var payRes = await db.from('payments').select('invoice_id,amount,status').in('invoice_id', ids);
+        if(payRes.error) throw payRes.error;
+        (payRes.data || []).forEach(function(p){
+          if(!invoicesPaymentsCache[p.invoice_id]) invoicesPaymentsCache[p.invoice_id] = [];
+          invoicesPaymentsCache[p.invoice_id].push(p);
+        });
+      }catch(payErr){
+        // Payments failed to load, but the invoice list itself loaded fine — never block the list on this.
+        invoicesPaymentsCache = {};
+        invoicesPaymentsCacheFailed = true;
+      }
+    }
+
     renderInvoicesList();
   }catch(e){
     invoicesListCache = [];
+    invoicesPaymentsCache = {};
+    invoicesPaymentsCacheFailed = false;
     if(body) body.textContent = 'Could not load invoices.';
   }
 }
@@ -780,6 +807,22 @@ function renderInvoicesList(){
   body.innerHTML = invoicesListCache.map(function(inv){
     var name = (inv.customer_snapshot && inv.customer_snapshot.name) || '—';
     var total = '$'+Number(inv.total_amount||0).toFixed(2);
+
+    // Step 10O: Paid / Outstanding — payments don't apply to draft/cancelled invoices (same rule as 10M/10N),
+    // and a failed payments query must show a safe fallback rather than a misleading $0.00.
+    var paidCell, outstandingCell;
+    if(inv.status === 'draft' || inv.status === 'cancelled'){
+      paidCell = '—';
+      outstandingCell = '—';
+    } else if(invoicesPaymentsCacheFailed){
+      paidCell = 'N/A';
+      outstandingCell = 'N/A';
+    } else {
+      var totals = calculatePaymentTotals(invoicesPaymentsCache[inv.id] || [], inv.total_amount);
+      paidCell = '$'+totals.totalPaid.toFixed(2);
+      outstandingCell = '$'+totals.outstandingBalance.toFixed(2);
+    }
+
     var actionCell = '<button onclick="openInvoice(\''+inv.id+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">View/Open</button>';
     actionCell += inv.effective_status==='draft'
       ? '<button onclick="markInvoiceAsSent(\''+inv.id+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer;margin-left:4px">Mark as Sent</button>'
@@ -787,9 +830,10 @@ function renderInvoicesList(){
     if(inv.status==='draft' || inv.status==='sent'){
       actionCell += '<button onclick="cancelInvoice(\''+inv.id+'\',\''+inv.invoice_number+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#c99;font-size:10px;padding:3px 6px;cursor:pointer;margin-left:4px">Cancel Invoice</button>';
     }
-    return '<div style="display:grid;grid-template-columns:1.2fr 1.4fr .8fr .9fr .8fr .8fr .9fr;gap:6px;padding:5px 0;border-bottom:1px solid #1c2130">'
+    return '<div style="display:grid;grid-template-columns:1.2fr 1.4fr .8fr .9fr .8fr .8fr .8fr .8fr .9fr;gap:6px;padding:5px 0;border-bottom:1px solid #1c2130">'
       +'<span>'+inv.invoice_number+'</span><span>'+name+'</span><span>'+total+'</span>'
-      +'<span>'+inv.effective_status+'</span><span>'+(inv.issued_date||'—')+'</span><span>'+(inv.due_date||'—')+'</span><span>'+actionCell+'</span></div>';
+      +'<span>'+inv.effective_status+'</span><span>'+(inv.issued_date||'—')+'</span><span>'+(inv.due_date||'—')+'</span>'
+      +'<span>'+paidCell+'</span><span>'+outstandingCell+'</span><span>'+actionCell+'</span></div>';
   }).join('');
 }
 
