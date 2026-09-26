@@ -509,6 +509,7 @@ These Terms and Conditions are governed by the laws of Australia.</div>
         <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.07em">Recent Invoices</div>
         <button onclick="loadInvoicesList()" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:11px;padding:4px 8px;cursor:pointer">🔄 Refresh</button>
       </div>
+      <input id="invSearchInput" class="search" placeholder="Search by invoice #, client or status..." oninput="renderInvoicesList()">
       <div id="invoicesListBody" style="font-size:12px;color:#9bb89b">Loading…</div>
     </div>
   </div>
@@ -811,7 +812,21 @@ function renderInvoicesList(){
   var body = document.getElementById('invoicesListBody');
   if(!body) return;
   if(!invoicesListCache.length){ body.textContent = 'No invoices saved yet.'; return; }
-  body.innerHTML = invoicesListCache.map(function(inv){
+
+  // Step 10S: case-insensitive substring search over invoice_number, customer name and effective_status.
+  // Filters only the already-loaded cache — no new query, loadInvoicesList() and the underlying data are untouched.
+  var searchInput = document.getElementById('invSearchInput');
+  var q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  var filteredInvoices = !q ? invoicesListCache : invoicesListCache.filter(function(inv){
+    var num = (inv.invoice_number || '').toLowerCase();
+    var custName = ((inv.customer_snapshot && inv.customer_snapshot.name) || '').toLowerCase();
+    var status = (inv.effective_status || '').toLowerCase();
+    return num.indexOf(q) !== -1 || custName.indexOf(q) !== -1 || status.indexOf(q) !== -1;
+  });
+
+  if(!filteredInvoices.length){ body.textContent = 'No invoices match your search.'; return; }
+
+  body.innerHTML = filteredInvoices.map(function(inv){
     var name = (inv.customer_snapshot && inv.customer_snapshot.name) || '—';
     var total = '$'+Number(inv.total_amount||0).toFixed(2);
 
