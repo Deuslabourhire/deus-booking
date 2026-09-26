@@ -1582,8 +1582,10 @@ function printAdminInvoice(){
   // Substitui src relativo por URL absoluta no GitHub Pages (necessário pq janela nova não herda base path)
   var LOGO_URL = 'https://deuslabourhire.github.io/deus-booking/logo.png';
   var html = previewClone.innerHTML.replace(/src="\.\/logo\.png(?:\?[^"]*)?"/g, 'src="'+LOGO_URL+'"');
+  var num = document.getElementById('inv_num').value;
+  var titleNum = (num && num !== 'PENDING') ? num : 'Draft';
   var w = window.open('','_blank');
-  w.document.write('<html><head><title>Invoice</title><style>body{font-family:Arial,sans-serif;margin:20px}table{width:100%;border-collapse:collapse}</style></head><body>');
+  w.document.write('<html><head><title>Invoice-'+titleNum+'</title><style>body{font-family:Arial,sans-serif;margin:20px}table{width:100%;border-collapse:collapse}</style></head><body>');
   w.document.write(html);
   w.document.write('</body></html>');
   w.document.close();
