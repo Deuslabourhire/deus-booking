@@ -588,6 +588,7 @@ let currentInvoiceBookingId = null;
 let currentInvoiceCustomerId = null;
 let lastInvoiceCalc = null;
 let currentInvoiceId = null;
+let currentInvoiceStatus = null;
 let invoicesListCache = [];
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const TERMS_TEXT=`DEUS LABOUR HIRE
@@ -726,8 +727,9 @@ function renderInvoicesList(){
   body.innerHTML = invoicesListCache.map(function(inv){
     var name = (inv.customer_snapshot && inv.customer_snapshot.name) || '—';
     var total = '$'+Number(inv.total_amount||0).toFixed(2);
-    var actionCell = inv.effective_status==='draft'
-      ? '<button onclick="markInvoiceAsSent(\''+inv.id+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Mark as Sent</button>'
+    var actionCell = '<button onclick="openInvoice(\''+inv.id+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">View/Open</button>';
+    actionCell += inv.effective_status==='draft'
+      ? '<button onclick="markInvoiceAsSent(\''+inv.id+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer;margin-left:4px">Mark as Sent</button>'
       : '';
     if(inv.status==='draft' || inv.status==='sent'){
       actionCell += '<button onclick="cancelInvoice(\''+inv.id+'\',\''+inv.invoice_number+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#c99;font-size:10px;padding:3px 6px;cursor:pointer;margin-left:4px">Cancel Invoice</button>';
@@ -1156,7 +1158,7 @@ function createInvoice(id){
 }
 
 function generateAdminInvoice(){
-  if(currentInvoiceId){ showToast('This invoice is already saved — click Reset to start a new one.'); return; }
+  if(currentInvoiceId && currentInvoiceStatus !== 'draft'){ showToast('This invoice is already saved — click Reset to start a new one.'); return; }
   var clientName = document.getElementById('inv_client').value.trim();
   var isFixed = document.getElementById('inv_fixed').checked;
   var start = document.getElementById('inv_start').value;
@@ -1287,14 +1289,170 @@ function resetAdminInvoice(){
   currentInvoiceCustomerId = null;
   lastInvoiceCalc = null;
   currentInvoiceId = null;
+  currentInvoiceStatus = null;
   document.getElementById('inv_num').value = 'PENDING';
   var btnReset = document.getElementById('btnSaveInvoice');
   if(btnReset) btnReset.disabled = false;
+  setInvoiceFormLocked(false);
   updateInvGST();
 }
 
+function setInvoiceFormLocked(locked){
+  ['inv_client','inv_pickup','inv_dropoff','inv_phone','inv_email','inv_start','inv_finish','inv_desc','inv_date','inv_due','inv_rate','inv_callout','inv_fixed_amt','inv_fixed_desc','inv_discount_value','inv_discount_desc'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.readOnly = locked;
+  });
+  ['inv_fixed','inv_gst','inv_discount_type'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.disabled = locked;
+  });
+  var addExtraBtn = document.querySelector('button[onclick="addInvExtra()"]');
+  if(addExtraBtn) addExtraBtn.disabled = locked;
+  document.querySelectorAll('#inv_extras input').forEach(function(el){ el.readOnly = locked; });
+  document.querySelectorAll('#inv_extras button').forEach(function(el){ el.disabled = locked; });
+}
+
+async function openInvoice(id){
+  resetAdminInvoice();
+  try{
+    const {data: inv, error: e1} = await db.from('invoices').select('*').eq('id', id).single();
+    if(e1 || !inv) throw e1 || new Error('Invoice not found');
+    const {data: items, error: e2} = await db.from('invoice_items').select('*').eq('invoice_id', id).order('sort_order');
+    if(e2) throw e2;
+
+    currentInvoiceId = inv.id;
+    currentInvoiceBookingId = inv.booking_id || null;
+    currentInvoiceCustomerId = inv.customer_id || null;
+    currentInvoiceStatus = inv.status;
+
+    var cs = inv.customer_snapshot || {};
+    var ss = inv.service_snapshot || {};
+    var isFixed = inv.pricing_type === 'fixed';
+
+    document.getElementById('inv_client').value = cs.name || '';
+    document.getElementById('inv_phone').value = cs.phone || '';
+    document.getElementById('inv_email').value = cs.email || '';
+    document.getElementById('inv_pickup').value = ss.pickup_address || '';
+    document.getElementById('inv_dropoff').value = ss.dropoff_address || '';
+    document.getElementById('inv_start').value = ss.start_time || '';
+    document.getElementById('inv_finish').value = inv.finish_time || '';
+    document.getElementById('inv_desc').value = inv.description || '';
+    document.getElementById('inv_date').value = inv.issued_date || '';
+    document.getElementById('inv_due').value = inv.due_date || '';
+    document.getElementById('inv_rate').value = inv.hourly_rate!=null ? inv.hourly_rate : 150;
+    document.getElementById('inv_callout').value = ss.callout_fee!=null ? ss.callout_fee : 0;
+    document.getElementById('inv_fixed').checked = isFixed;
+    document.getElementById('inv_fixed_fields').style.display = isFixed ? 'block' : 'none';
+    document.getElementById('inv_fixed_amt').value = inv.fixed_amount!=null ? inv.fixed_amount : '';
+    document.getElementById('inv_fixed_desc').value = inv.fixed_description || '';
+    document.getElementById('inv_gst').checked = !!inv.gst_included;
+    document.getElementById('inv_discount_type').value = inv.discount_type || 'fixed';
+    document.getElementById('inv_discount_value').value = inv.discount_value!=null ? inv.discount_value : 0;
+    document.getElementById('inv_discount_desc').value = inv.discount_description || '';
+
+    // Rebuild extras rows from invoice_items (excluding the synthetic Call Out Fee row — that maps to inv_callout instead)
+    var extras = [];
+    (items||[]).forEach(function(it){
+      if(it.sort_order===0 && it.description==='Call Out Fee') return;
+      extras.push({desc: it.description, amt: Number(it.amount)||0});
+      addInvExtra();
+      var lastDiv = document.getElementById('inv_extras').lastElementChild || document.getElementById('inv_extras').children[document.getElementById('inv_extras').children.length-1];
+      if(lastDiv){
+        var rowId = lastDiv.id;
+        var dEl = document.getElementById(rowId+'d'), aEl = document.getElementById(rowId+'a');
+        if(dEl) dEl.value = it.description;
+        if(aEl) aEl.value = it.amount;
+      }
+    });
+
+    updateInvGST();
+
+    // Rebuild lastInvoiceCalc directly from the saved DB row (not re-derived from the form)
+    lastInvoiceCalc = {
+      pricingType: inv.pricing_type,
+      hourlyRate: inv.hourly_rate,
+      hoursWorked: inv.hours_worked,
+      finishTime: inv.finish_time,
+      fixedAmount: inv.fixed_amount,
+      fixedDescription: inv.fixed_description,
+      labourAmount: inv.labour_amount,
+      callout: ss.callout_fee || 0,
+      extras: extras,
+      extrasTotal: extras.reduce(function(s,e){return s+e.amt;},0),
+      subtotal: inv.subtotal,
+      discountType: inv.discount_type,
+      discountValue: inv.discount_value,
+      discountAmount: inv.discount_amount,
+      discountDescription: inv.discount_description,
+      gstIncluded: inv.gst_included,
+      taxableSubtotal: inv.taxable_subtotal,
+      gstAmount: inv.gst_amount,
+      totalAmount: inv.total_amount,
+      description: inv.description,
+      durationLabel: ss.duration_label || '-'
+    };
+
+    // Render the preview from the saved data (mirrors generateAdminInvoice()'s preview markup, fed from DB values instead of live form fields)
+    function fmtT(h,m){ return (h>12?h-12:(h||12))+':'+(m<10?'0'+m:m)+' '+(h>=12?'PM':'AM'); }
+    function fmtD(str){ if(!str)return '-'; var d=new Date(str+'T00:00:00'); return d.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}); }
+
+    var rows = '';
+    if(isFixed){
+      rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(inv.fixed_description||'Removal Service — Fixed Price')+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Fixed</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(inv.fixed_amount||0).toFixed(2)+'</td></tr>';
+    } else {
+      var timeLabel = '';
+      if(ss.start_time && inv.finish_time){
+        var sh=parseInt(ss.start_time.split(':')[0]),sm=parseInt(ss.start_time.split(':')[1]);
+        var fh=parseInt(inv.finish_time.split(':')[0]),fm=parseInt(inv.finish_time.split(':')[1]);
+        timeLabel = '<br><small style="color:#888">'+fmtT(sh,sm)+' – '+fmtT(fh,fm)+'</small>';
+      }
+      rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(inv.description||'Removal Service')+timeLabel+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+Number(inv.hours_worked||0).toFixed(2)+'h</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+Number(inv.hourly_rate||0).toFixed(2)+'/hr</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(inv.labour_amount||0).toFixed(2)+'</td></tr>';
+      if((ss.callout_fee||0)>0) rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Call Out Fee</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(ss.callout_fee).toFixed(2)+'</td></tr>';
+    }
+    extras.forEach(function(e){ rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+e.desc+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+e.amt.toFixed(2)+'</td></tr>'; });
+
+    document.getElementById('inv_p_num').textContent = inv.invoice_number;
+    document.getElementById('inv_p_client').textContent = cs.name || '';
+    document.getElementById('inv_p_date').textContent = fmtD(inv.issued_date);
+    document.getElementById('inv_p_due').textContent = fmtD(inv.due_date);
+    document.getElementById('inv_p_dur').textContent = ss.duration_label || '—';
+    document.getElementById('inv_p_ref').textContent = (cs.name||'').split(' ')[0].toUpperCase()+'_'+inv.invoice_number;
+
+    var det='';
+    if(ss.pickup_address) det+='From: '+ss.pickup_address+'<br>';
+    if(ss.dropoff_address) det+='To: '+ss.dropoff_address+'<br>';
+    if(cs.phone) det+=cs.phone+'<br>';
+    if(cs.email) det+=cs.email;
+    document.getElementById('inv_p_detail').innerHTML = det;
+    document.getElementById('inv_p_items').innerHTML = rows;
+
+    var totals='';
+    totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>Subtotal</span><span>$'+Number(inv.subtotal||0).toFixed(2)+'</span></div>';
+    if((inv.discount_amount||0)>0) totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>Discount'+(inv.discount_description?' ('+inv.discount_description+')':'')+'</span><span>-$'+Number(inv.discount_amount).toFixed(2)+'</span></div>';
+    if(inv.gst_included) totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>GST (10%)</span><span>$'+Number(inv.gst_amount||0).toFixed(2)+'</span></div>';
+    totals+='<div style="display:flex;justify-content:space-between;padding:10px 0 4px;font-size:16px;font-weight:700;color:#1a1a1a;border-top:2px solid #1a1a1a;margin-top:4px"><span>TOTAL DUE</span><span>AUD $'+Number(inv.total_amount||0).toFixed(2)+'</span></div>';
+    if(inv.gst_included) totals+='<div style="font-size:11px;color:#888;text-align:right;margin-top:3px">GST included: $'+Number(inv.gst_amount||0).toFixed(2)+'</div>';
+    document.getElementById('inv_p_totals').innerHTML = totals;
+
+    document.getElementById('inv_preview').style.display='block';
+
+    document.getElementById('inv_num').value = inv.invoice_number;
+    var btnSave = document.getElementById('btnSaveInvoice');
+    if(btnSave) btnSave.disabled = (currentInvoiceStatus !== 'draft'); // Step 10K: editing/re-saving is only possible for an opened Draft
+
+    setInvoiceFormLocked(currentInvoiceStatus !== 'draft');
+
+    // Switch to Invoice tab (same pattern as createInvoice())
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+    document.querySelectorAll('.tab').forEach(function(t){ if(t.textContent.includes('Invoice')) t.classList.add('active'); });
+    ['Calendar','Clients','Docs','Calc','Invoice','Draw'].forEach(function(n){ var el=$('tab'+n); if(el) el.style.display='none'; });
+    $('tabInvoice').style.display = 'block';
+    document.getElementById('inv_preview').scrollIntoView({behavior:'smooth'});
+  }catch(e){
+    showToast('Could not open invoice: '+(e.message||'unknown error'), 5000);
+  }
+}
+
 async function saveAdminInvoice(){
-  if(currentInvoiceId){ showToast('Invoice already saved.'); return; }
+  if(currentInvoiceId && currentInvoiceStatus !== 'draft'){ showToast('Invoice already saved.'); return; }
   if(!lastInvoiceCalc){ showToast('Generate the invoice first.'); return; }
   var c = lastInvoiceCalc;
   var extrasTotalWithCallout = c.extrasTotal + (c.callout||0);
@@ -1337,6 +1495,28 @@ async function saveAdminInvoice(){
     taxable_subtotal: c.taxableSubtotal
   };
 
+  if(currentInvoiceId && currentInvoiceStatus === 'draft'){
+    // ---- Edit-Draft path (Step 10K): UPDATE the existing invoice, never INSERT a new one ----
+    // payload never contains invoice_number — it is never in this object, so the number cannot be overwritten here.
+    try{
+      const {data,error} = await db.from('invoices')
+        .update(payload)
+        .eq('id', currentInvoiceId)
+        .eq('status', 'draft')
+        .select().single();
+      if(error || !data){ showToast('Could not update — invoice may no longer be a draft.'); return; }
+      showToast('Invoice '+data.invoice_number+' updated ✓');
+      document.getElementById('inv_num').value = data.invoice_number;
+      document.getElementById('inv_p_num').textContent = data.invoice_number;
+      var clientNameForRefUpd = document.getElementById('inv_client').value.trim();
+      document.getElementById('inv_p_ref').textContent = clientNameForRefUpd.split(' ')[0].toUpperCase()+'_'+data.invoice_number;
+      await replaceInvoiceItems(currentInvoiceId, lastInvoiceCalc);
+    }catch(e){
+      showToast('Error updating invoice: '+(e.message||'unknown error'),5000);
+    }
+    return;
+  }
+
   try{
     const {data,error} = await db.from('invoices').insert(payload).select().single();
     if(error) throw error;
@@ -1351,6 +1531,29 @@ async function saveAdminInvoice(){
     await saveInvoiceItems(data.id);
   }catch(e){
     showToast('Error saving invoice: '+(e.message||'unknown error'),5000);
+  }
+}
+
+async function replaceInvoiceItems(invoiceId, calc){
+  try{
+    const {error: delError} = await db.from('invoice_items').delete().eq('invoice_id', invoiceId);
+    if(delError) throw delError;
+  }catch(e){
+    showToast('Could not clear old invoice items: '+(e.message||'unknown error'),6000);
+    return;
+  }
+  var rows = [];
+  if(calc.callout>0) rows.push({invoice_id:invoiceId, description:'Call Out Fee', amount:calc.callout, sort_order:0});
+  calc.extras.forEach(function(e){
+    rows.push({invoice_id:invoiceId, description:e.desc, amount:e.amt, sort_order:rows.length});
+  });
+  if(rows.length===0) return;
+
+  try{
+    const {error} = await db.from('invoice_items').insert(rows);
+    if(error) throw error;
+  }catch(e){
+    showToast('Invoice updated, but items failed to update: '+(e.message||'unknown error'),6000);
   }
 }
 
@@ -1398,9 +1601,17 @@ async function sendInvoiceEmail(){
 
   showToast('Sending email...');
   try{
+    var sessionResult = await db.auth.getSession();
+    var token = sessionResult && sessionResult.data && sessionResult.data.session
+                ? sessionResult.data.session.access_token : null;
+    if(!token){ showToast('Session expired — please log in again.'); return; }
+
     var res = await fetch('https://amnacoyjgdfykdfepkze.supabase.co/functions/v1/resend-email',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+token
+      },
       body:JSON.stringify({
         to:email,
         subject:'Invoice '+num+' — Deus Labour Hire',
