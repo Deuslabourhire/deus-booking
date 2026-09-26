@@ -451,6 +451,12 @@ These Terms and Conditions are governed by the laws of Australia.</div>
         <button id="btnSaveInvoice" onclick="saveAdminInvoice()" style="flex:2;padding:10px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#3d8b3d,#2a6b2a);color:#fff;font-size:13px;font-weight:600">💾 Save Invoice</button>
       </div>
     </div>
+
+    <!-- Payments (read-only; sibling of #inv_preview so it's never cloned by printAdminInvoice/sendInvoiceEmail) -->
+    <div id="inv_payments" style="display:none;margin-top:18px;background:#fff;border-radius:12px;padding:20px 24px">
+      <div style="font-size:13px;font-weight:700;color:#1a1a1a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Payments</div>
+      <div id="inv_payments_body"></div>
+    </div>
   </div>
 
 
@@ -1285,6 +1291,8 @@ function resetAdminInvoice(){
   document.getElementById('inv_fixed_fields').style.display='none';
   document.getElementById('inv_extras').innerHTML='';
   document.getElementById('inv_preview').style.display='none';
+  var invPay = document.getElementById('inv_payments');
+  if(invPay){ invPay.style.display='none'; document.getElementById('inv_payments_body').innerHTML=''; }
   currentInvoiceBookingId = null;
   currentInvoiceCustomerId = null;
   lastInvoiceCalc = null;
@@ -1308,6 +1316,63 @@ function setInvoiceFormLocked(locked){
   if(addExtraBtn) addExtraBtn.disabled = locked;
   document.querySelectorAll('#inv_extras input').forEach(function(el){ el.readOnly = locked; });
   document.querySelectorAll('#inv_extras button').forEach(function(el){ el.disabled = locked; });
+}
+
+// Step 10L: Payments (read-only) — pure calc kept separate from rendering/fetching so it's independently testable
+function calculatePaymentTotals(paymentsRows, totalAmount){
+  var rows = paymentsRows || [];
+  var totalPaid = rows.reduce(function(sum, p){
+    return (p && p.status === 'completed') ? sum + Number(p.amount || 0) : sum;
+  }, 0);
+  var outstandingBalance = Math.max(0, Number(totalAmount || 0) - totalPaid);
+  return { totalPaid: totalPaid, outstandingBalance: outstandingBalance };
+}
+
+function renderInvoicePaymentsBody(paymentsRows, totalAmount){
+  var rows = paymentsRows || [];
+  var totals = calculatePaymentTotals(rows, totalAmount);
+  var html = '';
+  if(rows.length === 0){
+    html += '<div style="font-size:13px;color:#888;margin-bottom:12px">No payments recorded for this invoice yet.</div>';
+  } else {
+    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:14px">';
+    html += '<thead><tr style="background:#f8f8f5">'
+      +'<th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">Date</th>'
+      +'<th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">Amount</th>'
+      +'<th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">Method</th>'
+      +'<th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">Reference</th>'
+      +'<th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">Status</th>'
+      +'</tr></thead><tbody>';
+    rows.forEach(function(p){
+      html += '<tr>'
+        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(p.paid_at ? String(p.paid_at).slice(0,10) : '-')+'</td>'
+        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+Number(p.amount||0).toFixed(2)+'</td>'
+        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(p.method||'-')+'</td>'
+        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(p.reference||'-')+'</td>'
+        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(p.status||'-')+'</td>'
+        +'</tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;color:#333"><span>Total Paid</span><strong>$'+totals.totalPaid.toFixed(2)+'</strong></div>';
+  html += '<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;color:#333;border-top:1px solid #f0f0eb;margin-top:4px"><span>Outstanding Balance</span><strong>$'+totals.outstandingBalance.toFixed(2)+'</strong></div>';
+  return html;
+}
+
+async function loadInvoicePayments(invoiceId, totalAmount){
+  var section = document.getElementById('inv_payments');
+  var body = document.getElementById('inv_payments_body');
+  if(!section || !body) return;
+  section.style.display = 'block';
+  body.innerHTML = '<div style="font-size:13px;color:#888">Loading payments…</div>';
+  try{
+    var res = await db.from('payments').select('amount,method,reference,status,paid_at').eq('invoice_id', invoiceId).order('paid_at', {ascending:true});
+    if(res.error) throw res.error;
+    body.innerHTML = renderInvoicePaymentsBody(res.data || [], totalAmount);
+  }catch(e){
+    // Fallback state — never claim a $0.00 total when we don't actually know it (that would be a false confirmation, not an empty result)
+    body.innerHTML = '<div style="font-size:13px;color:#b23b3b">Could not load payments for this invoice right now.</div>';
+  }
 }
 
 async function openInvoice(id){
@@ -1446,6 +1511,10 @@ async function openInvoice(id){
     ['Calendar','Clients','Docs','Calc','Invoice','Draw'].forEach(function(n){ var el=$('tab'+n); if(el) el.style.display='none'; });
     $('tabInvoice').style.display = 'block';
     document.getElementById('inv_preview').scrollIntoView({behavior:'smooth'});
+
+    // Step 10L: read-only Payments section — loaded last, after the invoice itself is fully open;
+    // loadInvoicePayments() catches its own errors internally so a failed query never affects the invoice above.
+    loadInvoicePayments(inv.id, inv.total_amount);
   }catch(e){
     showToast('Could not open invoice: '+(e.message||'unknown error'), 5000);
   }
