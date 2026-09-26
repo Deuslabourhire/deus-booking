@@ -444,7 +444,7 @@ These Terms and Conditions are governed by the laws of Australia.</div>
         </div>
         <div style="font-size:11px;color:#888;font-style:italic;border-top:1px solid #f0f0eb;padding-top:12px">Please note that the due date for this invoice is 7 business days from the date of the invoice. Thank you!</div>
       </div>
-      <div style="display:flex;gap:10px;padding:14px 24px;background:#f8f8f5;border-top:1px solid #f0f0eb">
+      <div id="inv_actions" style="display:flex;gap:10px;padding:14px 24px;background:#f8f8f5;border-top:1px solid #f0f0eb">
         <button onclick="document.getElementById(&#39;inv_preview&#39;).style.display=&#39;none&#39;" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:8px;cursor:pointer;font-family:inherit;background:#fff;color:#666;font-size:13px">← Edit</button>
         <button onclick="printAdminInvoice()" style="flex:2;padding:10px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#2a5a2a,#3d8b3d);color:#fff;font-size:13px;font-weight:600">🖨️ Print / PDF</button>
         <button onclick="sendInvoiceEmail()" style="flex:2;padding:10px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;background:#1a3a5a;color:#93c5fd;font-size:13px;font-weight:600">📧 Send Email</button>
@@ -1576,9 +1576,12 @@ async function saveInvoiceItems(invoiceId){
 
 function printAdminInvoice(){
   var preview = document.getElementById('inv_preview');
+  var previewClone = preview.cloneNode(true);
+  var actionsClone = previewClone.querySelector('#inv_actions');
+  if(actionsClone) actionsClone.remove();
   // Substitui src relativo por URL absoluta no GitHub Pages (necessário pq janela nova não herda base path)
   var LOGO_URL = 'https://deuslabourhire.github.io/deus-booking/logo.png';
-  var html = preview.innerHTML.replace(/src="\.\/logo\.png(?:\?[^"]*)?"/g, 'src="'+LOGO_URL+'"');
+  var html = previewClone.innerHTML.replace(/src="\.\/logo\.png(?:\?[^"]*)?"/g, 'src="'+LOGO_URL+'"');
   var w = window.open('','_blank');
   w.document.write('<html><head><title>Invoice</title><style>body{font-family:Arial,sans-serif;margin:20px}table{width:100%;border-collapse:collapse}</style></head><body>');
   w.document.write(html);
@@ -1594,9 +1597,12 @@ async function sendInvoiceEmail(){
   if(!email){ showToast('Please enter client email first.'); return; }
 
   var preview = document.getElementById('inv_preview');
+  var previewClone = preview.cloneNode(true);
+  var actionsClone = previewClone.querySelector('#inv_actions');
+  if(actionsClone) actionsClone.remove();
   // Logo precisa ser URL absoluta no email pq clientes não tem o contexto do GitHub Pages
   var LOGO_URL = 'https://deuslabourhire.github.io/deus-booking/logo.png';
-  var previewHtml = preview.innerHTML.replace(/src="\.\/logo\.png(?:\?[^"]*)?"/g, 'src="'+LOGO_URL+'"');
+  var previewHtml = previewClone.innerHTML.replace(/src="\.\/logo\.png(?:\?[^"]*)?"/g, 'src="'+LOGO_URL+'"');
   var invoiceHtml = '<div style="font-family:Arial,sans-serif;max-width:650px;margin:0 auto">'+previewHtml+'</div>';
 
   showToast('Sending email...');
