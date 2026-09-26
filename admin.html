@@ -452,10 +452,47 @@ These Terms and Conditions are governed by the laws of Australia.</div>
       </div>
     </div>
 
-    <!-- Payments (read-only; sibling of #inv_preview so it's never cloned by printAdminInvoice/sendInvoiceEmail) -->
+    <!-- Payments (sibling of #inv_preview so it's never cloned by printAdminInvoice/sendInvoiceEmail) -->
     <div id="inv_payments" style="display:none;margin-top:18px;background:#fff;border-radius:12px;padding:20px 24px">
       <div style="font-size:13px;font-weight:700;color:#1a1a1a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Payments</div>
       <div id="inv_payments_body"></div>
+      <button id="btnAddPayment" type="button" onclick="showAddPaymentForm()" style="display:none;margin-top:10px;padding:9px 16px;border:1.5px solid #3d8b3d;border-radius:8px;cursor:pointer;font-family:inherit;background:#fff;color:#2a6b2a;font-size:13px;font-weight:600">+ Add Payment</button>
+
+      <!-- Step 10M: Add Payment form (hidden by default; opened only for a saved, non-draft, non-cancelled invoice) -->
+      <div id="inv_add_payment_form" style="display:none;margin-top:14px;padding:16px;background:#f8f8f5;border-radius:8px;border:1px solid #eee">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div>
+            <label style="font-size:11px;color:#888;text-transform:uppercase;display:block;margin-bottom:4px">Amount *</label>
+            <input id="pay_amount" type="text" inputmode="decimal" placeholder="0.00" onkeydown="handlePaymentFieldEnter(event)" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#888;text-transform:uppercase;display:block;margin-bottom:4px">Method *</label>
+            <select id="pay_method" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box">
+              <option value="">Select…</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;color:#888;text-transform:uppercase;display:block;margin-bottom:4px">Reference</label>
+            <input id="pay_reference" type="text" onkeydown="handlePaymentFieldEnter(event)" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#888;text-transform:uppercase;display:block;margin-bottom:4px">Paid At</label>
+            <input id="pay_paid_at" type="datetime-local" onkeydown="handlePaymentFieldEnter(event)" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box">
+          </div>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:11px;color:#888;text-transform:uppercase;display:block;margin-bottom:4px">Notes</label>
+          <input id="pay_notes" type="text" onkeydown="handlePaymentFieldEnter(event)" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box">
+        </div>
+        <div style="display:flex;gap:10px">
+          <button id="btnCancelAddPayment" type="button" onclick="hideAddPaymentForm()" style="flex:1;padding:9px;border:1.5px solid #ddd;border-radius:8px;cursor:pointer;font-family:inherit;background:#fff;color:#666;font-size:13px">Cancel</button>
+          <button id="btnConfirmPayment" type="button" onclick="submitAddPayment()" style="flex:2;padding:9px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#3d8b3d,#2a6b2a);color:#fff;font-size:13px;font-weight:600">Confirm Payment</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1293,6 +1330,8 @@ function resetAdminInvoice(){
   document.getElementById('inv_preview').style.display='none';
   var invPay = document.getElementById('inv_payments');
   if(invPay){ invPay.style.display='none'; document.getElementById('inv_payments_body').innerHTML=''; }
+  // Step 10M: any invoice-context change (open a different invoice, create new, cancel, manual Reset) must close/reset Add Payment
+  hideAddPaymentForm();
   currentInvoiceBookingId = null;
   currentInvoiceCustomerId = null;
   lastInvoiceCalc = null;
@@ -1372,6 +1411,134 @@ async function loadInvoicePayments(invoiceId, totalAmount){
   }catch(e){
     // Fallback state — never claim a $0.00 total when we don't actually know it (that would be a false confirmation, not an empty result)
     body.innerHTML = '<div style="font-size:13px;color:#b23b3b">Could not load payments for this invoice right now.</div>';
+  }
+}
+
+// Step 10M: Add Payment
+var isAddingPayment = false;      // guard against double-submit (click, double-click, or double Enter)
+var addPaymentFormInvoiceId = null; // snapshot of currentInvoiceId taken when the form was opened
+
+function updateAddPaymentButtonVisibility(){
+  var btn = document.getElementById('btnAddPayment');
+  if(!btn) return;
+  var canAdd = !!currentInvoiceId && currentInvoiceStatus && currentInvoiceStatus !== 'draft' && currentInvoiceStatus !== 'cancelled';
+  btn.style.display = canAdd ? 'block' : 'none';
+}
+
+function showAddPaymentForm(){
+  if(!currentInvoiceId){ showToast('Open a saved invoice first.'); return; }
+  if(currentInvoiceStatus === 'draft' || currentInvoiceStatus === 'cancelled'){
+    showToast('Payments cannot be added to a '+currentInvoiceStatus+' invoice.');
+    return;
+  }
+  addPaymentFormInvoiceId = currentInvoiceId; // context snapshot, checked again on submit
+  ['pay_amount','pay_reference','pay_paid_at','pay_notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  var methodEl = document.getElementById('pay_method'); if(methodEl) methodEl.value = '';
+  var form = document.getElementById('inv_add_payment_form'); if(form) form.style.display = 'block';
+  var btn = document.getElementById('btnAddPayment'); if(btn) btn.style.display = 'none';
+}
+
+function hideAddPaymentForm(){
+  var form = document.getElementById('inv_add_payment_form'); if(form) form.style.display = 'none';
+  addPaymentFormInvoiceId = null;
+  isAddingPayment = false;
+  var btnConfirm = document.getElementById('btnConfirmPayment'); if(btnConfirm) btnConfirm.disabled = false;
+  updateAddPaymentButtonVisibility();
+}
+
+function handlePaymentFieldEnter(ev){
+  if(ev && ev.key === 'Enter'){
+    ev.preventDefault(); // no <form> wrapping these inputs, but block any native behavior too
+    submitAddPayment();
+  }
+}
+
+// Accepts "150", "150.50" or "150,50" — comma is normalized to a dot before Number()
+function parsePaymentAmount(raw){
+  if(raw == null) return NaN;
+  var s = String(raw).trim().replace(',', '.');
+  if(s === '') return NaN;
+  return Number(s);
+}
+
+async function submitAddPayment(){
+  if(isAddingPayment) return; // covers double-click AND double-Enter — both call this same function
+
+  if(!currentInvoiceId){ showToast('No invoice is open.'); return; }
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(currentInvoiceId)){
+    showToast('Invalid invoice reference — please reopen the invoice.');
+    return;
+  }
+  // The form may have been opened for a different invoice if the admin switched invoices without closing it first
+  if(addPaymentFormInvoiceId !== currentInvoiceId){
+    showToast('The open invoice changed — please reopen Add Payment.');
+    hideAddPaymentForm();
+    return;
+  }
+  if(currentInvoiceStatus === 'draft' || currentInvoiceStatus === 'cancelled'){
+    showToast('Payments cannot be added to a '+currentInvoiceStatus+' invoice.');
+    return;
+  }
+
+  var amount = parsePaymentAmount(document.getElementById('pay_amount').value);
+  if(!isFinite(amount) || amount <= 0){ showToast('Enter a valid payment amount greater than 0.'); return; }
+
+  var method = document.getElementById('pay_method').value;
+  var validMethods = ['bank_transfer','cash','card','other'];
+  if(validMethods.indexOf(method) === -1){ showToast('Select a valid payment method.'); return; }
+
+  var reference = document.getElementById('pay_reference').value.trim();
+  var notes = document.getElementById('pay_notes').value.trim();
+  var paidAtRaw = document.getElementById('pay_paid_at').value; // datetime-local string, or '' if untouched
+
+  var payload = {
+    invoice_id: currentInvoiceId,
+    amount: amount,
+    method: method,
+    status: 'completed' // never exposed in the UI — only value this step ever writes
+  };
+  if(reference) payload.reference = reference;
+  if(notes) payload.notes = notes;
+  if(paidAtRaw){
+    var d = new Date(paidAtRaw);
+    if(isNaN(d.getTime())){ showToast('Invalid Paid At date/time.'); return; }
+    payload.paid_at = d.toISOString();
+  }
+  // else: 'paid_at' key omitted entirely so the DB column DEFAULT now() applies — never send an empty string
+
+  isAddingPayment = true;
+  var btnConfirm = document.getElementById('btnConfirmPayment');
+  if(btnConfirm) btnConfirm.disabled = true;
+
+  try{
+    var res = await db.from('payments').insert(payload).select().single();
+    if(res.error) throw res.error;
+
+    hideAddPaymentForm();
+
+    // Reuse the existing Step 10L read path — full reload, not an in-place append, so nothing can duplicate on screen
+    await loadInvoicePayments(currentInvoiceId, lastInvoiceCalc ? lastInvoiceCalc.totalAmount : null);
+
+    // Re-read status/paid_date from the DB — the AFTER trigger (payments_sync_invoice_status ->
+    // recalculate_invoice_status) already decided the new status; this never sets it directly in JS.
+    try{
+      var statusRes = await db.from('invoices').select('status,paid_date').eq('id', currentInvoiceId).single();
+      if(!statusRes.error && statusRes.data){
+        currentInvoiceStatus = statusRes.data.status;
+        var btnSave = document.getElementById('btnSaveInvoice');
+        if(btnSave) btnSave.disabled = (currentInvoiceStatus !== 'draft');
+        setInvoiceFormLocked(currentInvoiceStatus !== 'draft');
+      }
+    }catch(e2){ /* best-effort re-read; the payment itself already succeeded */ }
+
+    updateAddPaymentButtonVisibility();
+    showToast('Payment recorded ✓');
+  }catch(e){
+    // Error path: keep the entered values, change nothing about status/totals, allow retry
+    showToast('Error recording payment: '+(e.message||'unknown error'));
+  }finally{
+    isAddingPayment = false;
+    if(btnConfirm) btnConfirm.disabled = false;
   }
 }
 
@@ -1515,6 +1682,7 @@ async function openInvoice(id){
     // Step 10L: read-only Payments section — loaded last, after the invoice itself is fully open;
     // loadInvoicePayments() catches its own errors internally so a failed query never affects the invoice above.
     loadInvoicePayments(inv.id, inv.total_amount);
+    updateAddPaymentButtonVisibility();
   }catch(e){
     showToast('Could not open invoice: '+(e.message||'unknown error'), 5000);
   }
