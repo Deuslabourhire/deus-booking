@@ -313,7 +313,15 @@ These Terms and Conditions are governed by the laws of Australia.</div>
     <div style="font-size:16px;font-weight:700;margin-bottom:6px">🧾 Invoice Generator</div>
     <p style="font-size:12px;color:#6b7a6b;margin-bottom:16px">Client data auto-fills when opened from the calendar or client list.</p>
 
-    <div class="field"><label>Invoice Number</label><input type="text" id="inv_num" value="INV001"></div>
+    <div id="invoicesListSection" style="background:#0a1a0a;border:1px solid #2a3a2a;border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.07em">Recent Invoices</div>
+        <button onclick="loadInvoicesList()" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:11px;padding:4px 8px;cursor:pointer">🔄 Refresh</button>
+      </div>
+      <div id="invoicesListBody" style="font-size:12px;color:#9bb89b">Loading…</div>
+    </div>
+
+    <div class="field"><label>Invoice Number</label><input type="text" id="inv_num" value="PENDING" readonly></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
       <div class="field" style="margin-bottom:0"><label>Date</label><input type="date" id="inv_date"></div>
       <div class="field" style="margin-bottom:0"><label>Due Date</label><input type="date" id="inv_due"></div>
@@ -440,6 +448,7 @@ These Terms and Conditions are governed by the laws of Australia.</div>
         <button onclick="document.getElementById(&#39;inv_preview&#39;).style.display=&#39;none&#39;" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:8px;cursor:pointer;font-family:inherit;background:#fff;color:#666;font-size:13px">← Edit</button>
         <button onclick="printAdminInvoice()" style="flex:2;padding:10px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#2a5a2a,#3d8b3d);color:#fff;font-size:13px;font-weight:600">🖨️ Print / PDF</button>
         <button onclick="sendInvoiceEmail()" style="flex:2;padding:10px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;background:#1a3a5a;color:#93c5fd;font-size:13px;font-weight:600">📧 Send Email</button>
+        <button id="btnSaveInvoice" onclick="saveAdminInvoice()" style="flex:2;padding:10px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#3d8b3d,#2a6b2a);color:#fff;font-size:13px;font-weight:600">💾 Save Invoice</button>
       </div>
     </div>
   </div>
@@ -575,6 +584,11 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let bookings=[],calDate=new Date();
+let currentInvoiceBookingId = null;
+let currentInvoiceCustomerId = null;
+let lastInvoiceCalc = null;
+let currentInvoiceId = null;
+let invoicesListCache = [];
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const TERMS_TEXT=`DEUS LABOUR HIRE
 Moving & Cleaning Services
@@ -679,14 +693,85 @@ async function login(){
   if(error||!data.user){$('loginErr').textContent='Invalid email or password. Please try again.';$('loginErr').style.display='block';$('passInput').value='';return;}
   const {data:role,error:roleError}=await db.from('user_roles').select('role').eq('user_id',data.user.id).single();
   if(roleError||!role||role.role!=='admin'){await db.auth.signOut();$('loginErr').textContent='Access denied. This account is not an admin.';$('loginErr').style.display='block';$('passInput').value='';return;}
-  $('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();
+  $('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();await loadInvoicesList();
 }
 async function logout(){await db.auth.signOut();$('loginScreen').style.display='flex';$('app').style.display='none';$('passInput').value='';$('emailInput').value='';$('loginErr').style.display='none';}
-async function restoreSession(){if(await requireAdmin()){$('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();}else{$('loginScreen').style.display='flex';$('app').style.display='none';}}
+async function restoreSession(){if(await requireAdmin()){$('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();await loadInvoicesList();}else{$('loginScreen').style.display='flex';$('app').style.display='none';}}
 
 async function loadBookings(){
   try{const {data,error}=await db.from('bookings').select('*').order('date',{ascending:false});if(error)throw error;bookings=Array.isArray(data)?data:[];}catch(e){bookings=[];showToast('Could not connect to database.',4000);}renderAll();
 }
+
+async function loadInvoicesList(){
+  var body = document.getElementById('invoicesListBody');
+  if(body) body.textContent = 'Loading…';
+  try{
+    const {data, error} = await db.from('invoices_effective_status')
+      .select('id, invoice_number, customer_snapshot, total_amount, status, effective_status, issued_date, due_date, created_at')
+      .order('created_at', {ascending:false})
+      .limit(50);
+    if(error) throw error;
+    invoicesListCache = Array.isArray(data) ? data : [];
+    renderInvoicesList();
+  }catch(e){
+    invoicesListCache = [];
+    if(body) body.textContent = 'Could not load invoices.';
+  }
+}
+
+function renderInvoicesList(){
+  var body = document.getElementById('invoicesListBody');
+  if(!body) return;
+  if(!invoicesListCache.length){ body.textContent = 'No invoices saved yet.'; return; }
+  body.innerHTML = invoicesListCache.map(function(inv){
+    var name = (inv.customer_snapshot && inv.customer_snapshot.name) || '—';
+    var total = '$'+Number(inv.total_amount||0).toFixed(2);
+    var actionCell = inv.effective_status==='draft'
+      ? '<button onclick="markInvoiceAsSent(\''+inv.id+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Mark as Sent</button>'
+      : '';
+    if(inv.status==='draft' || inv.status==='sent'){
+      actionCell += '<button onclick="cancelInvoice(\''+inv.id+'\',\''+inv.invoice_number+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#c99;font-size:10px;padding:3px 6px;cursor:pointer;margin-left:4px">Cancel Invoice</button>';
+    }
+    return '<div style="display:grid;grid-template-columns:1.2fr 1.4fr .8fr .9fr .8fr .8fr .9fr;gap:6px;padding:5px 0;border-bottom:1px solid #1c2130">'
+      +'<span>'+inv.invoice_number+'</span><span>'+name+'</span><span>'+total+'</span>'
+      +'<span>'+inv.effective_status+'</span><span>'+(inv.issued_date||'—')+'</span><span>'+(inv.due_date||'—')+'</span><span>'+actionCell+'</span></div>';
+  }).join('');
+}
+
+async function markInvoiceAsSent(id){
+  if(!confirm('Mark this invoice as Sent?')) return;
+  try{
+    const {error} = await db.from('invoices')
+      .update({ status: 'sent', sent_date: new Date().toISOString().split('T')[0] })
+      .eq('id', id)
+      .eq('status', 'draft');
+    if(error) throw error;
+    showToast('Invoice marked as Sent ✓');
+    await loadInvoicesList();
+  }catch(e){
+    showToast('Error updating invoice: '+(e.message||'unknown error'), 5000);
+  }
+}
+
+async function cancelInvoice(id, invoiceNumber){
+  if(!confirm('Cancel invoice '+invoiceNumber+'? This cannot be undone from this screen.')) return;
+  try{
+    const {error} = await db.from('invoices')
+      .update({ status: 'cancelled' })
+      .eq('id', id)
+      .in('status', ['draft','sent']);
+    if(error) throw error;
+    showToast('Invoice '+invoiceNumber+' cancelled ✓');
+    if(id === currentInvoiceId){
+      resetAdminInvoice();
+      showToast('The invoice currently open in the form was cancelled — form cleared.', 5000);
+    }
+    await loadInvoicesList();
+  }catch(e){
+    showToast('Error cancelling invoice: '+(e.message||'unknown error'), 5000);
+  }
+}
+
 async function saveToSupabase(data,id){
   try{if(id){const {data:row,error}=await db.from('bookings').update(data).eq('id',id).select().single();if(error)throw error;return row;}const {data:row,error}=await db.from('bookings').insert(data).select().single();if(error)throw error;return row;}catch(e){console.error('Supabase save error:',e);return null;}
 }
@@ -811,7 +896,7 @@ async function saveJob(){
   closeModal();renderAll();
 }
 
-function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Calendar','Clients','Docs','Calc','Invoice','Draw'].forEach(t=>$('tab'+t).style.display='none');$('tab'+name).style.display='block';}
+function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Calendar','Clients','Docs','Calc','Invoice','Draw'].forEach(t=>$('tab'+t).style.display='none');$('tab'+name).style.display='block';if(name==='Invoice'){currentInvoiceBookingId=null;currentInvoiceCustomerId=null;}}
 function switchDoc(name){$('docContent').textContent=name==='tc'?TERMS_TEXT:SA_TEXT;$('docTabTC').className='doc-tab-btn'+(name==='tc'?' active':'');$('docTabSA').className='doc-tab-btn'+(name==='sa'?' active':'');}
 function fmtTime(t){if(!t)return '';const[h,m]=t.split(':'),hr=parseInt(h);return `${hr>12?hr-12:hr||12}:${m} ${hr>=12?'PM':'AM'}`;}
 $('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
@@ -1040,6 +1125,9 @@ function addInvExtra(){
 function createInvoice(id){
   var b = bookings.find(function(x){ return String(x.id)===String(id); });
   if(!b) return;
+  resetAdminInvoice();
+  currentInvoiceBookingId = b.id;
+  currentInvoiceCustomerId = b.customer_id || null;
   // Switch to invoice tab
   document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
   document.querySelectorAll('.tab').forEach(function(t){ if(t.textContent.includes('Invoice')) t.classList.add('active'); });
@@ -1068,6 +1156,7 @@ function createInvoice(id){
 }
 
 function generateAdminInvoice(){
+  if(currentInvoiceId){ showToast('This invoice is already saved — click Reset to start a new one.'); return; }
   var clientName = document.getElementById('inv_client').value.trim();
   var isFixed = document.getElementById('inv_fixed').checked;
   var start = document.getElementById('inv_start').value;
@@ -1156,6 +1245,30 @@ function generateAdminInvoice(){
 
   document.getElementById('inv_preview').style.display='block';
   document.getElementById('inv_preview').scrollIntoView({behavior:'smooth'});
+
+  lastInvoiceCalc = {
+    pricingType: isFixed ? 'fixed' : 'hourly',
+    hourlyRate: isFixed ? null : rate,
+    hoursWorked: isFixed ? null : hours,
+    finishTime: isFixed ? null : finish,
+    fixedAmount: isFixed ? fixedAmt : null,
+    fixedDescription: isFixed ? fixedDesc : null,
+    labourAmount: isFixed ? null : labour,
+    callout: isFixed ? 0 : callout,
+    extras: extras,
+    extrasTotal: extTotal,
+    subtotal: subtotal,
+    discountType: discountType,
+    discountValue: discountValue,
+    discountAmount: discountAmt,
+    discountDescription: discountDesc,
+    gstIncluded: gst,
+    taxableSubtotal: taxableSubtotal,
+    gstAmount: gstAmt,
+    totalAmount: total,
+    description: desc,
+    durationLabel: durStr
+  };
 }
 
 function resetAdminInvoice(){
@@ -1170,7 +1283,92 @@ function resetAdminInvoice(){
   document.getElementById('inv_fixed_fields').style.display='none';
   document.getElementById('inv_extras').innerHTML='';
   document.getElementById('inv_preview').style.display='none';
+  currentInvoiceBookingId = null;
+  currentInvoiceCustomerId = null;
+  lastInvoiceCalc = null;
+  currentInvoiceId = null;
+  document.getElementById('inv_num').value = 'PENDING';
+  var btnReset = document.getElementById('btnSaveInvoice');
+  if(btnReset) btnReset.disabled = false;
   updateInvGST();
+}
+
+async function saveAdminInvoice(){
+  if(currentInvoiceId){ showToast('Invoice already saved.'); return; }
+  if(!lastInvoiceCalc){ showToast('Generate the invoice first.'); return; }
+  var c = lastInvoiceCalc;
+  var extrasTotalWithCallout = c.extrasTotal + (c.callout||0);
+
+  var payload = {
+    booking_id: currentInvoiceBookingId,
+    customer_id: currentInvoiceCustomerId,
+    description: c.description,
+    subtotal: c.subtotal,
+    gst_amount: c.gstAmount,
+    total_amount: c.totalAmount,
+    issued_date: document.getElementById('inv_date').value || null,
+    due_date: document.getElementById('inv_due').value || null,
+    customer_snapshot: {
+      name: document.getElementById('inv_client').value.trim(),
+      phone: document.getElementById('inv_phone').value.trim(),
+      email: document.getElementById('inv_email').value.trim()
+    },
+    service_snapshot: {
+      pickup_address: document.getElementById('inv_pickup').value.trim(),
+      dropoff_address: document.getElementById('inv_dropoff').value.trim(),
+      start_time: document.getElementById('inv_start').value,
+      finish_time: c.finishTime,
+      duration_label: c.durationLabel,
+      callout_fee: c.callout || 0
+    },
+    pricing_type: c.pricingType,
+    hourly_rate: c.hourlyRate,
+    hours_worked: c.hoursWorked,
+    finish_time: c.finishTime,
+    fixed_amount: c.fixedAmount,
+    fixed_description: c.fixedDescription,
+    labour_amount: c.labourAmount,
+    extras_total: extrasTotalWithCallout,
+    discount_type: c.discountType,
+    discount_value: c.discountValue,
+    discount_amount: c.discountAmount,
+    discount_description: c.discountDescription,
+    gst_included: c.gstIncluded,
+    taxable_subtotal: c.taxableSubtotal
+  };
+
+  try{
+    const {data,error} = await db.from('invoices').insert(payload).select().single();
+    if(error) throw error;
+    currentInvoiceId = data.id;
+    showToast('Invoice '+data.invoice_number+' saved as draft ✓');
+    document.getElementById('inv_num').value = data.invoice_number;
+    document.getElementById('inv_p_num').textContent = data.invoice_number;
+    var clientNameForRef = document.getElementById('inv_client').value.trim();
+    document.getElementById('inv_p_ref').textContent = clientNameForRef.split(' ')[0].toUpperCase()+'_'+data.invoice_number;
+    var btnSave = document.getElementById('btnSaveInvoice');
+    if(btnSave) btnSave.disabled = true;
+    await saveInvoiceItems(data.id);
+  }catch(e){
+    showToast('Error saving invoice: '+(e.message||'unknown error'),5000);
+  }
+}
+
+async function saveInvoiceItems(invoiceId){
+  var c = lastInvoiceCalc;
+  var rows = [];
+  if(c.callout>0) rows.push({invoice_id:invoiceId, description:'Call Out Fee', amount:c.callout, sort_order:0});
+  c.extras.forEach(function(e){
+    rows.push({invoice_id:invoiceId, description:e.desc, amount:e.amt, sort_order:rows.length});
+  });
+  if(rows.length===0) return;
+
+  try{
+    const {error} = await db.from('invoice_items').insert(rows);
+    if(error) throw error;
+  }catch(e){
+    showToast('Invoice saved, but items failed to save: '+(e.message||'unknown error'),6000);
+  }
 }
 
 function printAdminInvoice(){
