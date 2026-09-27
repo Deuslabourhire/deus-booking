@@ -821,7 +821,9 @@ function renderInvoicesList(){
     var num = (inv.invoice_number || '').toLowerCase();
     var custName = ((inv.customer_snapshot && inv.customer_snapshot.name) || '').toLowerCase();
     var status = (inv.effective_status || '').toLowerCase();
-    return num.indexOf(q) !== -1 || custName.indexOf(q) !== -1 || status.indexOf(q) !== -1;
+    var hasOutstanding = q === 'outstanding' &&
+      ['sent','partially_paid','overdue'].indexOf(inv.effective_status) !== -1;
+    return num.indexOf(q) !== -1 || custName.indexOf(q) !== -1 || status.indexOf(q) !== -1 || hasOutstanding;
   });
 
   if(!filteredInvoices.length){ body.textContent = 'No invoices match your search.'; return; }
