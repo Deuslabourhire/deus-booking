@@ -996,7 +996,36 @@ function renderClients(){
 function toggleCard(id){const body=$('body_'+id),chev=$('chev_'+id);if(!body||!chev)return;const open=body.classList.toggle('open');chev.textContent=open?'▲':'▼';}
 async function markDone(id){bookings=bookings.map(b=>String(b.id)===String(id)?{...b,status:'completed'}:b);await saveToSupabase({status:'completed'},id);renderAll();showToast('Job marked as completed ✓');}
 async function sendReminder(id){bookings=bookings.map(b=>String(b.id)===String(id)?{...b,reminder_sent:true}:b);await saveToSupabase({reminder_sent:true},id);const b=bookings.find(b=>String(b.id)===String(id));renderAll();showToast(`Reminder sent to ${b?b.name:'client'} ✓`);}
-async function deleteJob(id){if(!confirm('Delete this booking? This cannot be undone.'))return;try{const {error}=await db.from('bookings').delete().eq('id',id);if(error)throw error;bookings=bookings.filter(b=>String(b.id)!==String(id));renderAll();showToast('Booking deleted.');}catch(e){showToast('Error deleting booking.',4000);}}
+async function deleteJob(id){
+  if(!confirm('Delete this booking? This cannot be undone.'))return;
+  try{
+    // Guard: a non-draft invoice linked to this booking is immutable at the DB level
+    // (invoices_enforce_invoice_immutability trigger) — deleting the booking would
+    // trigger the invoices.booking_id ON DELETE SET NULL, which the trigger rejects
+    // for any invoice not in 'draft' status, aborting the whole delete with a generic
+    // Postgres error. Check first so we can give a clear, actionable message instead.
+    const {data: linkedInvoices, error: invErr} = await db
+      .from('invoices')
+      .select('id,invoice_number,status')
+      .eq('booking_id', id);
+    if(invErr) throw invErr;
+
+    const blocking = (linkedInvoices||[]).filter(inv => inv.status !== 'draft');
+    if(blocking.length){
+      showToast(`Cannot delete: invoice ${blocking[0].invoice_number} (${blocking[0].status}) is linked to this booking. Cancel or reassign the invoice first.`, 5000);
+      return;
+    }
+
+    const {error}=await db.from('bookings').delete().eq('id',id);
+    if(error)throw error;
+    bookings=bookings.filter(b=>String(b.id)!==String(id));
+    renderAll();
+    showToast('Booking deleted.');
+  }catch(e){
+    console.error('deleteJob error:', e);
+    showToast('Error deleting booking.',4000);
+  }
+}
 
 function openAddModal(){$('modalTitle').textContent='Add New Job';$('editId').value='';['mName','mPhone','mEmail','mDate','mTime','mPickup','mDropoff','mNotes'].forEach(id=>$(id).value='');$('mStatus').value='upcoming';$('modalOverlay').classList.add('open');}
 function openEditModal(id){const b=bookings.find(b=>String(b.id)===String(id));if(!b)return;$('modalTitle').textContent='Edit Booking';$('editId').value=String(id);$('mName').value=b.name||'';$('mPhone').value=b.phone||'';$('mEmail').value=b.email||'';$('mDate').value=b.date||'';$('mTime').value=b.start_time||'';$('mPickup').value=b.pickup_address||'';$('mDropoff').value=b.dropoff_address||'';$('mNotes').value=b.notes||'';$('mStatus').value=b.status||'upcoming';$('modalOverlay').classList.add('open');}
