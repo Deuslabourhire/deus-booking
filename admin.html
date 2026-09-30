@@ -871,6 +871,13 @@ async function markInvoiceAsSent(id){
     if(error) throw error;
     showToast('Invoice marked as Sent ✓');
     await loadInvoicesList();
+    if(id === currentInvoiceId){
+      currentInvoiceStatus = 'sent';
+      var btnSave = document.getElementById('btnSaveInvoice');
+      if(btnSave) btnSave.disabled = true;
+      setInvoiceFormLocked(true);
+      updateAddPaymentButtonVisibility();
+    }
   }catch(e){
     showToast('Error updating invoice: '+(e.message||'unknown error'), 5000);
   }
@@ -1039,7 +1046,7 @@ async function saveJob(){
   try{
     if(editId){bookings=bookings.map(b=>String(b.id)===String(editId)?{...b,...data}:b);await saveToSupabase(data,editId);showToast('Booking updated ✓');}
     else{
-      var newB={...data,id:Date.now(),signature_name:'(admin added)',signed_date:new Date().toISOString().split('T')[0],reminder_sent:false,created_at:new Date().toISOString()};
+      var newB={...data,signature_name:'(admin added)',signed_date:new Date().toISOString().split('T')[0],reminder_sent:false,created_at:new Date().toISOString()};
       if(SUPABASE_URL){const saved=await saveToSupabase(newB,null);if(saved&&saved.id)newB=saved;}
       bookings=[newB,...bookings];
       showToast('New job added ✓');
