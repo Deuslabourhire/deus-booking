@@ -926,10 +926,11 @@ function renderAll(){updateStats();renderCalendar();renderClients();$('docConten
 // Human Takeover — Etapa 2A: read-only Quotes tab. No writes to `quotes` happen anywhere in this block.
 var quotesListCache = [];
 
-// Set of quote_id (as strings) that already have a linked Booking (bookings.quote_id).
-// Read-only lookup, used only to decide the Accepted/Booked label and whether to show
-// the Booking-link actions — never touches quotes.status or any other column.
-var quotesBookedSet = new Set();
+// Map of quote_id (string) -> booking_id (string) for quotes that already have a linked
+// Booking (bookings.quote_id). Read-only lookup, used only to decide the Accepted/Booked
+// label, whether to show the Booking-link actions, and which booking "📅 Open Job" should
+// open — never touches quotes.status or any other column.
+var quotesBookedMap = new Map();
 
 async function loadQuotes(){
   var body = document.getElementById('quotesListBody');
@@ -941,15 +942,17 @@ async function loadQuotes(){
     if(error) throw error;
     quotesListCache = Array.isArray(data) ? data : [];
 
-    // Read-only: which quotes already have a Booking linked via bookings.quote_id.
-    // Fail-open — if this query errors, quotesBookedSet stays empty and every
-    // accepted quote simply falls back to showing as "Accepted" (today's behaviour).
+    // Read-only: which quotes already have a Booking linked via bookings.quote_id, and
+    // that booking's own id (needed by "📅 Open Job"). Fail-open — if this query errors,
+    // quotesBookedMap stays empty and every accepted quote simply falls back to showing
+    // as "Accepted" (today's behaviour).
     const {data: linkedBookings, error: bkErr} = await db.from('bookings')
-      .select('quote_id')
+      .select('id, quote_id')
       .not('quote_id', 'is', null);
-    quotesBookedSet = new Set(
-      !bkErr && Array.isArray(linkedBookings) ? linkedBookings.map(function(b){ return String(b.quote_id); }) : []
-    );
+    quotesBookedMap = new Map();
+    if(!bkErr && Array.isArray(linkedBookings)){
+      linkedBookings.forEach(function(b){ quotesBookedMap.set(String(b.quote_id), String(b.id)); });
+    }
 
     renderQuotesList();
   }catch(e){
@@ -1012,14 +1015,14 @@ function renderQuotesList(){
     }
 
     // Etapa 4B / Human Takeover follow-up — Booking-link actions: only shown when
-    // status === 'accepted' AND no Booking is linked yet (quotesBookedSet). None of
+    // status === 'accepted' AND no Booking is linked yet (quotesBookedMap). None of
     // these write to any table — open/copy only handle the link; send is a POST to
     // the existing resend-email Edge Function (same pattern used for invoices).
     // Once a Booking exists for this quote, the quote displays as "Booked" instead
     // and these three actions are hidden (resending/copying the link no longer
     // applies — create-booking itself would also reject a second booking for the
     // same quote_id).
-    var isBooked = q.status === 'accepted' && quotesBookedSet.has(qid);
+    var isBooked = q.status === 'accepted' && quotesBookedMap.has(qid);
     var bookingControls = '';
     if(q.status === 'accepted' && !isBooked){
       bookingControls = ''
@@ -1030,9 +1033,21 @@ function renderQuotesList(){
         +'</div>';
     }
 
+    // Once a Quote is booked, Human Takeover no longer applies — it is a commercial
+    // negotiation aid, not a job-management tool. Purely visual gating: takeOverQuote()
+    // and resumeAutomation() themselves are untouched, and this has no effect on any
+    // quote where isBooked is false (every other status keeps today's behaviour exactly).
+    var jobControls = '';
+    if(isBooked){
+      var bookingId = quotesBookedMap.get(qid);
+      jobControls = '<div style="margin-top:6px">'
+        +'<button onclick="openJobForQuote(\''+bookingId+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">📅 Open Job</button>'
+        +'</div>';
+    }
+
     // Display-only label: the underlying quotes.status value is never changed to
     // "booked" — the database keeps "accepted" exactly as required. "Booked" is
-    // purely derived here from quotesBookedSet for this one render.
+    // purely derived here from quotesBookedMap for this one render.
     var statusLabel = isBooked ? 'Booked' : (q.status || '—');
 
     return '<div class="quote-row">'
@@ -1040,8 +1055,8 @@ function renderQuotesList(){
       +'<span data-label="Email">'+email+'</span>'
       +'<span data-label="Status">'+statusLabel+'</span>'
       +'<span data-label="Created">'+created+'</span>'
-      +'<span data-label="Takeover">'+takeoverCell+takeoverControls+'</span>'
-      +'<span data-label="Actions">'+commercialControls+bookingControls+'</span>'
+      +'<span data-label="Takeover">'+takeoverCell+(isBooked ? '' : takeoverControls)+'</span>'
+      +'<span data-label="Actions">'+commercialControls+bookingControls+jobControls+'</span>'
       +'</div>';
   }).join('');
 }
@@ -1193,6 +1208,36 @@ async function sendBookingLink(id){
     }
   }catch(e){
     showToast('Error sending link: ' + (e.message || 'unknown error'), 5000);
+  }
+}
+
+// "📅 Open Job" (Booked Quotes). Read-only: a single fresh SELECT by booking id — never
+// relies solely on the global `bookings` array, which is only loaded at login and could be
+// stale if the Booking was created by a client after this Admin session started. Reuses
+// the existing Calendar machinery (calDate, renderCalendar, switchTab, openDayModal)
+// instead of building a second booking/job viewer. No table is written to.
+async function openJobForQuote(bookingId){
+  try{
+    const {data, error} = await db.from('bookings').select('*').eq('id', bookingId).single();
+    if(error || !data){ showToast('Could not load this booking.', 4000); return; }
+
+    // Keep the global `bookings` array (used by Calendar/Clients/modals) in sync with
+    // this freshly-fetched row — insert it if it's not there yet (new Booking created
+    // after login), or refresh it if it is. This is a local, in-memory merge only; it
+    // does not write anything back to Supabase.
+    var idx = bookings.findIndex(function(b){ return String(b.id) === String(data.id); });
+    if(idx >= 0) bookings[idx] = data; else bookings = [data, ...bookings];
+
+    var d = new Date(data.date);
+    calDate = new Date(d.getFullYear(), d.getMonth());
+    renderCalendar();
+
+    var calendarTabBtn = document.querySelectorAll('.tab')[0];
+    switchTab('Calendar', calendarTabBtn);
+
+    openDayModal(d.getDate());
+  }catch(e){
+    showToast('Could not open this job.', 4000);
   }
 }
 
