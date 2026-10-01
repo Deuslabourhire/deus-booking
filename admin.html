@@ -926,6 +926,11 @@ function renderAll(){updateStats();renderCalendar();renderClients();$('docConten
 // Human Takeover — Etapa 2A: read-only Quotes tab. No writes to `quotes` happen anywhere in this block.
 var quotesListCache = [];
 
+// Set of quote_id (as strings) that already have a linked Booking (bookings.quote_id).
+// Read-only lookup, used only to decide the Accepted/Booked label and whether to show
+// the Booking-link actions — never touches quotes.status or any other column.
+var quotesBookedSet = new Set();
+
 async function loadQuotes(){
   var body = document.getElementById('quotesListBody');
   if(body) body.textContent = 'Loading…';
@@ -935,6 +940,17 @@ async function loadQuotes(){
       .order('created_at', {ascending:false});
     if(error) throw error;
     quotesListCache = Array.isArray(data) ? data : [];
+
+    // Read-only: which quotes already have a Booking linked via bookings.quote_id.
+    // Fail-open — if this query errors, quotesBookedSet stays empty and every
+    // accepted quote simply falls back to showing as "Accepted" (today's behaviour).
+    const {data: linkedBookings, error: bkErr} = await db.from('bookings')
+      .select('quote_id')
+      .not('quote_id', 'is', null);
+    quotesBookedSet = new Set(
+      !bkErr && Array.isArray(linkedBookings) ? linkedBookings.map(function(b){ return String(b.quote_id); }) : []
+    );
+
     renderQuotesList();
   }catch(e){
     quotesListCache = [];
@@ -965,53 +981,64 @@ function renderQuotesList(){
     if(isActive){
       var hh = String(untilDate.getHours()).padStart(2,'0');
       var mm = String(untilDate.getMinutes()).padStart(2,'0');
-      takeoverCell = '<span class="badge" style="background:var(--warn-bg);color:var(--warn)">Manual até '+hh+':'+mm+'</span>';
+      takeoverCell = '<span class="badge" style="background:var(--warn-bg);color:var(--warn)">Manual until '+hh+':'+mm+'</span>';
     } else if(isExpired){
-      takeoverCell = '<span class="badge" style="background:var(--danger-bg);color:var(--danger)">Takeover expirado — ação necessária</span>';
+      takeoverCell = '<span class="badge" style="background:var(--danger-bg);color:var(--danger)">Takeover expired — action required</span>';
     } else {
-      takeoverCell = '<span class="badge" style="background:var(--success-bg);color:var(--success)">Automação Ativa</span>';
+      takeoverCell = '<span class="badge" style="background:var(--success-bg);color:var(--success)">Automation Active</span>';
     }
 
     var takeoverControls = ''
       +'<div style="margin-top:6px;display:flex;gap:4px;align-items:center;flex-wrap:wrap">'
       +'<select id="to_dur_'+qid+'" style="background:#0e1218;border:1px solid #1c2130;border-radius:6px;color:#e8f0e8;font-size:10px;padding:3px 4px;font-family:inherit">'
-      +'<option value="2h">2 horas</option>'
-      +'<option value="4h">4 horas</option>'
-      +'<option value="eod">Fim do dia</option>'
+      +'<option value="2h">2 hours</option>'
+      +'<option value="4h">4 hours</option>'
+      +'<option value="eod">End of day</option>'
       +'</select>'
-      +'<button onclick="takeOverQuote(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Assumir negociação</button>'
-      +'<button onclick="resumeAutomation(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Retomar automação</button>'
+      +'<button onclick="takeOverQuote(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Take over negotiation</button>'
+      +'<button onclick="resumeAutomation(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Resume automation</button>'
       +'</div>';
 
-    // Etapa 4A — ações comerciais: só aparecem quando status === 'sent'. Tocam somente
-    // quotes.status (via acceptQuote/declineQuote). Quotes já accepted/declined/expired/draft
-    // não mostram esses botões.
+    // Etapa 4A — commercial actions: only shown when status === 'sent'. Touch only
+    // quotes.status (via acceptQuote/declineQuote). Quotes already accepted/declined/
+    // expired/draft never show these buttons.
     var commercialControls = '';
     if(q.status === 'sent'){
       commercialControls = ''
         +'<div style="margin-top:6px;display:flex;gap:4px;align-items:center;flex-wrap:wrap">'
-        +'<button onclick="acceptQuote(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Cliente aceitou / Fechar trabalho</button>'
-        +'<button onclick="declineQuote(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Não vai prosseguir / Declined</button>'
+        +'<button onclick="acceptQuote(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Client Accepted / Close job</button>'
+        +'<button onclick="declineQuote(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Client Declined</button>'
         +'</div>';
     }
 
-    // Etapa 4B — ações de Booking: só aparecem quando status === 'accepted'. Nenhuma
-    // delas escreve em nenhuma tabela — abrir/copiar são só o link; enviar é um POST
-    // para a Edge Function resend-email já existente (mesmo padrão usado para invoices).
+    // Etapa 4B / Human Takeover follow-up — Booking-link actions: only shown when
+    // status === 'accepted' AND no Booking is linked yet (quotesBookedSet). None of
+    // these write to any table — open/copy only handle the link; send is a POST to
+    // the existing resend-email Edge Function (same pattern used for invoices).
+    // Once a Booking exists for this quote, the quote displays as "Booked" instead
+    // and these three actions are hidden (resending/copying the link no longer
+    // applies — create-booking itself would also reject a second booking for the
+    // same quote_id).
+    var isBooked = q.status === 'accepted' && quotesBookedSet.has(qid);
     var bookingControls = '';
-    if(q.status === 'accepted'){
+    if(q.status === 'accepted' && !isBooked){
       bookingControls = ''
         +'<div style="margin-top:6px;display:flex;gap:4px;align-items:center;flex-wrap:wrap">'
-        +'<button onclick="openBookingLink(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">🔗 Abrir Booking</button>'
-        +'<button onclick="copyBookingLink(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">📋 Copiar link</button>'
-        +'<button onclick="sendBookingLink(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">✉️ Enviar link ao cliente</button>'
+        +'<button onclick="openBookingLink(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">🔗 Open Booking</button>'
+        +'<button onclick="copyBookingLink(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">📋 Copy link</button>'
+        +'<button onclick="sendBookingLink(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">✉️ Send link to client</button>'
         +'</div>';
     }
+
+    // Display-only label: the underlying quotes.status value is never changed to
+    // "booked" — the database keeps "accepted" exactly as required. "Booked" is
+    // purely derived here from quotesBookedSet for this one render.
+    var statusLabel = isBooked ? 'Booked' : (q.status || '—');
 
     return '<div class="quote-row">'
       +'<span data-label="Name">'+name+'</span>'
       +'<span data-label="Email">'+email+'</span>'
-      +'<span data-label="Status">'+(q.status||'—')+'</span>'
+      +'<span data-label="Status">'+statusLabel+'</span>'
       +'<span data-label="Created">'+created+'</span>'
       +'<span data-label="Takeover">'+takeoverCell+takeoverControls+'</span>'
       +'<span data-label="Actions">'+commercialControls+bookingControls+'</span>'
@@ -1054,10 +1081,10 @@ async function takeOverQuote(id){
   try{
     const {error} = await db.from('quotes').update({ human_takeover_until: until }).eq('id', id);
     if(error) throw error;
-    showToast('Negociação assumida ✓');
+    showToast('Negotiation taken over ✓');
     await loadQuotes();
   }catch(e){
-    showToast('Erro ao assumir negociação: ' + (e.message || 'erro desconhecido'), 5000);
+    showToast('Error taking over negotiation: ' + (e.message || 'unknown error'), 5000);
   }
 }
 
@@ -1068,36 +1095,38 @@ async function resumeAutomation(id){
   try{
     const {error} = await db.from('quotes').update({ human_takeover_until: null }).eq('id', id);
     if(error) throw error;
-    showToast('Automação retomada ✓');
+    showToast('Automation resumed ✓');
     await loadQuotes();
   }catch(e){
-    showToast('Erro ao retomar automação: ' + (e.message || 'erro desconhecido'), 5000);
+    showToast('Error resuming automation: ' + (e.message || 'unknown error'), 5000);
   }
 }
 
-// Etapa 4A — ações comerciais. Tocam SOMENTE quotes.status (nunca human_takeover_until,
-// leads, bookings, invoices, payments, follow_ups ou communications). O filtro
-// .eq('status','sent') evita sobrescrever uma quote que já mudou de estado enquanto a
-// tela estava aberta.
+// Etapa 4A — commercial actions. Touch ONLY quotes.status and quotes.human_takeover_until
+// (never leads, bookings, invoices, payments, follow_ups or communications). The
+// .eq('status','sent') filter avoids overwriting a quote that already changed state while
+// the screen was open. human_takeover_until is cleared in the same update: accepting or
+// declining a quote always ends any active/expired Human Takeover immediately — the badge
+// re-derives to "Automation Active" as soon as loadQuotes() reloads below.
 async function acceptQuote(id){
   try{
-    const {error} = await db.from('quotes').update({ status: 'accepted' }).eq('id', id).eq('status', 'sent');
+    const {error} = await db.from('quotes').update({ status: 'accepted', human_takeover_until: null }).eq('id', id).eq('status', 'sent');
     if(error) throw error;
-    showToast('Quote marcada como aceita ✓');
+    showToast('Quote marked as accepted ✓');
     await loadQuotes();
   }catch(e){
-    showToast('Erro ao marcar quote como aceita: ' + (e.message || 'erro desconhecido'), 5000);
+    showToast('Error marking quote as accepted: ' + (e.message || 'unknown error'), 5000);
   }
 }
 
 async function declineQuote(id){
   try{
-    const {error} = await db.from('quotes').update({ status: 'declined' }).eq('id', id).eq('status', 'sent');
+    const {error} = await db.from('quotes').update({ status: 'declined', human_takeover_until: null }).eq('id', id).eq('status', 'sent');
     if(error) throw error;
-    showToast('Quote marcada como não prosseguida ✓');
+    showToast('Quote marked as declined ✓');
     await loadQuotes();
   }catch(e){
-    showToast('Erro ao marcar quote: ' + (e.message || 'erro desconhecido'), 5000);
+    showToast('Error updating quote: ' + (e.message || 'unknown error'), 5000);
   }
 }
 
@@ -1117,16 +1146,16 @@ function openBookingLink(id){
 async function copyBookingLink(id){
   try{
     await navigator.clipboard.writeText(bookingLinkFor(id));
-    showToast('Link copiado ✓');
+    showToast('Link copied ✓');
   }catch(e){
-    showToast('Erro ao copiar link: ' + (e.message || 'erro desconhecido'), 5000);
+    showToast('Error copying link: ' + (e.message || 'unknown error'), 5000);
   }
 }
 
 async function sendBookingLink(id){
   var quote = quotesListCache.find(function(q){ return String(q.id) === String(id); });
   var to = quote && quote.contact_email;
-  if(!to){ showToast('Esta quote não tem contact_email cadastrado.', 5000); return; }
+  if(!to){ showToast('This quote has no contact_email on file.', 5000); return; }
 
   var link = bookingLinkFor(id);
   var html = ''
@@ -1158,12 +1187,12 @@ async function sendBookingLink(id){
     });
     var data = await res.json();
     if(data.id || res.ok){
-      showToast('Link enviado ✓');
+      showToast('Link sent ✓');
     }else{
-      showToast('Erro ao enviar: ' + (data && data.message ? data.message : 'erro desconhecido'), 5000);
+      showToast('Error sending: ' + (data && data.message ? data.message : 'unknown error'), 5000);
     }
   }catch(e){
-    showToast('Erro ao enviar link: ' + (e.message || 'erro desconhecido'), 5000);
+    showToast('Error sending link: ' + (e.message || 'unknown error'), 5000);
   }
 }
 
