@@ -132,6 +132,12 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
   .inv-row span{display:block;padding:2px 0;word-break:break-word}
   .inv-row span::before{content:attr(data-label) ": ";font-weight:700;color:#6b7a6b}
 }
+.quote-row{display:grid;grid-template-columns:1.2fr 1.5fr .7fr .8fr 1fr 1.3fr;gap:6px;padding:5px 0;border-bottom:1px solid #1c2130}
+@media (max-width:640px){
+  .quote-row{display:block;padding:10px 0}
+  .quote-row span{display:block;padding:2px 0;word-break:break-word}
+  .quote-row span::before{content:attr(data-label) ": ";font-weight:700;color:#6b7a6b}
+}
 </style>
 </head>
 <body>
@@ -176,6 +182,7 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
     <button class="tab" onclick="switchTab(&#39;Calc&#39;,this)">🧮 Calc</button>
     <button class="tab" onclick="switchTab(&#39;Invoice&#39;,this)">🧾 Invoice</button>
     <button class="tab" onclick="switchTab('Draw',this)">🎁 Draw</button>
+    <button class="tab" onclick="switchTab('Quotes',this)">💬 Quotes</button>
   </div>
 
   <div id="tabCalendar">
@@ -610,6 +617,14 @@ These Terms and Conditions are governed by the laws of Australia.</div>
     </div>
   </div>
 
+  <div id="tabQuotes" style="display:none">
+    <div style="font-size:16px;font-weight:700;margin-bottom:16px">💬 Quotes</div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button onclick="loadQuotes()" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:11px;padding:4px 8px;cursor:pointer">🔄 Refresh</button>
+    </div>
+    <div id="quotesListBody" style="font-size:12px;color:#9bb89b">Loading…</div>
+  </div>
+
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <h3 id="modalTitle">Add New Job</h3>
@@ -755,10 +770,10 @@ async function login(){
   if(error||!data.user){$('loginErr').textContent='Invalid email or password. Please try again.';$('loginErr').style.display='block';$('passInput').value='';return;}
   const {data:role,error:roleError}=await db.from('user_roles').select('role').eq('user_id',data.user.id).single();
   if(roleError||!role||role.role!=='admin'){await db.auth.signOut();$('loginErr').textContent='Access denied. This account is not an admin.';$('loginErr').style.display='block';$('passInput').value='';return;}
-  $('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();await loadInvoicesList();
+  $('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();await loadInvoicesList();await loadQuotes();
 }
 async function logout(){await db.auth.signOut();$('loginScreen').style.display='flex';$('app').style.display='none';$('passInput').value='';$('emailInput').value='';$('loginErr').style.display='none';}
-async function restoreSession(){if(await requireAdmin()){$('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();await loadInvoicesList();}else{$('loginScreen').style.display='flex';$('app').style.display='none';}}
+async function restoreSession(){if(await requireAdmin()){$('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();await loadInvoicesList();await loadQuotes();}else{$('loginScreen').style.display='flex';$('app').style.display='none';}}
 
 async function loadBookings(){
   try{const {data,error}=await db.from('bookings').select('*').order('date',{ascending:false});if(error)throw error;bookings=Array.isArray(data)?data:[];}catch(e){bookings=[];showToast('Could not connect to database.',4000);}renderAll();
@@ -908,6 +923,250 @@ async function saveToSupabase(data,id){
 
 function renderAll(){updateStats();renderCalendar();renderClients();$('docContent').textContent=TERMS_TEXT;}
 
+// Human Takeover — Etapa 2A: read-only Quotes tab. No writes to `quotes` happen anywhere in this block.
+var quotesListCache = [];
+
+async function loadQuotes(){
+  var body = document.getElementById('quotesListBody');
+  if(body) body.textContent = 'Loading…';
+  try{
+    const {data, error} = await db.from('quotes')
+      .select('id, contact_name, contact_email, status, created_at, human_takeover_until')
+      .order('created_at', {ascending:false});
+    if(error) throw error;
+    quotesListCache = Array.isArray(data) ? data : [];
+    renderQuotesList();
+  }catch(e){
+    quotesListCache = [];
+    if(body) body.textContent = 'Could not load quotes.';
+  }
+}
+
+function renderQuotesList(){
+  var body = document.getElementById('quotesListBody');
+  if(!body) return;
+  if(!quotesListCache.length){ body.textContent = 'No quotes found.'; return; }
+
+  body.innerHTML = quotesListCache.map(function(q){
+    var name = q.contact_name || '—';
+    var email = q.contact_email || '—';
+    var created = q.created_at ? q.created_at.split('T')[0] : '—';
+    var qid = String(q.id);
+
+    // Three distinct states. An expired timestamp is NOT the same as "never taken over" —
+    // it still means a human was handling this negotiation and no one has confirmed it's
+    // safe to resume, so it must never silently fall back into the "Automação Ativa" badge.
+    var hasTakeover = !!q.human_takeover_until;
+    var untilDate = hasTakeover ? new Date(q.human_takeover_until) : null;
+    var isActive = hasTakeover && untilDate > new Date();
+    var isExpired = hasTakeover && !isActive;
+
+    var takeoverCell;
+    if(isActive){
+      var hh = String(untilDate.getHours()).padStart(2,'0');
+      var mm = String(untilDate.getMinutes()).padStart(2,'0');
+      takeoverCell = '<span class="badge" style="background:var(--warn-bg);color:var(--warn)">Manual até '+hh+':'+mm+'</span>';
+    } else if(isExpired){
+      takeoverCell = '<span class="badge" style="background:var(--danger-bg);color:var(--danger)">Takeover expirado — ação necessária</span>';
+    } else {
+      takeoverCell = '<span class="badge" style="background:var(--success-bg);color:var(--success)">Automação Ativa</span>';
+    }
+
+    var takeoverControls = ''
+      +'<div style="margin-top:6px;display:flex;gap:4px;align-items:center;flex-wrap:wrap">'
+      +'<select id="to_dur_'+qid+'" style="background:#0e1218;border:1px solid #1c2130;border-radius:6px;color:#e8f0e8;font-size:10px;padding:3px 4px;font-family:inherit">'
+      +'<option value="2h">2 horas</option>'
+      +'<option value="4h">4 horas</option>'
+      +'<option value="eod">Fim do dia</option>'
+      +'</select>'
+      +'<button onclick="takeOverQuote(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Assumir negociação</button>'
+      +'<button onclick="resumeAutomation(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Retomar automação</button>'
+      +'</div>';
+
+    // Etapa 4A — ações comerciais: só aparecem quando status === 'sent'. Tocam somente
+    // quotes.status (via acceptQuote/declineQuote). Quotes já accepted/declined/expired/draft
+    // não mostram esses botões.
+    var commercialControls = '';
+    if(q.status === 'sent'){
+      commercialControls = ''
+        +'<div style="margin-top:6px;display:flex;gap:4px;align-items:center;flex-wrap:wrap">'
+        +'<button onclick="acceptQuote(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Cliente aceitou / Fechar trabalho</button>'
+        +'<button onclick="declineQuote(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">Não vai prosseguir / Declined</button>'
+        +'</div>';
+    }
+
+    // Etapa 4B — ações de Booking: só aparecem quando status === 'accepted'. Nenhuma
+    // delas escreve em nenhuma tabela — abrir/copiar são só o link; enviar é um POST
+    // para a Edge Function resend-email já existente (mesmo padrão usado para invoices).
+    var bookingControls = '';
+    if(q.status === 'accepted'){
+      bookingControls = ''
+        +'<div style="margin-top:6px;display:flex;gap:4px;align-items:center;flex-wrap:wrap">'
+        +'<button onclick="openBookingLink(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">🔗 Abrir Booking</button>'
+        +'<button onclick="copyBookingLink(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">📋 Copiar link</button>'
+        +'<button onclick="sendBookingLink(\''+qid+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer">✉️ Enviar link ao cliente</button>'
+        +'</div>';
+    }
+
+    return '<div class="quote-row">'
+      +'<span data-label="Name">'+name+'</span>'
+      +'<span data-label="Email">'+email+'</span>'
+      +'<span data-label="Status">'+(q.status||'—')+'</span>'
+      +'<span data-label="Created">'+created+'</span>'
+      +'<span data-label="Takeover">'+takeoverCell+takeoverControls+'</span>'
+      +'<span data-label="Actions">'+commercialControls+bookingControls+'</span>'
+      +'</div>';
+  }).join('');
+}
+
+// Resolves the current UTC offset for Australia/Sydney (handles AEST/AEDT without hardcoding
+// either one) so "fim do dia" means 23:59:59 Sydney local time, not the browser's own timezone.
+function sydneyUtcOffsetMinutes(date){
+  var parts = new Intl.DateTimeFormat('en-US', {timeZone:'Australia/Sydney', timeZoneName:'shortOffset'}).formatToParts(date);
+  var tzPart = parts.find(function(p){ return p.type === 'timeZoneName'; });
+  var m = tzPart ? /GMT([+-]\d+)/.exec(tzPart.value) : null;
+  return m ? parseInt(m[1], 10) * 60 : 600; // fallback: AEST (+10h) if the offset can't be parsed
+}
+
+function sydneyEndOfDayISO(){
+  var now = new Date();
+  var ymd = new Intl.DateTimeFormat('en-CA', {timeZone:'Australia/Sydney', year:'numeric', month:'2-digit', day:'2-digit'}).format(now);
+  var offsetMin = sydneyUtcOffsetMinutes(now);
+  var utcMillis = Date.UTC(
+    parseInt(ymd.slice(0,4), 10),
+    parseInt(ymd.slice(5,7), 10) - 1,
+    parseInt(ymd.slice(8,10), 10),
+    23, 59, 59
+  ) - offsetMin * 60000;
+  return new Date(utcMillis).toISOString();
+}
+
+// Human Takeover — Etapa 2B: the only write path to `quotes.human_takeover_until`.
+// No other column, table, workflow or RLS policy is touched by this function.
+async function takeOverQuote(id){
+  var sel = document.getElementById('to_dur_' + id);
+  var duration = sel ? sel.value : '2h';
+  var until;
+  if(duration === '2h') until = new Date(Date.now() + 2 * 3600000).toISOString();
+  else if(duration === '4h') until = new Date(Date.now() + 4 * 3600000).toISOString();
+  else until = sydneyEndOfDayISO();
+
+  try{
+    const {error} = await db.from('quotes').update({ human_takeover_until: until }).eq('id', id);
+    if(error) throw error;
+    showToast('Negociação assumida ✓');
+    await loadQuotes();
+  }catch(e){
+    showToast('Erro ao assumir negociação: ' + (e.message || 'erro desconhecido'), 5000);
+  }
+}
+
+// Human Takeover — Etapa 2C: the only other write path to `quotes`, and it only ever
+// clears human_takeover_until. Works the same whether the takeover is still active or
+// already expired — both just become NULL ("Automação Ativa"). No other field is touched.
+async function resumeAutomation(id){
+  try{
+    const {error} = await db.from('quotes').update({ human_takeover_until: null }).eq('id', id);
+    if(error) throw error;
+    showToast('Automação retomada ✓');
+    await loadQuotes();
+  }catch(e){
+    showToast('Erro ao retomar automação: ' + (e.message || 'erro desconhecido'), 5000);
+  }
+}
+
+// Etapa 4A — ações comerciais. Tocam SOMENTE quotes.status (nunca human_takeover_until,
+// leads, bookings, invoices, payments, follow_ups ou communications). O filtro
+// .eq('status','sent') evita sobrescrever uma quote que já mudou de estado enquanto a
+// tela estava aberta.
+async function acceptQuote(id){
+  try{
+    const {error} = await db.from('quotes').update({ status: 'accepted' }).eq('id', id).eq('status', 'sent');
+    if(error) throw error;
+    showToast('Quote marcada como aceita ✓');
+    await loadQuotes();
+  }catch(e){
+    showToast('Erro ao marcar quote como aceita: ' + (e.message || 'erro desconhecido'), 5000);
+  }
+}
+
+async function declineQuote(id){
+  try{
+    const {error} = await db.from('quotes').update({ status: 'declined' }).eq('id', id).eq('status', 'sent');
+    if(error) throw error;
+    showToast('Quote marcada como não prosseguida ✓');
+    await loadQuotes();
+  }catch(e){
+    showToast('Erro ao marcar quote: ' + (e.message || 'erro desconhecido'), 5000);
+  }
+}
+
+// Etapa 4B — ações de Booking para quotes accepted. Nenhuma função abaixo escreve em
+// quotes, human_takeover_until, leads, customers, invoices, payments, follow_ups ou
+// communications — abrir/copiar só manipulam o link; enviar é um POST para a Edge
+// Function resend-email já existente (mesma Edge Function, mesmo padrão de auth e
+// mesmo endpoint já usados para enviar invoices por email).
+function bookingLinkFor(id){
+  return 'https://deuslabourhire.github.io/deus-booking/booking.html?quote_id=' + id;
+}
+
+function openBookingLink(id){
+  window.open(bookingLinkFor(id), '_blank');
+}
+
+async function copyBookingLink(id){
+  try{
+    await navigator.clipboard.writeText(bookingLinkFor(id));
+    showToast('Link copiado ✓');
+  }catch(e){
+    showToast('Erro ao copiar link: ' + (e.message || 'erro desconhecido'), 5000);
+  }
+}
+
+async function sendBookingLink(id){
+  var quote = quotesListCache.find(function(q){ return String(q.id) === String(id); });
+  var to = quote && quote.contact_email;
+  if(!to){ showToast('Esta quote não tem contact_email cadastrado.', 5000); return; }
+
+  var link = bookingLinkFor(id);
+  var html = ''
+    +'<p>Hi there,</p>'
+    +'<p>Thanks for confirming you\'d like to go ahead with your move!</p>'
+    +'<p>Please click the link below to complete your booking, read our Terms &amp; Conditions and sign your Service Agreement:</p>'
+    +'<p>👉 <a href="'+link+'">Complete your booking</a></p>'
+    +'<p>It only takes a few minutes. Once completed, your job is confirmed!</p>'
+    +'<p>Deus Labour Hire<br>0430 008 700<br>deus.labour.hire@gmail.com</p>';
+
+  showToast('Sending email...');
+  try{
+    var sessionResult = await db.auth.getSession();
+    var token = sessionResult && sessionResult.data && sessionResult.data.session
+                ? sessionResult.data.session.access_token : null;
+    if(!token){ showToast('Session expired — please log in again.'); return; }
+
+    var res = await fetch('https://amnacoyjgdfykdfepkze.supabase.co/functions/v1/resend-email',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+token
+      },
+      body:JSON.stringify({
+        to: to,
+        subject: 'Your booking link — Deus Labour Hire',
+        invoiceHtml: html
+      })
+    });
+    var data = await res.json();
+    if(data.id || res.ok){
+      showToast('Link enviado ✓');
+    }else{
+      showToast('Erro ao enviar: ' + (data && data.message ? data.message : 'erro desconhecido'), 5000);
+    }
+  }catch(e){
+    showToast('Erro ao enviar link: ' + (e.message || 'erro desconhecido'), 5000);
+  }
+}
+
 function updateStats(){
   const up=bookings.filter(b=>b.status==='upcoming').length;
   const done=bookings.filter(b=>b.status==='completed').length;
@@ -1055,7 +1314,7 @@ async function saveJob(){
   closeModal();renderAll();
 }
 
-function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Calendar','Clients','Docs','Calc','Invoice','Draw'].forEach(t=>$('tab'+t).style.display='none');$('tab'+name).style.display='block';if(name==='Invoice'){currentInvoiceBookingId=null;currentInvoiceCustomerId=null;}}
+function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Calendar','Clients','Docs','Calc','Invoice','Draw','Quotes'].forEach(t=>$('tab'+t).style.display='none');$('tab'+name).style.display='block';if(name==='Invoice'){currentInvoiceBookingId=null;currentInvoiceCustomerId=null;}}
 function switchDoc(name){$('docContent').textContent=name==='tc'?TERMS_TEXT:SA_TEXT;$('docTabTC').className='doc-tab-btn'+(name==='tc'?' active':'');$('docTabSA').className='doc-tab-btn'+(name==='sa'?' active':'');}
 function fmtTime(t){if(!t)return '';const[h,m]=t.split(':'),hr=parseInt(h);return `${hr>12?hr-12:hr||12}:${m} ${hr>=12?'PM':'AM'}`;}
 $('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
