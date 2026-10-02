@@ -132,7 +132,7 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
   .inv-row span{display:block;padding:2px 0;word-break:break-word}
   .inv-row span::before{content:attr(data-label) ": ";font-weight:700;color:#6b7a6b}
 }
-.quote-row{display:grid;grid-template-columns:1.2fr 1.5fr .7fr .8fr 1fr 1.3fr;gap:6px;padding:5px 0;border-bottom:1px solid #1c2130}
+.quote-row{display:grid;grid-template-columns:1.1fr 1.4fr .6fr .7fr .7fr 1fr 1.2fr;gap:6px;padding:5px 0;border-bottom:1px solid #1c2130}
 @media (max-width:640px){
   .quote-row{display:block;padding:10px 0}
   .quote-row span{display:block;padding:2px 0;word-break:break-word}
@@ -932,12 +932,19 @@ var quotesListCache = [];
 // open — never touches quotes.status or any other column.
 var quotesBookedMap = new Map();
 
+// Read-only: lead_id (string) -> leads.source, for quotes whose lead has a non-null
+// source. Rebuilt on every loadQuotes() call. Fail-open — if this lookup errors, the
+// map stays empty and every quote falls back to the "Legacy/Unknown" label (today's
+// data reality anyway, since leads.source is not yet populated by n8n). Never writes
+// to `leads` or any other table.
+var quotesLeadSourceMap = new Map();
+
 async function loadQuotes(){
   var body = document.getElementById('quotesListBody');
   if(body) body.textContent = 'Loading…';
   try{
     const {data, error} = await db.from('quotes')
-      .select('id, contact_name, contact_email, status, created_at, human_takeover_until')
+      .select('id, contact_name, contact_email, status, created_at, human_takeover_until, lead_id')
       .order('created_at', {ascending:false});
     if(error) throw error;
     quotesListCache = Array.isArray(data) ? data : [];
@@ -952,6 +959,19 @@ async function loadQuotes(){
     quotesBookedMap = new Map();
     if(!bkErr && Array.isArray(linkedBookings)){
       linkedBookings.forEach(function(b){ quotesBookedMap.set(String(b.quote_id), String(b.id)); });
+    }
+
+    // Read-only lookup of leads.source for the Source column. Only fetches the lead_ids
+    // actually present among the loaded quotes; quotes with no lead_id are skipped.
+    quotesLeadSourceMap = new Map();
+    var leadIds = Array.from(new Set(quotesListCache.map(function(q){ return q.lead_id; }).filter(Boolean).map(String)));
+    if(leadIds.length){
+      const {data: leadsData, error: leadErr} = await db.from('leads')
+        .select('id, source')
+        .in('id', leadIds);
+      if(!leadErr && Array.isArray(leadsData)){
+        leadsData.forEach(function(l){ quotesLeadSourceMap.set(String(l.id), l.source); });
+      }
     }
 
     renderQuotesList();
@@ -1051,10 +1071,18 @@ function renderQuotesList(){
     // purely derived here from quotesBookedMap for this one render.
     var statusLabel = isBooked ? 'Booked' : (q.status || '—');
 
+    // Source column — read-only display of leads.source via quotesLeadSourceMap. Never
+    // writes anything. Falls back to "Legacy/Unknown" both when the quote has no
+    // lead_id and when the linked lead's source is null (today's reality for all
+    // existing leads, since leads.source is not yet populated upstream in n8n).
+    var sourceRaw = q.lead_id ? quotesLeadSourceMap.get(String(q.lead_id)) : null;
+    var sourceLabel = sourceRaw || 'Legacy/Unknown';
+
     return '<div class="quote-row">'
       +'<span data-label="Name">'+name+'</span>'
       +'<span data-label="Email">'+email+'</span>'
       +'<span data-label="Status">'+statusLabel+'</span>'
+      +'<span data-label="Source">'+sourceLabel+'</span>'
       +'<span data-label="Created">'+created+'</span>'
       +'<span data-label="Takeover">'+takeoverCell+(q.status === 'sent' ? takeoverControls : '')+'</span>'
       +'<span data-label="Actions">'+commercialControls+bookingControls+jobControls+'</span>'
