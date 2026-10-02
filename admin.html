@@ -1033,10 +1033,11 @@ function renderQuotesList(){
         +'</div>';
     }
 
-    // Once a Quote is booked, Human Takeover no longer applies — it is a commercial
-    // negotiation aid, not a job-management tool. Purely visual gating: takeOverQuote()
-    // and resumeAutomation() themselves are untouched, and this has no effect on any
-    // quote where isBooked is false (every other status keeps today's behaviour exactly).
+    // Human Takeover is a commercial-negotiation aid, so Take Over/Resume Automation are
+    // only shown for status === 'sent' (see the final return below) — hidden for accepted,
+    // declined, expired and draft alike, including booked quotes. Purely visual gating:
+    // takeOverQuote() and resumeAutomation() themselves are untouched, and this has no
+    // effect on a 'sent' quote (today's behaviour there stays exactly the same).
     var jobControls = '';
     if(isBooked){
       var bookingId = quotesBookedMap.get(qid);
@@ -1055,7 +1056,7 @@ function renderQuotesList(){
       +'<span data-label="Email">'+email+'</span>'
       +'<span data-label="Status">'+statusLabel+'</span>'
       +'<span data-label="Created">'+created+'</span>'
-      +'<span data-label="Takeover">'+takeoverCell+(isBooked ? '' : takeoverControls)+'</span>'
+      +'<span data-label="Takeover">'+takeoverCell+(q.status === 'sent' ? takeoverControls : '')+'</span>'
       +'<span data-label="Actions">'+commercialControls+bookingControls+jobControls+'</span>'
       +'</div>';
   }).join('');
