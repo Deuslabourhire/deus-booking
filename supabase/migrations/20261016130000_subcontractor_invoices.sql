@@ -11,15 +11,23 @@
 --     subcontractor and only ever touches that subcontractor's rows.
 --   * Worker records days (open = invoice_id IS NULL). "Submit" moves all
 --     open days into a new pending invoice; those days are then locked and
---     can only be changed by an admin (with an audit row).
+--     can only be changed by an admin (with a reason and an audit row).
 --   * Travel time is paid at sub_travel_factor() (0.5) of the hourly rate.
---     The worker RPCs return amounts only, never rates.
+--     Worker-facing RPCs return hours and amounts only, never rates.
 --   * This is an operational payment record, not a tax invoice / RCTI.
 --
--- Tables have RLS enabled. anon has no table access at all. Admin access
--- is checked with public.sub_is_admin() (user_roles.role = 'admin').
--- All functions are SECURITY DEFINER with an empty search_path and
--- fully-qualified names.
+-- Bank details
+--   * Kept OUT of the main tables: sub_bank_details (current) and
+--     sub_invoice_bank (snapshot at submission). No role except the table
+--     owner can read them directly; there are no table grants at all.
+--   * The worker sees/edits only their own through the token-scoped RPCs.
+--   * Admins see them only on demand via sub_admin_get_bank /
+--     sub_admin_get_invoice_bank, and every view is written to sub_audit.
+--   * The audit log, lists, e-mails and CSV exports never contain full bank
+--     numbers (audit keeps masked values, e.g. "•••678").
+--
+-- Admin changes to a subcontractor (label, level, active, profile, bank)
+-- only go through RPCs that require a reason and write sub_audit.
 -- =====================================================================
 
 begin;
@@ -77,6 +85,14 @@ begin
 end;
 $$;
 
+-- Masks a bank number for audit/display: "•••678".
+create or replace function public.sub_mask(p text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$ select case when p is null or p = '' then null else '•••' || right(p, 3) end; $$;
+
 -- ---------------------------------------------------------------------
 -- Tables
 -- ---------------------------------------------------------------------
@@ -111,22 +127,29 @@ create table public.sub_rates (
   primary key (job_type_id, level_id)
 );
 
+-- Profile WITHOUT bank details.
 create table public.subcontractors (
-  id                  uuid primary key default gen_random_uuid(),
-  display_name        text not null check (char_length(display_name) between 1 and 80),
-  level_id            smallint not null references public.sub_levels(id) on delete restrict,
-  active              boolean not null default true,
-  -- filled by the worker through the portal
-  full_name           text check (char_length(full_name) <= 120),
-  email               text check (email is null or (char_length(email) <= 254 and email ~ '^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$')),
-  phone               text check (char_length(phone) <= 30),
-  abn                 text check (abn is null or public.sub_abn_valid(abn)),
-  gst_registered      boolean not null default false,
-  bank_account_name   text check (char_length(bank_account_name) <= 120),
-  bank_bsb            text check (bank_bsb is null or bank_bsb ~ '^[0-9]{6}$'),
-  bank_account_number text check (bank_account_number is null or bank_account_number ~ '^[0-9]{5,10}$'),
-  profile_updated_at  timestamptz,
-  created_at          timestamptz not null default now(),
+  id                 uuid primary key default gen_random_uuid(),
+  display_name       text not null check (char_length(display_name) between 1 and 80),
+  level_id           smallint not null references public.sub_levels(id) on delete restrict,
+  active             boolean not null default true,
+  full_name          text check (char_length(full_name) <= 120),
+  address            text check (char_length(address) <= 200),
+  email              text check (email is null or (char_length(email) <= 254 and email ~ '^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$')),
+  phone              text check (char_length(phone) <= 30),
+  abn                text check (abn is null or public.sub_abn_valid(abn)),
+  gst_registered     boolean not null default false,
+  profile_updated_at timestamptz,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
+);
+
+-- Current bank details (no client grants; RPC access only).
+create table public.sub_bank_details (
+  subcontractor_id    uuid primary key references public.subcontractors(id) on delete cascade,
+  account_name        text not null check (char_length(account_name) between 1 and 120),
+  bsb                 text not null check (bsb ~ '^[0-9]{6}$'),
+  account_number      text not null check (account_number ~ '^[0-9]{5,10}$'),
   updated_at          timestamptz not null default now()
 );
 
@@ -146,31 +169,39 @@ create unique index sub_links_one_active on public.sub_links (subcontractor_id) 
 create sequence public.sub_invoice_seq;
 
 create table public.sub_invoices (
-  id                 uuid primary key default gen_random_uuid(),
-  invoice_number     text not null unique,
-  subcontractor_id   uuid not null references public.subcontractors(id) on delete restrict,
-  status             text not null default 'pending' check (status in ('pending','approved','paid','cancelled')),
-  worker_snapshot    jsonb not null,
-  company_snapshot   jsonb not null,
-  gst_registered     boolean not null,
-  labour_total       numeric(10,2) not null default 0,
-  travel_total       numeric(10,2) not null default 0,
-  subtotal           numeric(10,2) not null default 0,
-  gst_amount         numeric(10,2) not null default 0,
-  total              numeric(10,2) not null default 0,
-  submitted_at       timestamptz not null default now(),
-  approved_at        timestamptz,
-  paid_at            date,
-  payment_method     text check (char_length(payment_method) <= 40),
-  payment_reference  text check (char_length(payment_reference) <= 120),
-  expense_category   text not null default 'Subcontractor labour' check (char_length(expense_category) <= 60),
-  admin_notes        text check (char_length(admin_notes) <= 1000),
+  id                  uuid primary key default gen_random_uuid(),
+  invoice_number      text not null unique,
+  subcontractor_id    uuid not null references public.subcontractors(id) on delete restrict,
+  status              text not null default 'pending' check (status in ('pending','approved','paid','cancelled')),
+  worker_snapshot     jsonb not null,          -- name, address, email, phone, ABN, GST flag (NO bank)
+  company_snapshot    jsonb not null,
+  gst_registered      boolean not null,
+  labour_total        numeric(10,2) not null default 0,
+  travel_total        numeric(10,2) not null default 0,
+  subtotal            numeric(10,2) not null default 0,
+  gst_amount          numeric(10,2) not null default 0,
+  total               numeric(10,2) not null default 0,
+  submitted_at        timestamptz not null default now(),
+  approved_at         timestamptz,
+  paid_at             date,
+  payment_method      text check (char_length(payment_method) <= 40),
+  payment_reference   text check (char_length(payment_reference) <= 120),
+  expense_category    text not null default 'Subcontractor labour' check (char_length(expense_category) <= 60),
+  admin_notes         text check (char_length(admin_notes) <= 1000),
   worker_email_status text,
   admin_email_status  text,
-  updated_at         timestamptz not null default now()
+  updated_at          timestamptz not null default now()
 );
 create index sub_invoices_status_idx on public.sub_invoices (status, submitted_at desc);
 create index sub_invoices_sub_idx on public.sub_invoices (subcontractor_id);
+
+-- Bank snapshot taken at submission (no client grants; RPC access only).
+create table public.sub_invoice_bank (
+  invoice_id     uuid primary key references public.sub_invoices(id) on delete restrict,
+  account_name   text not null,
+  bsb            text not null,
+  account_number text not null
+);
 
 create table public.sub_work_days (
   id               uuid primary key default gen_random_uuid(),
@@ -200,56 +231,61 @@ create index sub_work_days_open_idx on public.sub_work_days (subcontractor_id) w
 create index sub_work_days_invoice_idx on public.sub_work_days (invoice_id);
 
 create table public.sub_audit (
-  id          bigint generated always as identity primary key,
-  at          timestamptz not null default now(),
-  actor       uuid,
-  action      text not null,
-  invoice_id  uuid,
-  work_day_id uuid,
-  old_data    jsonb,
-  new_data    jsonb,
-  reason      text
+  id               bigint generated always as identity primary key,
+  at               timestamptz not null default now(),
+  actor            uuid,                       -- admin user id; null = worker (link) or system
+  action           text not null,
+  subcontractor_id uuid,
+  invoice_id       uuid,
+  work_day_id      uuid,
+  old_data         jsonb,
+  new_data         jsonb,
+  reason           text
 );
 create index sub_audit_invoice_idx on public.sub_audit (invoice_id);
+create index sub_audit_sub_idx on public.sub_audit (subcontractor_id);
 
 -- Seed: company details already published in invoice.html (not invented).
 insert into public.sub_settings (company_name, company_abn, company_address)
 values ('Deus Labour Hire Pty Ltd', '62 665 081 783', 'Unit 10/6 Grosvenor St, Croydon NSW');
 
 -- ---------------------------------------------------------------------
--- Access control: RLS on, no anon access, admin via sub_is_admin()
+-- Access control: RLS on everywhere, no anon access, admin via sub_is_admin()
 -- ---------------------------------------------------------------------
-alter table public.sub_settings   enable row level security;
-alter table public.sub_levels     enable row level security;
-alter table public.sub_job_types  enable row level security;
-alter table public.sub_rates      enable row level security;
-alter table public.subcontractors enable row level security;
-alter table public.sub_links      enable row level security;
-alter table public.sub_invoices   enable row level security;
-alter table public.sub_work_days  enable row level security;
-alter table public.sub_audit      enable row level security;
+alter table public.sub_settings     enable row level security;
+alter table public.sub_levels       enable row level security;
+alter table public.sub_job_types    enable row level security;
+alter table public.sub_rates        enable row level security;
+alter table public.subcontractors   enable row level security;
+alter table public.sub_bank_details enable row level security;
+alter table public.sub_links        enable row level security;
+alter table public.sub_invoices     enable row level security;
+alter table public.sub_invoice_bank enable row level security;
+alter table public.sub_work_days    enable row level security;
+alter table public.sub_audit        enable row level security;
 
 revoke all on public.sub_settings, public.sub_levels, public.sub_job_types, public.sub_rates,
-              public.subcontractors, public.sub_links, public.sub_invoices, public.sub_work_days,
-              public.sub_audit from anon, authenticated;
+              public.subcontractors, public.sub_bank_details, public.sub_links, public.sub_invoices,
+              public.sub_invoice_bank, public.sub_work_days, public.sub_audit
+  from anon, authenticated;
 revoke all on sequence public.sub_invoice_seq from anon, authenticated;
 
--- Admin-managed configuration: full CRUD for admins.
+-- Configuration (no personal data): full CRUD for admins.
 grant select, update on public.sub_settings to authenticated;
 grant select, insert, update, delete on public.sub_levels, public.sub_job_types, public.sub_rates to authenticated;
-grant select, insert, update on public.subcontractors to authenticated;
--- Records: read-only for admins; all writes go through audited RPCs.
-grant select on public.sub_links, public.sub_invoices, public.sub_work_days, public.sub_audit to authenticated;
+-- Records and profiles: read-only for admins; every write goes through audited RPCs.
+grant select on public.subcontractors, public.sub_links, public.sub_invoices, public.sub_work_days, public.sub_audit to authenticated;
+-- sub_bank_details and sub_invoice_bank: NO grants (RPC only).
 
 create policy sub_settings_admin   on public.sub_settings   for all to authenticated using (public.sub_is_admin()) with check (public.sub_is_admin());
 create policy sub_levels_admin     on public.sub_levels     for all to authenticated using (public.sub_is_admin()) with check (public.sub_is_admin());
 create policy sub_job_types_admin  on public.sub_job_types  for all to authenticated using (public.sub_is_admin()) with check (public.sub_is_admin());
 create policy sub_rates_admin      on public.sub_rates      for all to authenticated using (public.sub_is_admin()) with check (public.sub_is_admin());
-create policy subcontractors_admin on public.subcontractors for all to authenticated using (public.sub_is_admin()) with check (public.sub_is_admin());
-create policy sub_links_admin_read      on public.sub_links     for select to authenticated using (public.sub_is_admin());
-create policy sub_invoices_admin_read   on public.sub_invoices  for select to authenticated using (public.sub_is_admin());
-create policy sub_work_days_admin_read  on public.sub_work_days for select to authenticated using (public.sub_is_admin());
-create policy sub_audit_admin_read      on public.sub_audit     for select to authenticated using (public.sub_is_admin());
+create policy subcontractors_admin_read on public.subcontractors for select to authenticated using (public.sub_is_admin());
+create policy sub_links_admin_read      on public.sub_links      for select to authenticated using (public.sub_is_admin());
+create policy sub_invoices_admin_read   on public.sub_invoices   for select to authenticated using (public.sub_is_admin());
+create policy sub_work_days_admin_read  on public.sub_work_days  for select to authenticated using (public.sub_is_admin());
+create policy sub_audit_admin_read      on public.sub_audit      for select to authenticated using (public.sub_is_admin());
 
 -- ---------------------------------------------------------------------
 -- Internal helpers (not callable by clients)
@@ -281,6 +317,90 @@ begin
   end if;
   update public.sub_links set last_used_at = now() where id = v_link_id;
   return v_sub_id;
+end;
+$$;
+
+-- Validate + store profile fields (shared by worker and admin paths). Audits the
+-- fields that changed. Returns the number of changed fields.
+create or replace function public.sub_apply_profile(
+  p_sub_id uuid, p_full_name text, p_address text, p_email text, p_phone text, p_abn text,
+  p_gst_registered boolean, p_actor uuid, p_action text, p_reason text)
+returns int
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_abn text := regexp_replace(coalesce(p_abn, ''), '\s', '', 'g');
+  v_old jsonb; v_new jsonb; v_o jsonb := '{}'; v_n jsonb := '{}'; k text;
+begin
+  if nullif(btrim(p_full_name), '') is null then raise exception 'name_required' using errcode = 'P0001'; end if;
+  if nullif(btrim(p_address), '') is null then raise exception 'address_required' using errcode = 'P0001'; end if;
+  if not public.sub_abn_valid(v_abn) then raise exception 'abn_invalid' using errcode = 'P0001'; end if;
+  if nullif(btrim(p_email), '') is not null
+     and lower(btrim(p_email)) !~ '^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$' then
+    raise exception 'email_invalid' using errcode = 'P0001';
+  end if;
+
+  select jsonb_build_object('full_name', full_name, 'address', address, 'email', email, 'phone', phone,
+                            'abn', abn, 'gst_registered', gst_registered)
+    into v_old from public.subcontractors where id = p_sub_id for update;
+  v_new := jsonb_build_object('full_name', btrim(p_full_name), 'address', btrim(p_address),
+                              'email', nullif(lower(btrim(p_email)), ''), 'phone', nullif(btrim(p_phone), ''),
+                              'abn', v_abn, 'gst_registered', coalesce(p_gst_registered, false));
+  for k in select jsonb_object_keys(v_new) loop
+    if (v_old -> k) is distinct from (v_new -> k) then
+      v_o := v_o || jsonb_build_object(k, v_old -> k);
+      v_n := v_n || jsonb_build_object(k, v_new -> k);
+    end if;
+  end loop;
+  if v_n = '{}'::jsonb then return 0; end if;
+
+  update public.subcontractors set
+    full_name = v_new->>'full_name', address = v_new->>'address', email = v_new->>'email',
+    phone = v_new->>'phone', abn = v_new->>'abn', gst_registered = (v_new->>'gst_registered')::boolean,
+    profile_updated_at = now(), updated_at = now()
+  where id = p_sub_id;
+  insert into public.sub_audit (actor, action, subcontractor_id, old_data, new_data, reason)
+  values (p_actor, p_action, p_sub_id, v_o, v_n, nullif(btrim(p_reason), ''));
+  return (select count(*) from jsonb_object_keys(v_n));
+end;
+$$;
+
+-- Validate + store bank details. The audit row keeps MASKED values only.
+create or replace function public.sub_apply_bank(
+  p_sub_id uuid, p_account_name text, p_bsb text, p_account_number text,
+  p_actor uuid, p_action text, p_reason text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_name text := btrim(coalesce(p_account_name, ''));
+  v_bsb  text := regexp_replace(coalesce(p_bsb, ''), '[\s-]', '', 'g');
+  v_acc  text := regexp_replace(coalesce(p_account_number, ''), '\s', '', 'g');
+  o      public.sub_bank_details%rowtype;
+begin
+  if v_name = '' then raise exception 'bank_name_required' using errcode = 'P0001'; end if;
+  if v_bsb !~ '^[0-9]{6}$' then raise exception 'bsb_invalid' using errcode = 'P0001'; end if;
+  if v_acc !~ '^[0-9]{5,10}$' then raise exception 'account_invalid' using errcode = 'P0001'; end if;
+  select * into o from public.sub_bank_details where subcontractor_id = p_sub_id for update;
+  if o.subcontractor_id is not null and o.account_name = v_name and o.bsb = v_bsb and o.account_number = v_acc then
+    return false;   -- unchanged
+  end if;
+  insert into public.sub_bank_details (subcontractor_id, account_name, bsb, account_number, updated_at)
+  values (p_sub_id, v_name, v_bsb, v_acc, now())
+  on conflict (subcontractor_id) do update
+    set account_name = excluded.account_name, bsb = excluded.bsb,
+        account_number = excluded.account_number, updated_at = now();
+  insert into public.sub_audit (actor, action, subcontractor_id, old_data, new_data, reason)
+  values (p_actor, p_action, p_sub_id,
+          case when o.subcontractor_id is null then null else
+            jsonb_build_object('account_name', o.account_name, 'bsb', public.sub_mask(o.bsb), 'account_number', public.sub_mask(o.account_number)) end,
+          jsonb_build_object('account_name', v_name, 'bsb', public.sub_mask(v_bsb), 'account_number', public.sub_mask(v_acc)),
+          nullif(btrim(p_reason), ''));
+  return true;
 end;
 $$;
 
@@ -330,8 +450,9 @@ begin
 end;
 $$;
 
--- Worker-visible view of open days (amounts only, no rates).
-create or replace function public.sub_open_days_json(p_sub_id uuid)
+-- Worker-visible list of days (hours and amounts only, no rates).
+-- p_invoice_id null = open days of the subcontractor.
+create or replace function public.sub_days_json(p_sub_id uuid, p_invoice_id uuid)
 returns jsonb
 language sql
 stable
@@ -346,7 +467,8 @@ as $$
          order by d.work_date, d.start_time), '[]'::jsonb)
   from public.sub_work_days d
   join public.sub_job_types j on j.id = d.job_type_id
-  where d.subcontractor_id = p_sub_id and d.invoice_id is null;
+  where d.subcontractor_id = p_sub_id
+    and d.invoice_id is not distinct from p_invoice_id;
 $$;
 
 -- ---------------------------------------------------------------------
@@ -361,35 +483,34 @@ as $$
 declare
   v_sub_id uuid;
   v_sub    public.subcontractors%rowtype;
-  v_res    jsonb;
+  v_bank   public.sub_bank_details%rowtype;
 begin
   v_sub_id := public.sub_resolve_token(p_token);
   select * into v_sub from public.subcontractors where id = v_sub_id;
-  select jsonb_build_object(
+  select * into v_bank from public.sub_bank_details where subcontractor_id = v_sub_id;
+  return jsonb_build_object(
     'company', (select jsonb_build_object('name', company_name, 'abn', company_abn, 'address', company_address) from public.sub_settings),
     'profile', jsonb_build_object(
-        'display_name', v_sub.display_name, 'full_name', v_sub.full_name, 'email', v_sub.email, 'phone', v_sub.phone,
-        'abn', v_sub.abn, 'gst_registered', v_sub.gst_registered, 'bank_account_name', v_sub.bank_account_name,
-        'bank_bsb', v_sub.bank_bsb, 'bank_account_number', v_sub.bank_account_number),
+        'display_name', v_sub.display_name, 'full_name', v_sub.full_name, 'address', v_sub.address,
+        'email', v_sub.email, 'phone', v_sub.phone, 'abn', v_sub.abn, 'gst_registered', v_sub.gst_registered,
+        -- the worker's OWN bank details (only reachable with their own link)
+        'bank_account_name', v_bank.account_name, 'bank_bsb', v_bank.bsb, 'bank_account_number', v_bank.account_number),
     'job_types', (select coalesce(jsonb_agg(jsonb_build_object('id', j.id, 'name', j.name) order by j.name), '[]'::jsonb)
                   from public.sub_job_types j
                   join public.sub_rates r on r.job_type_id = j.id and r.level_id = v_sub.level_id
                   where j.active),
-    'open_days', public.sub_open_days_json(v_sub_id),
+    'open_days', public.sub_days_json(v_sub_id, null),
     'invoices', (select coalesce(jsonb_agg(x.o order by x.submitted_at desc), '[]'::jsonb) from (
                    select i.submitted_at, jsonb_build_object('invoice_number', i.invoice_number,
-                          'submitted_at', i.submitted_at, 'status', i.status, 'total', i.total) as o
+                          'submitted_at', i.submitted_at, 'status', i.status, 'total', i.total, 'paid_at', i.paid_at) as o
                    from public.sub_invoices i where i.subcontractor_id = v_sub_id
                    order by i.submitted_at desc limit 20) x),
-    'today', public.sub_today()
-  ) into v_res;
-  return v_res;
+    'today', public.sub_today());
 end;
 $$;
 
-create or replace function public.sub_portal_save_profile(
-  p_token text, p_full_name text, p_email text, p_phone text, p_abn text, p_gst_registered boolean,
-  p_bank_account_name text, p_bank_bsb text, p_bank_account_number text)
+-- One submitted record as the worker sees it: days, hours, one travel line, totals. No rates.
+create or replace function public.sub_portal_get_invoice(p_token text, p_invoice_number text)
 returns jsonb
 language plpgsql
 security definer
@@ -397,26 +518,36 @@ set search_path = ''
 as $$
 declare
   v_sub_id uuid;
-  v_abn text := regexp_replace(coalesce(p_abn, ''), '\s', '', 'g');
-  v_bsb text := regexp_replace(coalesce(p_bank_bsb, ''), '[\s-]', '', 'g');
-  v_acc text := regexp_replace(coalesce(p_bank_account_number, ''), '\s', '', 'g');
+  i public.sub_invoices%rowtype;
 begin
   v_sub_id := public.sub_resolve_token(p_token);
-  if nullif(btrim(p_full_name), '') is null then raise exception 'name_required' using errcode = 'P0001'; end if;
-  if not public.sub_abn_valid(v_abn) then raise exception 'abn_invalid' using errcode = 'P0001'; end if;
-  if v_bsb <> '' and v_bsb !~ '^[0-9]{6}$' then raise exception 'bsb_invalid' using errcode = 'P0001'; end if;
-  if v_acc <> '' and v_acc !~ '^[0-9]{5,10}$' then raise exception 'account_invalid' using errcode = 'P0001'; end if;
-  update public.subcontractors set
-    full_name = btrim(p_full_name),
-    email = nullif(lower(btrim(p_email)), ''),
-    phone = nullif(btrim(p_phone), ''),
-    abn = v_abn,
-    gst_registered = coalesce(p_gst_registered, false),
-    bank_account_name = nullif(btrim(p_bank_account_name), ''),
-    bank_bsb = nullif(v_bsb, ''),
-    bank_account_number = nullif(v_acc, ''),
-    profile_updated_at = now(), updated_at = now()
-  where id = v_sub_id;
+  select * into i from public.sub_invoices where invoice_number = p_invoice_number and subcontractor_id = v_sub_id;
+  if i.id is null then raise exception 'not_found' using errcode = 'P0001'; end if;
+  return jsonb_build_object(
+    'invoice_number', i.invoice_number, 'submitted_at', i.submitted_at, 'status', i.status, 'paid_at', i.paid_at,
+    'worker', i.worker_snapshot, 'company', i.company_snapshot,
+    'days', public.sub_days_json(v_sub_id, i.id),
+    'labour_total', i.labour_total, 'travel_total', i.travel_total,
+    'subtotal', i.subtotal, 'gst_amount', i.gst_amount, 'total', i.total);
+end;
+$$;
+
+create or replace function public.sub_portal_save_profile(
+  p_token text, p_full_name text, p_address text, p_email text, p_phone text, p_abn text,
+  p_gst_registered boolean, p_bank_account_name text, p_bank_bsb text, p_bank_account_number text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_sub_id uuid;
+begin
+  v_sub_id := public.sub_resolve_token(p_token);
+  perform public.sub_apply_profile(v_sub_id, p_full_name, p_address, p_email, p_phone, p_abn, p_gst_registered,
+                                   null, 'profile_updated_by_worker', null);
+  perform public.sub_apply_bank(v_sub_id, p_bank_account_name, p_bank_bsb, p_bank_account_number,
+                                null, 'bank_updated_by_worker', null);
   return jsonb_build_object('ok', true);
 end;
 $$;
@@ -460,7 +591,7 @@ begin
     where id = p_day_id and subcontractor_id = v_sub_id and invoice_id is null;
     if not found then raise exception 'day_locked_or_missing' using errcode = 'P0001'; end if;
   end if;
-  return jsonb_build_object('ok', true, 'open_days', public.sub_open_days_json(v_sub_id));
+  return jsonb_build_object('ok', true, 'open_days', public.sub_days_json(v_sub_id, null));
 exception
   when unique_violation then raise exception 'day_duplicate' using errcode = 'P0001';
 end;
@@ -478,12 +609,13 @@ begin
   v_sub_id := public.sub_resolve_token(p_token);
   delete from public.sub_work_days where id = p_day_id and subcontractor_id = v_sub_id and invoice_id is null;
   if not found then raise exception 'day_locked_or_missing' using errcode = 'P0001'; end if;
-  return jsonb_build_object('ok', true, 'open_days', public.sub_open_days_json(v_sub_id));
+  return jsonb_build_object('ok', true, 'open_days', public.sub_days_json(v_sub_id, null));
 end;
 $$;
 
 -- Submit: only callable by service_role (the sub-invoice-submit Edge Function),
 -- so the notification step cannot be skipped by calling the RPC directly.
+-- The returned payload contains NO bank details.
 create or replace function public.sub_portal_submit(p_token text)
 returns jsonb
 language plpgsql
@@ -493,6 +625,7 @@ as $$
 declare
   v_sub_id  uuid;
   v_sub     public.subcontractors%rowtype;
+  v_bank    public.sub_bank_details%rowtype;
   v_inv_id  uuid;
   v_number  text;
   v_count   int;
@@ -501,7 +634,8 @@ begin
   v_sub_id := public.sub_resolve_token(p_token);
   -- serialise concurrent submits for the same subcontractor
   select * into v_sub from public.subcontractors where id = v_sub_id for update;
-  if v_sub.full_name is null or v_sub.abn is null or v_sub.bank_bsb is null or v_sub.bank_account_number is null then
+  select * into v_bank from public.sub_bank_details where subcontractor_id = v_sub_id;
+  if v_sub.full_name is null or v_sub.address is null or v_sub.abn is null or v_bank.subcontractor_id is null then
     raise exception 'profile_incomplete' using errcode = 'P0001';
   end if;
   select count(*) into v_count from public.sub_work_days where subcontractor_id = v_sub_id and invoice_id is null;
@@ -510,17 +644,19 @@ begin
   v_number := 'SUB-' || to_char(public.sub_today(), 'YYYY') || '-' || lpad(nextval('public.sub_invoice_seq')::text, 5, '0');
   insert into public.sub_invoices (invoice_number, subcontractor_id, worker_snapshot, company_snapshot, gst_registered)
   values (v_number, v_sub_id,
-    jsonb_build_object('full_name', v_sub.full_name, 'email', v_sub.email, 'phone', v_sub.phone, 'abn', v_sub.abn,
-                       'gst_registered', v_sub.gst_registered, 'bank_account_name', v_sub.bank_account_name,
-                       'bank_bsb', v_sub.bank_bsb, 'bank_account_number', v_sub.bank_account_number),
+    jsonb_build_object('full_name', v_sub.full_name, 'address', v_sub.address, 'email', v_sub.email,
+                       'phone', v_sub.phone, 'abn', v_sub.abn, 'gst_registered', v_sub.gst_registered),
     (select jsonb_build_object('name', company_name, 'abn', company_abn, 'address', company_address) from public.sub_settings),
     v_sub.gst_registered)
   returning id into v_inv_id;
+  insert into public.sub_invoice_bank (invoice_id, account_name, bsb, account_number)
+  values (v_inv_id, v_bank.account_name, v_bank.bsb, v_bank.account_number);
 
   update public.sub_work_days set invoice_id = v_inv_id, updated_at = now()
   where subcontractor_id = v_sub_id and invoice_id is null;
   perform public.sub_recalc_invoice(v_inv_id);
-  insert into public.sub_audit (action, invoice_id, new_data) values ('submitted', v_inv_id, jsonb_build_object('days', v_count));
+  insert into public.sub_audit (action, subcontractor_id, invoice_id, new_data)
+  values ('submitted', v_sub_id, v_inv_id, jsonb_build_object('days', v_count));
 
   select * into v_inv from public.sub_invoices where id = v_inv_id;
   return jsonb_build_object(
@@ -528,14 +664,8 @@ begin
     'worker', v_inv.worker_snapshot, 'company', v_inv.company_snapshot,
     'labour_total', v_inv.labour_total, 'travel_total', v_inv.travel_total, 'subtotal', v_inv.subtotal,
     'gst_amount', v_inv.gst_amount, 'total', v_inv.total,
-    'days', (select jsonb_agg(jsonb_build_object(
-               'work_date', d.work_date, 'job_type', j.name,
-               'start_time', to_char(d.start_time, 'HH24:MI'), 'finish_time', to_char(d.finish_time, 'HH24:MI'),
-               'break_minutes', d.break_minutes, 'work_hours', d.work_hours, 'labour_amount', d.labour_amount,
-               'travel_minutes', d.travel_minutes, 'travel_amount', d.travel_amount,
-               'hourly_rate', d.hourly_rate, 'travel_rate', d.travel_rate) order by d.work_date, d.start_time)
-             from public.sub_work_days d join public.sub_job_types j on j.id = d.job_type_id
-             where d.invoice_id = v_inv_id));
+    -- worker-safe day lines (no rates); the admin e-mail only says "review in Admin"
+    'days', public.sub_days_json(v_sub_id, v_inv_id));
 end;
 $$;
 
@@ -552,8 +682,137 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------
--- Admin RPCs
+-- Admin RPCs (each re-checks sub_is_admin(); changes need a reason)
 -- ---------------------------------------------------------------------
+create or replace function public.sub_require_admin(p_reason text, p_reason_required boolean)
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.sub_is_admin() then raise exception 'forbidden' using errcode = '42501'; end if;
+  if p_reason_required and (p_reason is null or char_length(btrim(p_reason)) < 3) then
+    raise exception 'reason_required' using errcode = 'P0001';
+  end if;
+  return (select auth.uid());
+end;
+$$;
+
+create or replace function public.sub_admin_create_subcontractor(p_display_name text, p_level_id int)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := public.sub_require_admin(null, false);
+  v_id uuid;
+begin
+  insert into public.subcontractors (display_name, level_id) values (btrim(p_display_name), p_level_id)
+  returning id into v_id;
+  insert into public.sub_audit (actor, action, subcontractor_id, new_data)
+  values (v_actor, 'subcontractor_created', v_id, jsonb_build_object('display_name', btrim(p_display_name), 'level_id', p_level_id));
+  return v_id;
+end;
+$$;
+
+create or replace function public.sub_admin_update_subcontractor(
+  p_id uuid, p_display_name text, p_level_id int, p_active boolean, p_reason text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := public.sub_require_admin(p_reason, true);
+  o public.subcontractors%rowtype;
+begin
+  select * into o from public.subcontractors where id = p_id for update;
+  if o.id is null then raise exception 'not_found' using errcode = 'P0001'; end if;
+  update public.subcontractors set display_name = btrim(p_display_name), level_id = p_level_id,
+         active = p_active, updated_at = now() where id = p_id;
+  insert into public.sub_audit (actor, action, subcontractor_id, old_data, new_data, reason)
+  values (v_actor, 'subcontractor_updated_by_admin', p_id,
+          jsonb_build_object('display_name', o.display_name, 'level_id', o.level_id, 'active', o.active),
+          jsonb_build_object('display_name', btrim(p_display_name), 'level_id', p_level_id, 'active', p_active),
+          btrim(p_reason));
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+create or replace function public.sub_admin_update_profile(
+  p_id uuid, p_full_name text, p_address text, p_email text, p_phone text, p_abn text,
+  p_gst_registered boolean, p_reason text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := public.sub_require_admin(p_reason, true);
+begin
+  if not exists (select 1 from public.subcontractors where id = p_id) then raise exception 'not_found' using errcode = 'P0001'; end if;
+  return jsonb_build_object('ok', true, 'changed',
+    public.sub_apply_profile(p_id, p_full_name, p_address, p_email, p_phone, p_abn, p_gst_registered,
+                             v_actor, 'profile_updated_by_admin', p_reason));
+end;
+$$;
+
+create or replace function public.sub_admin_update_bank(
+  p_id uuid, p_account_name text, p_bsb text, p_account_number text, p_reason text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := public.sub_require_admin(p_reason, true);
+begin
+  if not exists (select 1 from public.subcontractors where id = p_id) then raise exception 'not_found' using errcode = 'P0001'; end if;
+  return jsonb_build_object('ok', true, 'changed',
+    public.sub_apply_bank(p_id, p_account_name, p_bsb, p_account_number, v_actor, 'bank_updated_by_admin', p_reason));
+end;
+$$;
+
+-- On-demand view of CURRENT bank details. Every view is audited.
+create or replace function public.sub_admin_get_bank(p_subcontractor_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := public.sub_require_admin(null, false);
+  b public.sub_bank_details%rowtype;
+begin
+  select * into b from public.sub_bank_details where subcontractor_id = p_subcontractor_id;
+  insert into public.sub_audit (actor, action, subcontractor_id) values (v_actor, 'bank_viewed', p_subcontractor_id);
+  if b.subcontractor_id is null then return null; end if;
+  return jsonb_build_object('account_name', b.account_name, 'bsb', b.bsb, 'account_number', b.account_number, 'updated_at', b.updated_at);
+end;
+$$;
+
+-- On-demand view of the bank snapshot taken when a record was submitted. Audited.
+create or replace function public.sub_admin_get_invoice_bank(p_invoice_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := public.sub_require_admin(null, false);
+  b public.sub_invoice_bank%rowtype;
+begin
+  select * into b from public.sub_invoice_bank where invoice_id = p_invoice_id;
+  insert into public.sub_audit (actor, action, subcontractor_id, invoice_id)
+  values (v_actor, 'bank_viewed', (select subcontractor_id from public.sub_invoices where id = p_invoice_id), p_invoice_id);
+  if b.invoice_id is null then return null; end if;
+  return jsonb_build_object('account_name', b.account_name, 'bsb', b.bsb, 'account_number', b.account_number);
+end;
+$$;
+
 create or replace function public.sub_admin_create_link(p_subcontractor_id uuid, p_token_hash text, p_expires_at timestamptz default null)
 returns uuid
 language plpgsql
@@ -561,16 +820,16 @@ security definer
 set search_path = ''
 as $$
 declare
+  v_actor uuid := public.sub_require_admin(null, false);
   v_id uuid;
 begin
-  if not public.sub_is_admin() then raise exception 'forbidden' using errcode = '42501'; end if;
   if p_token_hash !~ '^[0-9a-f]{64}$' then raise exception 'hash_invalid' using errcode = 'P0001'; end if;
   update public.sub_links set revoked_at = now() where subcontractor_id = p_subcontractor_id and revoked_at is null;
   insert into public.sub_links (subcontractor_id, token_hash, created_by, expires_at)
-  values (p_subcontractor_id, p_token_hash, (select auth.uid()), p_expires_at)
+  values (p_subcontractor_id, p_token_hash, v_actor, p_expires_at)
   returning id into v_id;
-  insert into public.sub_audit (actor, action, new_data)
-  values ((select auth.uid()), 'link_created', jsonb_build_object('subcontractor_id', p_subcontractor_id, 'link_id', v_id));
+  insert into public.sub_audit (actor, action, subcontractor_id, new_data)
+  values (v_actor, 'link_created', p_subcontractor_id, jsonb_build_object('link_id', v_id));
   return v_id;
 end;
 $$;
@@ -582,13 +841,13 @@ security definer
 set search_path = ''
 as $$
 declare
+  v_actor uuid := public.sub_require_admin(null, false);
   v_n int;
 begin
-  if not public.sub_is_admin() then raise exception 'forbidden' using errcode = '42501'; end if;
   update public.sub_links set revoked_at = now() where subcontractor_id = p_subcontractor_id and revoked_at is null;
   get diagnostics v_n = row_count;
-  insert into public.sub_audit (actor, action, new_data)
-  values ((select auth.uid()), 'links_revoked', jsonb_build_object('subcontractor_id', p_subcontractor_id, 'count', v_n));
+  insert into public.sub_audit (actor, action, subcontractor_id, new_data)
+  values (v_actor, 'links_revoked', p_subcontractor_id, jsonb_build_object('count', v_n));
   return v_n;
 end;
 $$;
@@ -602,13 +861,12 @@ security definer
 set search_path = ''
 as $$
 declare
+  v_actor uuid := public.sub_require_admin(p_reason, true);
   d      public.sub_work_days%rowtype;
   v_stat text;
   v_rate numeric;
   c      record;
 begin
-  if not public.sub_is_admin() then raise exception 'forbidden' using errcode = '42501'; end if;
-  if nullif(btrim(p_reason), '') is null then raise exception 'reason_required' using errcode = 'P0001'; end if;
   select * into d from public.sub_work_days where id = p_day_id for update;
   if d.id is null or d.invoice_id is null then raise exception 'day_not_submitted' using errcode = 'P0001'; end if;
   select status into v_stat from public.sub_invoices where id = d.invoice_id for update;
@@ -632,13 +890,15 @@ begin
   where id = p_day_id;
   perform public.sub_recalc_invoice(d.invoice_id);
 
-  insert into public.sub_audit (actor, action, invoice_id, work_day_id, old_data, new_data, reason)
-  values ((select auth.uid()), 'day_adjusted', d.invoice_id, d.id, to_jsonb(d),
+  insert into public.sub_audit (actor, action, subcontractor_id, invoice_id, work_day_id, old_data, new_data, reason)
+  values (v_actor, 'day_adjusted', d.subcontractor_id, d.invoice_id, d.id, to_jsonb(d),
           (select to_jsonb(x) from public.sub_work_days x where x.id = p_day_id), btrim(p_reason));
   return jsonb_build_object('ok', true);
 end;
 $$;
 
+-- Status flow: pending -> approved | paid | cancelled; approved -> pending | paid | cancelled;
+-- paid -> approved (undo, reason required). "paid" requires a date and a method; reference optional.
 create or replace function public.sub_admin_set_status(
   p_invoice_id uuid, p_status text, p_paid_at date default null,
   p_payment_method text default null, p_payment_reference text default null, p_note text default null)
@@ -648,33 +908,41 @@ security definer
 set search_path = ''
 as $$
 declare
+  v_actor uuid := public.sub_require_admin(null, false);
   v_old public.sub_invoices%rowtype;
 begin
-  if not public.sub_is_admin() then raise exception 'forbidden' using errcode = '42501'; end if;
   select * into v_old from public.sub_invoices where id = p_invoice_id for update;
   if v_old.id is null then raise exception 'not_found' using errcode = 'P0001'; end if;
   if not (
-       (v_old.status = 'pending'  and p_status in ('approved', 'cancelled'))
+       (v_old.status = 'pending'  and p_status in ('approved', 'paid', 'cancelled'))
     or (v_old.status = 'approved' and p_status in ('pending', 'paid', 'cancelled'))
-    or (v_old.status = 'paid'     and p_status = 'approved' and nullif(btrim(p_note), '') is not null)
+    or (v_old.status = 'paid'     and p_status = 'approved')
   ) then
     raise exception 'transition_not_allowed' using errcode = 'P0001';
   end if;
-  if p_status = 'paid' and p_paid_at is null then raise exception 'paid_date_required' using errcode = 'P0001'; end if;
+  if p_status in ('cancelled') or v_old.status = 'paid' then
+    perform public.sub_require_admin(p_note, true);
+  end if;
+  if p_status = 'paid' then
+    if p_paid_at is null then raise exception 'paid_date_required' using errcode = 'P0001'; end if;
+    if p_paid_at > public.sub_today() then raise exception 'paid_date_future' using errcode = 'P0001'; end if;
+    if nullif(btrim(p_payment_method), '') is null then raise exception 'payment_method_required' using errcode = 'P0001'; end if;
+  end if;
 
   update public.sub_invoices set
     status = p_status,
-    approved_at = case when p_status = 'approved' and v_old.status = 'pending' then now() else approved_at end,
-    paid_at = case when p_status = 'paid' then p_paid_at when p_status <> 'paid' then null else paid_at end,
-    payment_method = case when p_status = 'paid' then nullif(btrim(p_payment_method), '') else payment_method end,
-    payment_reference = case when p_status = 'paid' then nullif(btrim(p_payment_reference), '') else payment_reference end,
+    approved_at = case when p_status in ('approved', 'paid') and approved_at is null then now() else approved_at end,
+    paid_at = case when p_status = 'paid' then p_paid_at else null end,
+    payment_method = case when p_status = 'paid' then btrim(p_payment_method) else null end,
+    payment_reference = case when p_status = 'paid' then nullif(btrim(p_payment_reference), '') else null end,
     admin_notes = coalesce(nullif(btrim(p_note), ''), admin_notes),
     updated_at = now()
   where id = p_invoice_id;
 
-  insert into public.sub_audit (actor, action, invoice_id, old_data, new_data, reason)
-  values ((select auth.uid()), 'status_changed', p_invoice_id,
-          jsonb_build_object('status', v_old.status, 'paid_at', v_old.paid_at),
+  insert into public.sub_audit (actor, action, subcontractor_id, invoice_id, old_data, new_data, reason)
+  values (v_actor, 'status_changed', v_old.subcontractor_id, p_invoice_id,
+          jsonb_build_object('status', v_old.status, 'paid_at', v_old.paid_at, 'payment_method', v_old.payment_method,
+                             'payment_reference', v_old.payment_reference),
           jsonb_build_object('status', p_status, 'paid_at', p_paid_at, 'payment_method', p_payment_method,
                              'payment_reference', p_payment_reference),
           nullif(btrim(p_note), ''));
@@ -685,28 +953,25 @@ $$;
 -- ---------------------------------------------------------------------
 -- Function privileges: nothing is executable by default.
 -- ---------------------------------------------------------------------
-revoke execute on function
-  public.sub_is_admin(), public.sub_today(), public.sub_travel_factor(), public.sub_abn_valid(text),
-  public.sub_resolve_token(text), public.sub_calc_day(time, time, int, int, numeric),
-  public.sub_recalc_invoice(uuid), public.sub_open_days_json(uuid),
-  public.sub_portal_get(text),
-  public.sub_portal_save_profile(text, text, text, text, text, boolean, text, text, text),
-  public.sub_portal_save_day(text, uuid, date, int, time, time, int, int, text),
-  public.sub_portal_delete_day(text, uuid), public.sub_portal_submit(text),
-  public.sub_record_email_status(uuid, text, text),
-  public.sub_admin_create_link(uuid, text, timestamptz), public.sub_admin_revoke_links(uuid),
-  public.sub_admin_adjust_day(uuid, int, time, time, int, int, text),
-  public.sub_admin_set_status(uuid, text, date, text, text, text)
-from public, anon, authenticated;
+do $$
+declare f regprocedure;
+begin
+  for f in select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname like 'sub\_%'
+  loop
+    execute format('revoke execute on function %s from public, anon, authenticated', f);
+  end loop;
+end $$;
 
 -- Used inside RLS policies and table CHECK constraints.
 grant execute on function public.sub_is_admin() to authenticated;
 grant execute on function public.sub_abn_valid(text) to authenticated;
 
--- Worker portal (link token is the credential).
+-- Worker portal (the link token is the credential).
 grant execute on function
   public.sub_portal_get(text),
-  public.sub_portal_save_profile(text, text, text, text, text, boolean, text, text, text),
+  public.sub_portal_get_invoice(text, text),
+  public.sub_portal_save_profile(text, text, text, text, text, text, boolean, text, text, text),
   public.sub_portal_save_day(text, uuid, date, int, time, time, int, int, text),
   public.sub_portal_delete_day(text, uuid)
 to anon, authenticated;
@@ -716,7 +981,14 @@ grant execute on function public.sub_portal_submit(text), public.sub_record_emai
 
 -- Admin actions (each re-checks sub_is_admin()).
 grant execute on function
-  public.sub_admin_create_link(uuid, text, timestamptz), public.sub_admin_revoke_links(uuid),
+  public.sub_admin_create_subcontractor(text, int),
+  public.sub_admin_update_subcontractor(uuid, text, int, boolean, text),
+  public.sub_admin_update_profile(uuid, text, text, text, text, text, boolean, text),
+  public.sub_admin_update_bank(uuid, text, text, text, text),
+  public.sub_admin_get_bank(uuid),
+  public.sub_admin_get_invoice_bank(uuid),
+  public.sub_admin_create_link(uuid, text, timestamptz),
+  public.sub_admin_revoke_links(uuid),
   public.sub_admin_adjust_day(uuid, int, time, time, int, int, text),
   public.sub_admin_set_status(uuid, text, date, text, text, text)
 to authenticated;

@@ -58,13 +58,15 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     <div class="card">
       <h2>Your details</h2>
       <div class="field"><label>Full name *</label><input id="pName" autocomplete="name"></div>
+      <div class="field"><label>Address *</label><input id="pAddress" autocomplete="street-address"></div>
       <div class="row">
         <div class="field"><label>Email</label><input id="pEmail" type="email" autocomplete="email"></div>
         <div class="field"><label>Phone</label><input id="pPhone" type="tel" autocomplete="tel"></div>
       </div>
       <div class="field"><label>ABN *</label><input id="pAbn" inputmode="numeric" placeholder="11 digits"></div>
       <label class="check"><input type="checkbox" id="pGst"> I am registered for GST</label>
-      <div class="field"><label>Bank account name *</label><input id="pBankName"></div>
+      <p class="muted" style="margin:4px 0 8px">Bank details are only visible to you and to the office admins.</p>
+      <div class="field"><label>Account holder *</label><input id="pBankName"></div>
       <div class="row">
         <div class="field"><label>BSB *</label><input id="pBsb" inputmode="numeric" placeholder="000-000"></div>
         <div class="field"><label>Account number *</label><input id="pAcc" inputmode="numeric"></div>
@@ -119,6 +121,10 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     invalid_link: 'This link is not valid any more. Please ask the office for a new link.',
     abn_invalid: 'The ABN is not valid. Please check the 11 digits.',
     name_required: 'Please enter your full name.',
+    address_required: 'Please enter your address.',
+    email_invalid: 'The email address is not valid.',
+    bank_name_required: 'Please enter the account holder name.',
+    not_found: 'Record not found.',
     bsb_invalid: 'BSB must have 6 digits.',
     account_invalid: 'Account number must have 5 to 10 digits.',
     date_invalid: 'The date cannot be in the future.',
@@ -128,7 +134,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     break_too_long: 'The break is longer than the time worked.',
     day_duplicate: 'You already have a day with the same date and start time.',
     day_locked_or_missing: 'This day was already sent and can no longer be changed.',
-    profile_incomplete: 'Please complete your details (name, ABN and bank details) before sending.',
+    profile_incomplete: 'Please complete your details (name, address, ABN and bank details) before sending.',
     no_open_days: 'There are no new days to send.'
   };
 
@@ -166,6 +172,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
 
   function renderProfile(p) {
     $('pName').value = p.full_name || p.display_name || '';
+    $('pAddress').value = p.address || '';
     $('pEmail').value = p.email || '';
     $('pPhone').value = p.phone || '';
     $('pAbn').value = p.abn || '';
@@ -223,11 +230,39 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     var box = $('sent'); box.textContent = '';
     if (!state.invoices.length) { box.textContent = 'Nothing sent yet.'; return; }
     state.invoices.forEach(function (i) {
-      var l = el('div', 'line');
+      var wrap = el('div', 'day');
+      var l = el('div', 'line'); l.style.cursor = 'pointer';
       l.appendChild(el('span', null, i.invoice_number + ' · ' + String(i.submitted_at).slice(0, 10)));
       var r = el('span'); r.appendChild(el('span', 'badge ' + i.status, i.status)); r.appendChild(document.createTextNode(' ' + money(i.total)));
-      l.appendChild(r); box.appendChild(l);
+      l.appendChild(r);
+      var detail = el('div'); detail.style.display = 'none';
+      l.onclick = function () { toggleInvoice(i.invoice_number, detail); };
+      wrap.appendChild(l); wrap.appendChild(detail); box.appendChild(wrap);
     });
+  }
+
+  // Submitted record as the worker sees it: days, hours, one travel-time line, totals (no rates).
+  async function toggleInvoice(number, box) {
+    if (box.style.display === 'block') { box.style.display = 'none'; return; }
+    box.textContent = 'Loading…'; box.style.display = 'block';
+    try {
+      var inv = await rpc('sub_portal_get_invoice', { p_invoice_number: number });
+      box.textContent = '';
+      inv.days.forEach(function (d) {
+        var l = el('div', 'line');
+        l.appendChild(el('span', null, d.work_date + ' · ' + d.job_type + ' · ' + d.start_time + '–' + d.finish_time + ' · ' + d.work_hours + ' h'));
+        l.appendChild(el('span', null, money(d.labour_amount)));
+        box.appendChild(l);
+      });
+      var rows = [['Travel time', inv.travel_total], ['Subtotal', inv.subtotal]];
+      if (inv.worker && inv.worker.gst_registered) rows.push(['GST', inv.gst_amount]);
+      rows.forEach(function (r) {
+        if (r[0] === 'Travel time' && !Number(r[1])) return;
+        var l = el('div', 'line'); l.appendChild(el('span', null, r[0])); l.appendChild(el('span', null, money(r[1]))); box.appendChild(l);
+      });
+      var t = el('div', 'line total'); t.appendChild(el('span', null, 'Total')); t.appendChild(el('span', null, money(inv.total))); box.appendChild(t);
+      box.appendChild(el('p', 'muted', 'Status: ' + inv.status + (inv.paid_at ? ' · paid on ' + inv.paid_at : '')));
+    } catch (e) { box.textContent = friendly(e.code); }
   }
 
   function resetDayForm() {
@@ -259,7 +294,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
   $('saveProfileBtn').onclick = function () {
     withButton(this, async function () {
       await rpc('sub_portal_save_profile', {
-        p_full_name: $('pName').value, p_email: $('pEmail').value, p_phone: $('pPhone').value,
+        p_full_name: $('pName').value, p_address: $('pAddress').value, p_email: $('pEmail').value, p_phone: $('pPhone').value,
         p_abn: $('pAbn').value, p_gst_registered: $('pGst').checked, p_bank_account_name: $('pBankName').value,
         p_bank_bsb: $('pBsb').value, p_bank_account_number: $('pAcc').value
       });

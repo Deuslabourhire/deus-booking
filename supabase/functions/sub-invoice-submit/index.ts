@@ -13,19 +13,21 @@
 //   EMAIL_FROM          sender, e.g. "Deus Labour Hire <invoices@your-domain>" (live only)
 //   ADMIN_NOTIFY_EMAIL  optional; if unset the admin copy is skipped ("not_configured")
 //
-// The token, bank details and e-mail bodies are never logged.
+// The token and e-mail bodies are never logged. The database never returns bank
+// details to this function, so they cannot appear in any e-mail.
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 const KNOWN_ERRORS: Record<string, [number, string]> = {
   invalid_link: [401, "This link is not valid any more. Please ask the office for a new link."],
-  profile_incomplete: [400, "Please complete your details (name, ABN and bank details) before sending."],
+  profile_incomplete: [400, "Please complete your details (name, address, ABN and bank details) before sending."],
   no_open_days: [400, "There are no new days to send."],
 };
 
+// Day lines as returned by the database: hours and amounts only (no rates, no bank data).
 type Day = {
   work_date: string; job_type: string; start_time: string; finish_time: string;
   break_minutes: number; work_hours: number; labour_amount: number;
-  travel_minutes: number; travel_amount: number; hourly_rate: number; travel_rate: number;
+  travel_minutes: number; travel_amount: number;
 };
 type Submitted = {
   invoice_id: string; invoice_number: string; submitted_at: string;
@@ -98,20 +100,20 @@ ${rows}${travel}</table>
 <p style="color:#888;font-size:12px">Status: pending. The office may correct hours before payment.</p></div>`;
 }
 
-// Admin copy: full detail including travel minutes and rates.
+// Admin copy: summary only (no bank details, no rates). Full detail is in Admin → Subcontractors.
 function adminHtml(s: Submitted): string {
   const w = s.worker;
   const rows = s.days.map((d) =>
-    `<tr><td>${esc(d.work_date)}</td><td>${esc(d.job_type)}</td><td>${esc(d.start_time)}–${esc(d.finish_time)} (break ${esc(d.break_minutes)}m)</td>` +
-    `<td>${esc(d.work_hours)} h × ${money(d.hourly_rate)} = ${money(d.labour_amount)}</td>` +
-    `<td>${esc(d.travel_minutes)}m × ${money(d.travel_rate)}/h = ${money(d.travel_amount)}</td></tr>`).join("");
-  return `<div style="font-family:Arial,sans-serif;max-width:760px">
+    `<tr><td>${esc(d.work_date)}</td><td>${esc(d.job_type)}</td><td>${esc(d.start_time)}–${esc(d.finish_time)}</td>` +
+    `<td style="text-align:right">${esc(d.work_hours)} h</td><td style="text-align:right">${money(d.labour_amount)}</td></tr>`).join("");
+  return `<div style="font-family:Arial,sans-serif;max-width:640px">
 <h2>New subcontractor record ${esc(s.invoice_number)} — pending</h2>
 <p><b>${esc(w.full_name)}</b> — ABN ${esc(w.abn)} — GST registered: ${w.gst_registered ? "yes" : "no"}</p>
 <table cellpadding="6" border="1" style="border-collapse:collapse;font-size:12px">
-<tr><th>Date</th><th>Job</th><th>Time</th><th>Labour</th><th>Travel</th></tr>${rows}</table>
-<p>Labour ${money(s.labour_total)} · Travel ${money(s.travel_total)} · Subtotal ${money(s.subtotal)} · GST ${money(s.gst_amount)} · <b>Total ${money(s.total)}</b></p>
-<p>Review and approve in Admin → Subcontractors.</p></div>`;
+<tr><th>Date</th><th>Job</th><th>Time</th><th>Hours</th><th>Amount</th></tr>${rows}
+<tr><td colspan="4">Travel time</td><td style="text-align:right">${money(s.travel_total)}</td></tr></table>
+<p>Subtotal ${money(s.subtotal)} · GST ${money(s.gst_amount)} · <b>Total ${money(s.total)}</b></p>
+<p>Review, correct and mark as paid in Admin → Subcontractors.</p></div>`;
 }
 
 async function sendEmail(to: string, subject: string, html: string): Promise<string> {

@@ -43,7 +43,8 @@
       db.from('sub_levels').select('*').order('sort_order').order('name'),
       db.from('sub_job_types').select('*').order('name'),
       db.from('sub_rates').select('*'),
-      db.from('subcontractors').select('id,display_name,level_id,active,full_name,email,phone,abn,gst_registered,profile_updated_at').order('display_name'),
+      // bank details are NOT in this table; they are only fetched on demand via an audited RPC
+      db.from('subcontractors').select('id,display_name,level_id,active,full_name,address,email,phone,abn,gst_registered,profile_updated_at').order('display_name'),
       db.from('sub_links').select('id,subcontractor_id,created_at,expires_at,revoked_at,last_used_at').is('revoked_at', null),
       db.from('sub_invoices').select('*').order('submitted_at', { ascending: false }).limit(200)
     ]);
@@ -93,8 +94,9 @@
     details.textContent = '';
     var w = inv.worker_snapshot || {};
     details.appendChild(el('div', { style: 'font-size:12px;color:#555;margin-bottom:6px', text:
-      'Bank: ' + (w.bank_account_name || '-') + ' · BSB ' + (w.bank_bsb || '-') + ' · Acc ' + (w.bank_account_number || '-') +
-      ' · Email ' + (w.email || '-') + ' · Phone ' + (w.phone || '-') }));
+      (w.address || '-') + ' · Email ' + (w.email || '-') + ' · Phone ' + (w.phone || '-') }));
+    details.appendChild(bankReveal(function () { return db.rpc('sub_admin_get_invoice_bank', { p_invoice_id: inv.id }); },
+      'Show bank details used for this record'));
     var editable = inv.status === 'pending' || inv.status === 'approved';
     r.data.forEach(function (d) { details.appendChild(dayRow(d, inv, editable)); });
     details.appendChild(el('div', { style: 'font-size:13px;margin:8px 0', text:
@@ -110,6 +112,27 @@
         return el('div', { text: String(a.at).slice(0, 16).replace('T', ' ') + ' · ' + a.action + (a.reason ? ' · ' + a.reason : '') });
       })));
     }
+  }
+
+  // Bank details are fetched only when an admin clicks, and every view is recorded in sub_audit.
+  function bankReveal(fetcher, label) {
+    var box = el('div', { style: 'font-size:12px;margin:4px 0' });
+    var btn = el('button', { style: BTN, text: '🔒 ' + label + ' (logged)', onclick: async function () {
+      var r = await fetcher();
+      if (r.error) return fail(r.error);
+      box.textContent = '';
+      box.appendChild(el('div', { style: 'background:#fff7e0;padding:6px;border-radius:6px', text: r.data
+        ? 'Account holder: ' + r.data.account_name + ' · BSB ' + r.data.bsb + ' · Account ' + r.data.account_number
+        : 'No bank details on file.' }));
+    } });
+    box.appendChild(btn);
+    return box;
+  }
+  function askReason(what) {
+    var r = prompt('Reason for ' + what + ' (required, saved in history):');
+    if (r === null) return null;
+    if (r.trim().length < 3) { toast('A reason is required.'); return null; }
+    return r.trim();
   }
 
   function jobName(id) { var j = cache.jobs.find(function (x) { return x.id === id; }); return j ? j.name : '?'; }
@@ -148,6 +171,8 @@
     row.appendChild(form);
   }
 
+  var PAY_METHODS = ['Bank transfer', 'Cash', 'Other'];
+
   function statusActions(inv) {
     var box = el('div', { style: 'margin-top:8px' });
     async function set(status, extra) {
@@ -158,25 +183,30 @@
     if (inv.status === 'pending') {
       box.appendChild(el('button', { style: BTN_G, text: 'Approve', onclick: function () { set('approved'); } }));
     }
-    if (inv.status === 'approved') {
+    if (inv.status === 'pending' || inv.status === 'approved') {
+      // Mark as paid: date + method required, reference optional.
       var date = el('input', { type: 'date', style: INPUT, value: new Date().toISOString().slice(0, 10) });
-      var method = el('input', { style: INPUT, placeholder: 'Method (e.g. bank transfer)' });
-      var ref = el('input', { style: INPUT, placeholder: 'Reference' });
-      box.appendChild(el('div', null, [date, method, ref,
+      var method = el('select', { style: INPUT }, [el('option', { value: '', text: 'Payment method *' })]
+        .concat(PAY_METHODS.map(function (m) { return el('option', { value: m, text: m }); })));
+      var ref = el('input', { style: INPUT, placeholder: 'Reference (optional)', maxlength: '120' });
+      box.appendChild(el('div', { style: 'margin:4px 0' }, [date, method, ref,
         el('button', { style: BTN_G, text: 'Mark as paid', onclick: function () {
+          if (!date.value || !method.value) return toast('Payment date and method are required.');
           set('paid', { p_paid_at: date.value, p_payment_method: method.value, p_payment_reference: ref.value });
         } })]));
+    }
+    if (inv.status === 'approved') {
       box.appendChild(el('button', { style: BTN, text: 'Back to pending', onclick: function () { set('pending'); } }));
     }
     if (inv.status === 'pending' || inv.status === 'approved') {
       box.appendChild(el('button', { style: BTN + ';color:#b91c1c', text: 'Cancel record', onclick: function () {
-        var note = prompt('Reason for cancelling (the days stay locked):'); if (note === null) return;
+        var note = askReason('cancelling this record (the days stay locked)'); if (!note) return;
         set('cancelled', { p_note: note });
       } }));
     }
     if (inv.status === 'paid') {
       box.appendChild(el('button', { style: BTN, text: 'Undo payment', onclick: function () {
-        var note = prompt('Reason for undoing the payment (required):'); if (!note) return;
+        var note = askReason('undoing the payment'); if (!note) return;
         set('approved', { p_note: note });
       } }));
     }
@@ -204,18 +234,23 @@
     var level = el('select', { style: INPUT }, cache.levels.filter(function (l) { return l.active; }).map(function (l) { return el('option', { value: l.id, text: l.name }); }));
     box.appendChild(el('div', { style: 'margin:6px 0' }, [name, level, el('button', { style: BTN_G, text: '+ Add', onclick: async function () {
       if (!name.value.trim() || !level.value) return toast('Name and level are required.');
-      var r = await db.from('subcontractors').insert({ display_name: name.value.trim(), level_id: Number(level.value) });
+      var r = await db.rpc('sub_admin_create_subcontractor', { p_display_name: name.value.trim(), p_level_id: Number(level.value) });
       if (r.error) return fail(r.error); await refresh();
     } })]));
     cache.subs.forEach(function (s) {
       var link = cache.links.find(function (l) { return l.subcontractor_id === s.id; });
       var lvl = el('select', { style: INPUT }, cache.levels.map(function (l) { return el('option', { value: l.id, text: l.name }); }));
       lvl.value = String(s.level_id);
-      lvl.onchange = async function () { var r = await db.from('subcontractors').update({ level_id: Number(lvl.value), updated_at: new Date().toISOString() }).eq('id', s.id); if (r.error) fail(r.error); else toast('Level updated (applies to new days).'); };
+      lvl.onchange = async function () {
+        var reason = askReason('changing the level'); if (!reason) { lvl.value = String(s.level_id); return; }
+        var r = await db.rpc('sub_admin_update_subcontractor', { p_id: s.id, p_display_name: s.display_name, p_level_id: Number(lvl.value), p_active: s.active, p_reason: reason });
+        if (r.error) return fail(r.error); toast('Level updated (applies to new days).'); await refresh();
+      };
       var out = el('div');
       box.appendChild(el('div', { style: CARD }, [
         el('div', null, [el('b', { text: s.display_name }), s.full_name ? ' · ' + s.full_name : '', ' · ', s.active ? 'active' : 'INACTIVE']),
-        el('div', { style: 'font-size:11px;color:#888', text: 'ABN ' + (s.abn || '-') + (s.gst_registered ? ' · GST' : '') + ' · ' + (s.email || 'no email') +
+        el('div', { style: 'font-size:11px;color:#888', text: (s.address || 'no address') + ' · ABN ' + (s.abn || '-') + (s.gst_registered ? ' · GST' : ' · no GST') +
+          ' · ' + (s.email || 'no email') + ' · ' + (s.phone || 'no phone') +
           ' · link: ' + (link ? 'active since ' + String(link.created_at).slice(0, 10) + (link.last_used_at ? ', last used ' + String(link.last_used_at).slice(0, 10) : ', never used') : 'none') }),
         el('div', null, [lvl,
           el('button', { style: BTN_G, text: link ? 'New link (replaces old)' : 'Create link', onclick: function () { newLink(s, out); } }),
@@ -225,12 +260,66 @@
             toast('Link revoked.'); await refresh();
           } }) : null,
           el('button', { style: BTN, text: s.active ? 'Deactivate' : 'Activate', onclick: async function () {
-            var r = await db.from('subcontractors').update({ active: !s.active, updated_at: new Date().toISOString() }).eq('id', s.id);
+            var reason = askReason(s.active ? 'deactivating' : 'activating'); if (!reason) return;
+            var r = await db.rpc('sub_admin_update_subcontractor', { p_id: s.id, p_display_name: s.display_name, p_level_id: s.level_id, p_active: !s.active, p_reason: reason });
             if (r.error) return fail(r.error); await refresh();
-          } })
+          } }),
+          el('button', { style: BTN, text: 'Edit details', onclick: function () { profileForm(s, out); } }),
+          el('button', { style: BTN, text: 'Bank details', onclick: function () { bankPanel(s, out); } }),
+          el('button', { style: BTN, text: 'History', onclick: function () { historyPanel(s, out); } })
         ]),
         out
       ]));
+    });
+  }
+
+  // Admin edit of the worker profile: reason required, changes recorded in sub_audit.
+  function profileForm(s, out) {
+    out.textContent = '';
+    function inp(v, ph) { return el('input', { style: INPUT + ';width:100%', value: v || '', placeholder: ph }); }
+    var f = { name: inp(s.full_name, 'Full name *'), address: inp(s.address, 'Address *'), email: inp(s.email, 'Email'),
+      phone: inp(s.phone, 'Phone'), abn: inp(s.abn, 'ABN *'), reason: inp('', 'Reason for the change (required)') };
+    var gst = el('input', { type: 'checkbox' }); gst.checked = !!s.gst_registered;
+    out.appendChild(el('form', { style: 'background:#fafafa;padding:8px;border-radius:6px;margin-top:6px', onsubmit: async function (ev) {
+      ev.preventDefault();
+      var r = await db.rpc('sub_admin_update_profile', { p_id: s.id, p_full_name: f.name.value, p_address: f.address.value,
+        p_email: f.email.value, p_phone: f.phone.value, p_abn: f.abn.value, p_gst_registered: gst.checked, p_reason: f.reason.value });
+      if (r.error) return fail(r.error);
+      toast(r.data && r.data.changed ? 'Details updated and recorded in history.' : 'No changes.'); await refresh();
+    } }, [f.name, f.address, f.email, f.phone, f.abn, el('label', { style: 'font-size:12px' }, [gst, ' Registered for GST']), f.reason,
+      el('button', { type: 'submit', style: BTN_G, text: 'Save details' })]));
+  }
+
+  // Bank details: shown only after an explicit (logged) request; edits need a reason.
+  function bankPanel(s, out) {
+    out.textContent = '';
+    out.appendChild(bankReveal(function () { return db.rpc('sub_admin_get_bank', { p_subcontractor_id: s.id }); }, 'Show current bank details'));
+    var name = el('input', { style: INPUT, placeholder: 'Account holder *' });
+    var bsb = el('input', { style: INPUT, placeholder: 'BSB *', inputmode: 'numeric' });
+    var acc = el('input', { style: INPUT, placeholder: 'Account number *', inputmode: 'numeric' });
+    var reason = el('input', { style: INPUT + ';width:100%', placeholder: 'Reason for the change (required)' });
+    out.appendChild(el('form', { style: 'background:#fafafa;padding:8px;border-radius:6px;margin-top:6px', onsubmit: async function (ev) {
+      ev.preventDefault();
+      var r = await db.rpc('sub_admin_update_bank', { p_id: s.id, p_account_name: name.value, p_bsb: bsb.value, p_account_number: acc.value, p_reason: reason.value });
+      if (r.error) return fail(r.error);
+      name.value = bsb.value = acc.value = reason.value = '';
+      toast(r.data && r.data.changed ? 'Bank details updated and recorded in history.' : 'No changes.');
+    } }, [el('div', { style: 'font-size:11px;color:#888', text: 'Replace bank details (only if the subcontractor asked for it):' }), name, bsb, acc, reason,
+      el('button', { type: 'submit', style: BTN_G, text: 'Save bank details' })]));
+  }
+
+  // History for one subcontractor. Bank values in the log are masked (•••123).
+  async function historyPanel(s, out) {
+    out.textContent = 'Loading…';
+    var r = await db.from('sub_audit').select('at,actor,action,old_data,new_data,reason').eq('subcontractor_id', s.id).order('at', { ascending: false }).limit(100);
+    if (r.error) { out.textContent = 'Error loading history.'; return; }
+    out.textContent = '';
+    if (!r.data.length) out.appendChild(el('div', { style: 'font-size:12px;color:#999', text: 'No history.' }));
+    r.data.forEach(function (a) {
+      var who = a.actor ? 'admin' : 'worker/system';
+      var change = a.new_data && a.action !== 'day_adjusted' ? ' · ' + JSON.stringify(a.old_data || {}) + ' → ' + JSON.stringify(a.new_data) : '';
+      out.appendChild(el('div', { style: 'font-size:11px;color:#555;border-top:1px solid #f0f0f0;padding:3px 0', text:
+        String(a.at).slice(0, 16).replace('T', ' ') + ' · ' + a.action + ' (' + who + ')' + (a.reason ? ' · reason: ' + a.reason : '') + change }));
     });
   }
 
