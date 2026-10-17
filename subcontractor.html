@@ -60,7 +60,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       <div class="field"><label>Full name *</label><input id="pName" autocomplete="name"></div>
       <div class="field"><label>Address *</label><input id="pAddress" autocomplete="street-address"></div>
       <div class="row">
-        <div class="field"><label>Email</label><input id="pEmail" type="email" autocomplete="email"></div>
+        <div class="field"><label>Email * (you receive a copy of each record)</label><input id="pEmail" type="email" autocomplete="email"></div>
         <div class="field"><label>Phone</label><input id="pPhone" type="tel" autocomplete="tel"></div>
       </div>
       <div class="field"><label>ABN *</label><input id="pAbn" inputmode="numeric" placeholder="11 digits"></div>
@@ -98,7 +98,9 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       <h2>Days not sent yet</h2>
       <div id="days"></div>
       <div id="totals"></div>
-      <button class="btn btn-green" id="submitBtn" style="margin-top:12px">Send invoice</button>
+      <label class="check" style="align-items:flex-start;margin-top:12px"><input type="checkbox" id="declAccept" style="margin-top:2px">
+        <span id="declText" style="font-size:13px"></span></label>
+      <button class="btn btn-green" id="submitBtn" style="margin-top:4px">Send invoice</button>
       <p class="muted" style="margin-top:8px">After sending, these days are locked and can only be corrected by the office. You can keep using this link for future days.</p>
     </div>
 
@@ -123,6 +125,8 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     name_required: 'Please enter your full name.',
     address_required: 'Please enter your address.',
     email_invalid: 'The email address is not valid.',
+    email_required: 'Please enter your email address. You receive a copy of every record you send.',
+    declaration_required: 'Please tick the declaration before sending.',
     bank_name_required: 'Please enter the account holder name.',
     not_found: 'Record not found.',
     bsb_invalid: 'BSB must have 6 digits.',
@@ -134,7 +138,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     break_too_long: 'The break is longer than the time worked.',
     day_duplicate: 'You already have a day with the same date and start time.',
     day_locked_or_missing: 'This day was already sent and can no longer be changed.',
-    profile_incomplete: 'Please complete your details (name, address, ABN and bank details) before sending.',
+    profile_incomplete: 'Please complete your details (name, address, email, ABN and bank details) before sending.',
     no_open_days: 'There are no new days to send.'
   };
 
@@ -248,6 +252,8 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     try {
       var inv = await rpc('sub_portal_get_invoice', { p_invoice_number: number });
       box.textContent = '';
+      var w = inv.worker || {};
+      box.appendChild(el('div', 'muted', [w.full_name, 'ABN ' + w.abn, w.address, w.email, w.phone].filter(Boolean).join(' · ')));
       inv.days.forEach(function (d) {
         var l = el('div', 'line');
         l.appendChild(el('span', null, d.work_date + ' · ' + d.job_type + ' · ' + d.start_time + '–' + d.finish_time + ' · ' + d.work_hours + ' h'));
@@ -262,6 +268,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       });
       var t = el('div', 'line total'); t.appendChild(el('span', null, 'Total')); t.appendChild(el('span', null, money(inv.total))); box.appendChild(t);
       box.appendChild(el('p', 'muted', 'Status: ' + inv.status + (inv.paid_at ? ' · paid on ' + inv.paid_at : '')));
+      if (inv.declaration_text) box.appendChild(el('p', 'muted', 'Declaration accepted ' + String(inv.declaration_accepted_at).slice(0, 16).replace('T', ' ') + ': ' + inv.declaration_text));
     } catch (e) { box.textContent = friendly(e.code); }
   }
 
@@ -280,6 +287,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
 
   async function load() {
     var data = await rpc('sub_portal_get');
+    $('declText').textContent = (data.declaration && data.declaration.text) || '';
     state.profile = data.profile; state.jobTypes = data.job_types || []; state.openDays = data.open_days || []; state.invoices = data.invoices || [];
     renderCompany(data.company); renderProfile(data.profile); renderJobs(); renderDays(); renderSent();
     $('dDate').max = data.today; if (!$('dDate').value) $('dDate').value = data.today;
@@ -293,12 +301,18 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
 
   $('saveProfileBtn').onclick = function () {
     withButton(this, async function () {
-      await rpc('sub_portal_save_profile', {
+      var r = await rpc('sub_portal_save_profile', {
         p_full_name: $('pName').value, p_address: $('pAddress').value, p_email: $('pEmail').value, p_phone: $('pPhone').value,
         p_abn: $('pAbn').value, p_gst_registered: $('pGst').checked, p_bank_account_name: $('pBankName').value,
         p_bank_bsb: $('pBsb').value, p_bank_account_number: $('pAcc').value
       });
       state.gst = $('pGst').checked;
+      // Bank details replaced: the office alert is already recorded by the database; this asks for the e-mail alert.
+      if (r && r.bank_alert) {
+        try { await fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token, action: 'bank_changed' }) }); } catch (e) { /* alert stays queued */ }
+        showMsg('Your details were saved. Because your bank details changed, the office was notified and a warning was sent to your previous e-mail address.', true);
+        return;
+      }
       showMsg('Your details were saved.', true);
     });
   };
@@ -326,11 +340,13 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
   }
 
   $('submitBtn').onclick = function () {
+    if (!$('declAccept').checked) { showMsg(ERRORS.declaration_required); return; }
     if (!confirm('Send ' + state.openDays.length + ' day(s) to the office? After sending you cannot change them.')) return;
     withButton(this, async function () {
-      var res = await fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token }) });
+      var res = await fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token, action: 'submit', declaration_accepted: $('declAccept').checked === true }) });
       var data = null; try { data = await res.json(); } catch (e) { data = null; }
       if (!res.ok || !data || !data.ok) { var err = new Error('submit'); err.code = data && data.error; throw err; }
+      $('declAccept').checked = false;
       await load();
       showMsg('Sent: ' + data.invoice_number + ' — total ' + money(data.total) + '. Status: pending.', true);
     });

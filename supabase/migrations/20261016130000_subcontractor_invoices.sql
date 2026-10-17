@@ -23,11 +23,47 @@
 --   * The worker sees/edits only their own through the token-scoped RPCs.
 --   * Admins see them only on demand via sub_admin_get_bank /
 --     sub_admin_get_invoice_bank, and every view is written to sub_audit.
---   * The audit log, lists, e-mails and CSV exports never contain full bank
---     numbers (audit keeps masked values, e.g. "•••678").
+--   * The audit log, lists, e-mails and CSV exports never contain bank
+--     details in clear: the audit keeps masked values only (holder "A•••",
+--     BSB/account "•••678").
+--   * Paying a record uses the snapshot taken at submission
+--     (sub_admin_get_invoice_bank), never the current profile.
 --
--- Admin changes to a subcontractor (label, level, active, profile, bank)
--- only go through RPCs that require a reason and write sub_audit.
+-- Submission requires the worker to accept a declaration (validated here, in
+-- the database). The exact text, its version and the acceptance time are
+-- stored on the record.
+--
+-- When a worker changes bank details through the personal link, the change is
+-- audited (masked) and a row is queued in sub_notifications in the SAME
+-- transaction; the Admin sees it until acknowledged, and the Edge Function
+-- sends an e-mail alert (dry-run by default) without bank numbers. The worker
+-- is also warned, at the e-mail address that was on file BEFORE the change
+-- (so changing e-mail and bank in the same save cannot hide the warning).
+--
+-- While a bank-change alert is not acknowledged by an Admin, marking ANY record
+-- of that subcontractor as paid is refused (checked inside the payment
+-- transaction, with the subcontractor row locked) and the decision is audited.
+--
+-- Alert e-mails use a claim/lease: a claim expires after sub_alert_lease() so an
+-- interrupted attempt is picked up again; results are recorded per channel and
+-- tied to the claim token (late results from an expired claim are ignored);
+-- channels already delivered are never re-sent; every attempt and result is
+-- logged in sub_alert_attempts; after sub_alert_max_attempts() it gives up
+-- (the Admin alert stays visible regardless).
+--
+-- Duplicate-safety window: every alert e-mail carries a provider Idempotency-Key
+-- that the provider (Resend) keeps for 24 hours from its first use. Automatic
+-- retries are therefore only allowed while now() < first_claimed_at +
+-- sub_alert_retry_window() (23 h = 24 h minus a 1 h safety margin). After that the
+-- alert is closed as gave_up / retry_window_closed and NOT re-sent automatically
+-- (an earlier attempt may have been delivered without being recorded, and the
+-- provider would no longer de-duplicate it). The Admin alert and the payment
+-- block stay in place; the Admin contacts the subcontractor directly.
+-- An alert never claimed has never been sent, so its first claim is always allowed.
+--
+-- Admin changes to a subcontractor (label, level, active, profile, bank) and
+-- to configuration (levels, job types, rates) only go through RPCs that
+-- require a reason and write sub_audit (old value, new value, who, when).
 -- =====================================================================
 
 begin;
@@ -92,6 +128,36 @@ language sql
 immutable
 set search_path = ''
 as $$ select case when p is null or p = '' then null else '•••' || right(p, 3) end; $$;
+
+-- Masks a name for audit: "Ana Test" -> "A•••".
+create or replace function public.sub_mask_name(p text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$ select case when p is null or btrim(p) = '' then null else left(btrim(p), 1) || '•••' end; $$;
+
+-- Declaration the worker must accept before sending. Change the version when the text changes.
+create or replace function public.sub_declaration_version()
+returns text
+language sql
+immutable
+set search_path = ''
+as $$ select 'v1'::text; $$;
+
+create or replace function public.sub_declaration_text()
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  return (select 'I declare that the information in this work record is true and correct, and that the work '
+              || 'listed was performed by me as an independent subcontractor for ' || company_name || '.'
+          from public.sub_settings);
+end;
+$$;
 
 -- ---------------------------------------------------------------------
 -- Tables
@@ -184,8 +250,11 @@ create table public.sub_invoices (
   submitted_at        timestamptz not null default now(),
   approved_at         timestamptz,
   paid_at             date,
-  payment_method      text check (char_length(payment_method) <= 40),
+  payment_method      text check (payment_method in ('Bank transfer', 'Cash', 'Other')),
   payment_reference   text check (char_length(payment_reference) <= 120),
+  declaration_text        text not null,
+  declaration_version     text not null,
+  declaration_accepted_at timestamptz not null,
   expense_category    text not null default 'Subcontractor labour' check (char_length(expense_category) <= 60),
   admin_notes         text check (char_length(admin_notes) <= 1000),
   worker_email_status text,
@@ -245,6 +314,43 @@ create table public.sub_audit (
 create index sub_audit_invoice_idx on public.sub_audit (invoice_id);
 create index sub_audit_sub_idx on public.sub_audit (subcontractor_id);
 
+-- Alerts for the Admin (e.g. bank details changed by the worker). details are MASKED.
+create table public.sub_notifications (
+  id               bigint generated always as identity primary key,
+  kind             text not null check (kind in ('bank_changed_by_worker')),
+  subcontractor_id uuid not null references public.subcontractors(id) on delete cascade,
+  created_at       timestamptz not null default now(),
+  details          jsonb not null,                 -- masked old/new bank details only
+  email_status     text,                           -- admin e-mail alert outcome
+  worker_notify_email text,                        -- worker address on file BEFORE the change
+  worker_email_status text,                        -- worker e-mail warning outcome
+  delivery_state   text not null default 'pending'
+                   check (delivery_state in ('pending', 'claimed', 'done', 'gave_up')),
+  claim_token      uuid,                            -- current claim (null when not claimed)
+  claimed_at       timestamptz,
+  first_claimed_at timestamptz,                     -- first send attempt (start of the idempotency window)
+  attempts         int not null default 0,
+  gave_up_reason   text check (gave_up_reason in ('max_attempts', 'retry_window_closed')),
+  acknowledged_at  timestamptz,
+  acknowledged_by  uuid
+);
+create index sub_notifications_delivery_idx on public.sub_notifications (delivery_state, claimed_at);
+
+-- One row per claim / result / recovery event of an alert e-mail attempt.
+create table public.sub_alert_attempts (
+  id              bigint generated always as identity primary key,
+  notification_id bigint not null references public.sub_notifications(id) on delete cascade,
+  attempt         int not null,
+  claim_token     uuid,
+  event           text not null check (event in ('claimed', 'claim_expired', 'result', 'stale_result_ignored', 'finished',
+                                                 'gave_up', 'retry_window_closed')),
+  channel         text check (channel in ('admin', 'worker')),
+  status          text,
+  at              timestamptz not null default now()
+);
+create index sub_alert_attempts_notification_idx on public.sub_alert_attempts (notification_id, id);
+create index sub_notifications_open_idx on public.sub_notifications (created_at desc) where acknowledged_at is null;
+
 -- Seed: company details already published in invoice.html (not invented).
 insert into public.sub_settings (company_name, company_abn, company_address)
 values ('Deus Labour Hire Pty Ltd', '62 665 081 783', 'Unit 10/6 Grosvenor St, Croydon NSW');
@@ -263,29 +369,35 @@ alter table public.sub_invoices     enable row level security;
 alter table public.sub_invoice_bank enable row level security;
 alter table public.sub_work_days    enable row level security;
 alter table public.sub_audit        enable row level security;
+alter table public.sub_notifications enable row level security;
+alter table public.sub_alert_attempts enable row level security;
 
 revoke all on public.sub_settings, public.sub_levels, public.sub_job_types, public.sub_rates,
               public.subcontractors, public.sub_bank_details, public.sub_links, public.sub_invoices,
-              public.sub_invoice_bank, public.sub_work_days, public.sub_audit
+              public.sub_invoice_bank, public.sub_work_days, public.sub_audit, public.sub_notifications,
+              public.sub_alert_attempts
   from anon, authenticated;
 revoke all on sequence public.sub_invoice_seq from anon, authenticated;
 
--- Configuration (no personal data): full CRUD for admins.
-grant select, update on public.sub_settings to authenticated;
-grant select, insert, update, delete on public.sub_levels, public.sub_job_types, public.sub_rates to authenticated;
+-- Configuration: read-only for admins; levels, job types and rates are changed
+-- only through audited RPCs (reason required).
+grant select on public.sub_settings, public.sub_levels, public.sub_job_types, public.sub_rates to authenticated;
 -- Records and profiles: read-only for admins; every write goes through audited RPCs.
-grant select on public.subcontractors, public.sub_links, public.sub_invoices, public.sub_work_days, public.sub_audit to authenticated;
+grant select on public.subcontractors, public.sub_links, public.sub_invoices, public.sub_work_days, public.sub_audit,
+                public.sub_notifications, public.sub_alert_attempts to authenticated;
 -- sub_bank_details and sub_invoice_bank: NO grants (RPC only).
 
-create policy sub_settings_admin   on public.sub_settings   for all to authenticated using (public.sub_is_admin()) with check (public.sub_is_admin());
-create policy sub_levels_admin     on public.sub_levels     for all to authenticated using (public.sub_is_admin()) with check (public.sub_is_admin());
-create policy sub_job_types_admin  on public.sub_job_types  for all to authenticated using (public.sub_is_admin()) with check (public.sub_is_admin());
-create policy sub_rates_admin      on public.sub_rates      for all to authenticated using (public.sub_is_admin()) with check (public.sub_is_admin());
+create policy sub_settings_admin_read  on public.sub_settings  for select to authenticated using (public.sub_is_admin());
+create policy sub_levels_admin_read    on public.sub_levels    for select to authenticated using (public.sub_is_admin());
+create policy sub_job_types_admin_read on public.sub_job_types for select to authenticated using (public.sub_is_admin());
+create policy sub_rates_admin_read     on public.sub_rates     for select to authenticated using (public.sub_is_admin());
 create policy subcontractors_admin_read on public.subcontractors for select to authenticated using (public.sub_is_admin());
 create policy sub_links_admin_read      on public.sub_links      for select to authenticated using (public.sub_is_admin());
 create policy sub_invoices_admin_read   on public.sub_invoices   for select to authenticated using (public.sub_is_admin());
 create policy sub_work_days_admin_read  on public.sub_work_days  for select to authenticated using (public.sub_is_admin());
 create policy sub_audit_admin_read      on public.sub_audit      for select to authenticated using (public.sub_is_admin());
+create policy sub_notifications_admin_read on public.sub_notifications for select to authenticated using (public.sub_is_admin());
+create policy sub_alert_attempts_admin_read on public.sub_alert_attempts for select to authenticated using (public.sub_is_admin());
 
 -- ---------------------------------------------------------------------
 -- Internal helpers (not callable by clients)
@@ -337,8 +449,9 @@ begin
   if nullif(btrim(p_full_name), '') is null then raise exception 'name_required' using errcode = 'P0001'; end if;
   if nullif(btrim(p_address), '') is null then raise exception 'address_required' using errcode = 'P0001'; end if;
   if not public.sub_abn_valid(v_abn) then raise exception 'abn_invalid' using errcode = 'P0001'; end if;
-  if nullif(btrim(p_email), '') is not null
-     and lower(btrim(p_email)) !~ '^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$' then
+  -- e-mail is required: the worker receives a copy of every record sent
+  if nullif(btrim(p_email), '') is null then raise exception 'email_required' using errcode = 'P0001'; end if;
+  if lower(btrim(p_email)) !~ '^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$' then
     raise exception 'email_invalid' using errcode = 'P0001';
   end if;
 
@@ -370,7 +483,7 @@ $$;
 -- Validate + store bank details. The audit row keeps MASKED values only.
 create or replace function public.sub_apply_bank(
   p_sub_id uuid, p_account_name text, p_bsb text, p_account_number text,
-  p_actor uuid, p_action text, p_reason text)
+  p_actor uuid, p_action text, p_reason text, p_worker_notify_email text default null)
 returns boolean
 language plpgsql
 security definer
@@ -397,9 +510,20 @@ begin
   insert into public.sub_audit (actor, action, subcontractor_id, old_data, new_data, reason)
   values (p_actor, p_action, p_sub_id,
           case when o.subcontractor_id is null then null else
-            jsonb_build_object('account_name', o.account_name, 'bsb', public.sub_mask(o.bsb), 'account_number', public.sub_mask(o.account_number)) end,
-          jsonb_build_object('account_name', v_name, 'bsb', public.sub_mask(v_bsb), 'account_number', public.sub_mask(v_acc)),
+            jsonb_build_object('account_name', public.sub_mask_name(o.account_name), 'bsb', public.sub_mask(o.bsb), 'account_number', public.sub_mask(o.account_number)) end,
+          jsonb_build_object('account_name', public.sub_mask_name(v_name), 'bsb', public.sub_mask(v_bsb), 'account_number', public.sub_mask(v_acc)),
           nullif(btrim(p_reason), ''));
+  -- Worker (link) changed EXISTING bank details: queue an Admin alert (masked) in the same transaction.
+  if p_actor is null and o.subcontractor_id is not null then
+    insert into public.sub_notifications (kind, subcontractor_id, worker_notify_email, worker_email_status, details)
+    values ('bank_changed_by_worker', p_sub_id, p_worker_notify_email,
+            case when p_worker_notify_email is null then 'no_previous_email' end,
+            jsonb_build_object(
+      'old', jsonb_build_object('account_name', public.sub_mask_name(o.account_name), 'bsb', public.sub_mask(o.bsb), 'account_number', public.sub_mask(o.account_number)),
+      'new', jsonb_build_object('account_name', public.sub_mask_name(v_name), 'bsb', public.sub_mask(v_bsb), 'account_number', public.sub_mask(v_acc)),
+      'email_changed_in_same_save', p_worker_notify_email is distinct from
+          (select email from public.subcontractors where id = p_sub_id)));
+  end if;
   return true;
 end;
 $$;
@@ -505,6 +629,7 @@ begin
                           'submitted_at', i.submitted_at, 'status', i.status, 'total', i.total, 'paid_at', i.paid_at) as o
                    from public.sub_invoices i where i.subcontractor_id = v_sub_id
                    order by i.submitted_at desc limit 20) x),
+    'declaration', jsonb_build_object('version', public.sub_declaration_version(), 'text', public.sub_declaration_text()),
     'today', public.sub_today());
 end;
 $$;
@@ -526,6 +651,7 @@ begin
   return jsonb_build_object(
     'invoice_number', i.invoice_number, 'submitted_at', i.submitted_at, 'status', i.status, 'paid_at', i.paid_at,
     'worker', i.worker_snapshot, 'company', i.company_snapshot,
+    'declaration_text', i.declaration_text, 'declaration_accepted_at', i.declaration_accepted_at,
     'days', public.sub_days_json(v_sub_id, i.id),
     'labour_total', i.labour_total, 'travel_total', i.travel_total,
     'subtotal', i.subtotal, 'gst_amount', i.gst_amount, 'total', i.total);
@@ -542,13 +668,21 @@ set search_path = ''
 as $$
 declare
   v_sub_id uuid;
+  v_had_bank boolean;
+  v_bank_changed boolean;
+  v_email_before text;
 begin
   v_sub_id := public.sub_resolve_token(p_token);
+  v_had_bank := exists (select 1 from public.sub_bank_details where subcontractor_id = v_sub_id);
+  -- the worker's warning goes to the address on file BEFORE this save
+  select email into v_email_before from public.subcontractors where id = v_sub_id for update;
   perform public.sub_apply_profile(v_sub_id, p_full_name, p_address, p_email, p_phone, p_abn, p_gst_registered,
                                    null, 'profile_updated_by_worker', null);
-  perform public.sub_apply_bank(v_sub_id, p_bank_account_name, p_bank_bsb, p_bank_account_number,
-                                null, 'bank_updated_by_worker', null);
-  return jsonb_build_object('ok', true);
+  v_bank_changed := public.sub_apply_bank(v_sub_id, p_bank_account_name, p_bank_bsb, p_bank_account_number,
+                                          null, 'bank_updated_by_worker', null, v_email_before);
+  -- bank_alert = an existing account was replaced (Admin alert queued); the page then asks the
+  -- Edge Function to e-mail the alert. The queued alert exists even if that call never happens.
+  return jsonb_build_object('ok', true, 'bank_alert', v_had_bank and v_bank_changed);
 end;
 $$;
 
@@ -616,7 +750,7 @@ $$;
 -- Submit: only callable by service_role (the sub-invoice-submit Edge Function),
 -- so the notification step cannot be skipped by calling the RPC directly.
 -- The returned payload contains NO bank details.
-create or replace function public.sub_portal_submit(p_token text)
+create or replace function public.sub_portal_submit(p_token text, p_declaration_accepted boolean)
 returns jsonb
 language plpgsql
 security definer
@@ -635,19 +769,25 @@ begin
   -- serialise concurrent submits for the same subcontractor
   select * into v_sub from public.subcontractors where id = v_sub_id for update;
   select * into v_bank from public.sub_bank_details where subcontractor_id = v_sub_id;
-  if v_sub.full_name is null or v_sub.address is null or v_sub.abn is null or v_bank.subcontractor_id is null then
+  if p_declaration_accepted is not true then
+    raise exception 'declaration_required' using errcode = 'P0001';
+  end if;
+  if v_sub.full_name is null or v_sub.address is null or v_sub.email is null or v_sub.abn is null
+     or v_bank.subcontractor_id is null then
     raise exception 'profile_incomplete' using errcode = 'P0001';
   end if;
   select count(*) into v_count from public.sub_work_days where subcontractor_id = v_sub_id and invoice_id is null;
   if v_count = 0 then raise exception 'no_open_days' using errcode = 'P0001'; end if;
 
   v_number := 'SUB-' || to_char(public.sub_today(), 'YYYY') || '-' || lpad(nextval('public.sub_invoice_seq')::text, 5, '0');
-  insert into public.sub_invoices (invoice_number, subcontractor_id, worker_snapshot, company_snapshot, gst_registered)
+  insert into public.sub_invoices (invoice_number, subcontractor_id, worker_snapshot, company_snapshot, gst_registered,
+                                   declaration_text, declaration_version, declaration_accepted_at)
   values (v_number, v_sub_id,
     jsonb_build_object('full_name', v_sub.full_name, 'address', v_sub.address, 'email', v_sub.email,
                        'phone', v_sub.phone, 'abn', v_sub.abn, 'gst_registered', v_sub.gst_registered),
     (select jsonb_build_object('name', company_name, 'abn', company_abn, 'address', company_address) from public.sub_settings),
-    v_sub.gst_registered)
+    v_sub.gst_registered,
+    public.sub_declaration_text(), public.sub_declaration_version(), now())
   returning id into v_inv_id;
   insert into public.sub_invoice_bank (invoice_id, account_name, bsb, account_number)
   values (v_inv_id, v_bank.account_name, v_bank.bsb, v_bank.account_number);
@@ -664,8 +804,215 @@ begin
     'worker', v_inv.worker_snapshot, 'company', v_inv.company_snapshot,
     'labour_total', v_inv.labour_total, 'travel_total', v_inv.travel_total, 'subtotal', v_inv.subtotal,
     'gst_amount', v_inv.gst_amount, 'total', v_inv.total,
+    'declaration_text', v_inv.declaration_text, 'declaration_accepted_at', v_inv.declaration_accepted_at,
     -- worker-safe day lines (no rates); the admin e-mail only says "review in Admin"
     'days', public.sub_days_json(v_sub_id, v_inv_id));
+end;
+$$;
+
+-- ---- Alert e-mail delivery (Edge Function only) -------------------------------
+-- A claim expires after this lease; an interrupted attempt is then claimed again.
+create or replace function public.sub_alert_lease()
+returns interval
+language sql
+immutable
+set search_path = ''
+as $$ select interval '10 minutes'; $$;
+
+-- Automatic retries only within this time after the FIRST claim (provider keeps
+-- idempotency keys 24 h; 1 h safety margin).
+create or replace function public.sub_alert_retry_window()
+returns interval
+language sql
+immutable
+set search_path = ''
+as $$ select interval '23 hours'; $$;
+
+create or replace function public.sub_alert_max_attempts()
+returns int
+language sql
+immutable
+set search_path = ''
+as $$ select 5; $$;
+
+-- Channel outcomes that count as finished (never re-sent).
+create or replace function public.sub_alert_channel_final(p_status text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$ select p_status in ('sent', 'dry_run', 'not_configured', 'no_previous_email'); $$;
+
+-- Claims due alerts: never claimed / back to pending, or claimed but the lease expired
+-- (interrupted attempt). Rows locked by a concurrent claim are skipped. Returns masked
+-- details plus which channels still need sending.
+create or replace function public.sub_claim_alerts_internal(p_sub_id uuid, p_limit int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  n       public.sub_notifications%rowtype;
+  v_token uuid;
+  v_res   jsonb := '[]'::jsonb;
+begin
+  for n in
+    select * from public.sub_notifications x
+    where x.kind = 'bank_changed_by_worker'
+      and (p_sub_id is null or x.subcontractor_id = p_sub_id)
+      and (x.delivery_state = 'pending'
+           or (x.delivery_state = 'claimed' and x.claimed_at < now() - public.sub_alert_lease()))
+    order by x.id
+    limit greatest(coalesce(p_limit, 20), 1)
+    for update skip locked
+  loop
+    if n.delivery_state = 'claimed' then
+      insert into public.sub_alert_attempts (notification_id, attempt, claim_token, event)
+      values (n.id, n.attempts, n.claim_token, 'claim_expired');
+    end if;
+    -- Outside the idempotency window: never re-send automatically (possible duplicate).
+    if n.first_claimed_at is not null and n.first_claimed_at <= now() - public.sub_alert_retry_window() then
+      update public.sub_notifications
+         set delivery_state = 'gave_up', gave_up_reason = 'retry_window_closed', claim_token = null, claimed_at = null
+       where id = n.id;
+      insert into public.sub_alert_attempts (notification_id, attempt, event, status)
+      values (n.id, n.attempts, 'retry_window_closed', 'first claim ' || to_char(n.first_claimed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI"Z"'));
+      continue;
+    end if;
+    if n.attempts >= public.sub_alert_max_attempts() then
+      update public.sub_notifications
+         set delivery_state = 'gave_up', gave_up_reason = 'max_attempts', claim_token = null, claimed_at = null
+       where id = n.id;
+      insert into public.sub_alert_attempts (notification_id, attempt, event) values (n.id, n.attempts, 'gave_up');
+      continue;
+    end if;
+    v_token := gen_random_uuid();
+    update public.sub_notifications
+       set delivery_state = 'claimed', claim_token = v_token, claimed_at = now(), attempts = attempts + 1,
+           first_claimed_at = coalesce(first_claimed_at, now())
+     where id = n.id;
+    insert into public.sub_alert_attempts (notification_id, attempt, claim_token, event)
+    values (n.id, n.attempts + 1, v_token, 'claimed');
+    v_res := v_res || jsonb_build_array(jsonb_build_object(
+      'id', n.id, 'claim_token', v_token, 'attempt', n.attempts + 1, 'created_at', n.created_at, 'details', n.details,
+      'worker_notify_email', n.worker_notify_email,
+      'need_admin', not coalesce(public.sub_alert_channel_final(n.email_status), false),
+      'need_worker', not coalesce(public.sub_alert_channel_final(n.worker_email_status), false),
+      'worker', (select full_name from public.subcontractors where id = n.subcontractor_id),
+      'display_name', (select display_name from public.subcontractors where id = n.subcontractor_id)));
+  end loop;
+  return v_res;
+end;
+$$;
+
+-- Alerts of the worker behind this link (called right after the worker saves).
+create or replace function public.sub_claim_bank_alerts(p_token text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  return public.sub_claim_alerts_internal(public.sub_resolve_token(p_token), 20);
+end;
+$$;
+
+-- Retry sweep for all subcontractors (pending retries and expired claims).
+create or replace function public.sub_claim_due_bank_alerts(p_limit int)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  return public.sub_claim_alerts_internal(null, p_limit);
+end;
+$$;
+
+-- Records one channel result. Accepted only for the CURRENT claim; a late result from an
+-- expired claim is logged and ignored. A channel already final is never overwritten.
+create or replace function public.sub_record_alert_channel(p_id bigint, p_claim_token uuid, p_channel text, p_status text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  n public.sub_notifications%rowtype;
+  v_status text := left(coalesce(p_status, 'unknown'), 40);
+begin
+  if p_channel not in ('admin', 'worker') then raise exception 'channel_invalid' using errcode = 'P0001'; end if;
+  select * into n from public.sub_notifications where id = p_id for update;
+  if n.id is null then raise exception 'not_found' using errcode = 'P0001'; end if;
+  if n.delivery_state <> 'claimed' or n.claim_token is distinct from p_claim_token then
+    insert into public.sub_alert_attempts (notification_id, attempt, claim_token, event, channel, status)
+    values (p_id, n.attempts, p_claim_token, 'stale_result_ignored', p_channel, v_status);
+    return jsonb_build_object('accepted', false);
+  end if;
+  if p_channel = 'admin' and not coalesce(public.sub_alert_channel_final(n.email_status), false) then
+    update public.sub_notifications set email_status = v_status where id = p_id;
+  elsif p_channel = 'worker' and not coalesce(public.sub_alert_channel_final(n.worker_email_status), false) then
+    update public.sub_notifications set worker_email_status = v_status where id = p_id;
+  end if;
+  insert into public.sub_alert_attempts (notification_id, attempt, claim_token, event, channel, status)
+  values (p_id, n.attempts, p_claim_token, 'result', p_channel, v_status);
+  return jsonb_build_object('accepted', true);
+end;
+$$;
+
+-- Closes the current claim: done when both channels are final; otherwise back to pending
+-- for a later retry (or gave_up after the maximum attempts).
+create or replace function public.sub_finish_alert_claim(p_id bigint, p_claim_token uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  n public.sub_notifications%rowtype;
+  v_state text;
+begin
+  select * into n from public.sub_notifications where id = p_id for update;
+  if n.id is null then raise exception 'not_found' using errcode = 'P0001'; end if;
+  if n.delivery_state <> 'claimed' or n.claim_token is distinct from p_claim_token then
+    insert into public.sub_alert_attempts (notification_id, attempt, claim_token, event)
+    values (p_id, n.attempts, p_claim_token, 'stale_result_ignored');
+    return jsonb_build_object('accepted', false, 'delivery_state', n.delivery_state);
+  end if;
+  v_state := case
+    when coalesce(public.sub_alert_channel_final(n.email_status), false)
+         and coalesce(public.sub_alert_channel_final(n.worker_email_status), false) then 'done'
+    when n.attempts >= public.sub_alert_max_attempts() then 'gave_up'
+    else 'pending' end;
+  update public.sub_notifications
+     set delivery_state = v_state, claim_token = null, claimed_at = null,
+         gave_up_reason = case when v_state = 'gave_up' then 'max_attempts' else gave_up_reason end
+   where id = p_id;
+  insert into public.sub_alert_attempts (notification_id, attempt, claim_token, event, status)
+  values (p_id, n.attempts, p_claim_token, case when v_state = 'gave_up' then 'gave_up' else 'finished' end, v_state);
+  return jsonb_build_object('accepted', true, 'delivery_state', v_state);
+end;
+$$;
+
+-- Admin acknowledges an alert (audited).
+create or replace function public.sub_admin_ack_notification(p_id bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := public.sub_require_admin(null, false);
+  n public.sub_notifications%rowtype;
+begin
+  update public.sub_notifications set acknowledged_at = now(), acknowledged_by = v_actor
+  where id = p_id and acknowledged_at is null
+  returning * into n;
+  if n.id is null then raise exception 'not_found' using errcode = 'P0001'; end if;
+  insert into public.sub_audit (actor, action, subcontractor_id, new_data)
+  values (v_actor, 'alert_acknowledged', n.subcontractor_id, jsonb_build_object('notification_id', n.id, 'kind', n.kind));
+  return jsonb_build_object('ok', true);
 end;
 $$;
 
@@ -788,13 +1135,15 @@ declare
   b public.sub_bank_details%rowtype;
 begin
   select * into b from public.sub_bank_details where subcontractor_id = p_subcontractor_id;
-  insert into public.sub_audit (actor, action, subcontractor_id) values (v_actor, 'bank_viewed', p_subcontractor_id);
+  insert into public.sub_audit (actor, action, subcontractor_id, new_data)
+  values (v_actor, 'bank_viewed', p_subcontractor_id, jsonb_build_object('source', 'current_profile'));
   if b.subcontractor_id is null then return null; end if;
   return jsonb_build_object('account_name', b.account_name, 'bsb', b.bsb, 'account_number', b.account_number, 'updated_at', b.updated_at);
 end;
 $$;
 
--- On-demand view of the bank snapshot taken when a record was submitted. Audited.
+-- On-demand view of the bank snapshot taken when a record was submitted (the
+-- details to pay this record with — NOT the current profile). Audited.
 create or replace function public.sub_admin_get_invoice_bank(p_invoice_id uuid)
 returns jsonb
 language plpgsql
@@ -806,10 +1155,108 @@ declare
   b public.sub_invoice_bank%rowtype;
 begin
   select * into b from public.sub_invoice_bank where invoice_id = p_invoice_id;
-  insert into public.sub_audit (actor, action, subcontractor_id, invoice_id)
-  values (v_actor, 'bank_viewed', (select subcontractor_id from public.sub_invoices where id = p_invoice_id), p_invoice_id);
+  insert into public.sub_audit (actor, action, subcontractor_id, invoice_id, new_data)
+  values (v_actor, 'bank_viewed', (select subcontractor_id from public.sub_invoices where id = p_invoice_id), p_invoice_id,
+          jsonb_build_object('source', 'record_snapshot'));
   if b.invoice_id is null then return null; end if;
   return jsonb_build_object('account_name', b.account_name, 'bsb', b.bsb, 'account_number', b.account_number);
+end;
+$$;
+
+-- ---- Configuration changes (reason required; old/new/who/when in sub_audit) ----
+create or replace function public.sub_admin_save_level(p_id int, p_name text, p_sort_order int, p_active boolean, p_reason text)
+returns int
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := public.sub_require_admin(p_reason, true);
+  o public.sub_levels%rowtype;
+  v_id int;
+begin
+  if p_id is null then
+    insert into public.sub_levels (name, sort_order, active) values (btrim(p_name), coalesce(p_sort_order, 0), coalesce(p_active, true))
+    returning id into v_id;
+    insert into public.sub_audit (actor, action, new_data, reason)
+    values (v_actor, 'level_created', jsonb_build_object('id', v_id, 'name', btrim(p_name), 'sort_order', coalesce(p_sort_order, 0), 'active', coalesce(p_active, true)), btrim(p_reason));
+  else
+    select * into o from public.sub_levels where id = p_id for update;
+    if o.id is null then raise exception 'not_found' using errcode = 'P0001'; end if;
+    update public.sub_levels set name = btrim(p_name), sort_order = coalesce(p_sort_order, 0), active = coalesce(p_active, true) where id = p_id;
+    v_id := p_id;
+    insert into public.sub_audit (actor, action, old_data, new_data, reason)
+    values (v_actor, 'level_updated', jsonb_build_object('id', o.id, 'name', o.name, 'sort_order', o.sort_order, 'active', o.active),
+            jsonb_build_object('id', p_id, 'name', btrim(p_name), 'sort_order', coalesce(p_sort_order, 0), 'active', coalesce(p_active, true)), btrim(p_reason));
+  end if;
+  return v_id;
+exception
+  when unique_violation then raise exception 'name_duplicate' using errcode = 'P0001';
+end;
+$$;
+
+create or replace function public.sub_admin_save_job_type(p_id int, p_name text, p_active boolean, p_reason text)
+returns int
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := public.sub_require_admin(p_reason, true);
+  o public.sub_job_types%rowtype;
+  v_id int;
+begin
+  if p_id is null then
+    insert into public.sub_job_types (name, active) values (btrim(p_name), coalesce(p_active, true)) returning id into v_id;
+    insert into public.sub_audit (actor, action, new_data, reason)
+    values (v_actor, 'job_type_created', jsonb_build_object('id', v_id, 'name', btrim(p_name), 'active', coalesce(p_active, true)), btrim(p_reason));
+  else
+    select * into o from public.sub_job_types where id = p_id for update;
+    if o.id is null then raise exception 'not_found' using errcode = 'P0001'; end if;
+    update public.sub_job_types set name = btrim(p_name), active = coalesce(p_active, true) where id = p_id;
+    v_id := p_id;
+    insert into public.sub_audit (actor, action, old_data, new_data, reason)
+    values (v_actor, 'job_type_updated', jsonb_build_object('id', o.id, 'name', o.name, 'active', o.active),
+            jsonb_build_object('id', p_id, 'name', btrim(p_name), 'active', coalesce(p_active, true)), btrim(p_reason));
+  end if;
+  return v_id;
+exception
+  when unique_violation then raise exception 'name_duplicate' using errcode = 'P0001';
+end;
+$$;
+
+-- p_hourly_rate null = remove the rate (the job is then not offered to that level).
+-- Existing days keep the rate captured when they were saved.
+create or replace function public.sub_admin_set_rate(p_job_type_id int, p_level_id int, p_hourly_rate numeric, p_reason text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := public.sub_require_admin(p_reason, true);
+  v_old numeric;
+begin
+  if p_hourly_rate is not null and (p_hourly_rate <= 0 or p_hourly_rate >= 1000) then
+    raise exception 'rate_invalid' using errcode = 'P0001';
+  end if;
+  select hourly_rate into v_old from public.sub_rates where job_type_id = p_job_type_id and level_id = p_level_id for update;
+  if v_old is not distinct from round(p_hourly_rate, 2) then return jsonb_build_object('ok', true, 'changed', false); end if;
+  if p_hourly_rate is null then
+    delete from public.sub_rates where job_type_id = p_job_type_id and level_id = p_level_id;
+  else
+    insert into public.sub_rates (job_type_id, level_id, hourly_rate, updated_at)
+    values (p_job_type_id, p_level_id, round(p_hourly_rate, 2), now())
+    on conflict (job_type_id, level_id) do update set hourly_rate = excluded.hourly_rate, updated_at = now();
+  end if;
+  insert into public.sub_audit (actor, action, old_data, new_data, reason)
+  values (v_actor, 'rate_changed',
+          jsonb_build_object('job_type_id', p_job_type_id, 'level_id', p_level_id, 'hourly_rate', v_old),
+          jsonb_build_object('job_type_id', p_job_type_id, 'level_id', p_level_id, 'hourly_rate', round(p_hourly_rate, 2)),
+          btrim(p_reason));
+  return jsonb_build_object('ok', true, 'changed', true);
+exception
+  when foreign_key_violation then raise exception 'not_found' using errcode = 'P0001';
 end;
 $$;
 
@@ -910,6 +1357,7 @@ as $$
 declare
   v_actor uuid := public.sub_require_admin(null, false);
   v_old public.sub_invoices%rowtype;
+  v_pending jsonb;
 begin
   select * into v_old from public.sub_invoices where id = p_invoice_id for update;
   if v_old.id is null then raise exception 'not_found' using errcode = 'P0001'; end if;
@@ -927,6 +1375,27 @@ begin
     if p_paid_at is null then raise exception 'paid_date_required' using errcode = 'P0001'; end if;
     if p_paid_at > public.sub_today() then raise exception 'paid_date_future' using errcode = 'P0001'; end if;
     if nullif(btrim(p_payment_method), '') is null then raise exception 'payment_method_required' using errcode = 'P0001'; end if;
+    if btrim(p_payment_method) not in ('Bank transfer', 'Cash', 'Other') then
+      raise exception 'payment_method_invalid' using errcode = 'P0001';
+    end if;
+    -- Bank-change alerts block payment until an Admin acknowledges them. The subcontractor
+    -- row is locked so a concurrent bank change through the link (which locks the same row
+    -- before queuing its alert) is either seen here or happens after this payment.
+    perform 1 from public.subcontractors where id = v_old.subcontractor_id for update;
+    select coalesce(jsonb_agg(n.id order by n.id), '[]'::jsonb) into v_pending
+    from public.sub_notifications n
+    where n.subcontractor_id = v_old.subcontractor_id and n.kind = 'bank_changed_by_worker'
+      and n.acknowledged_at is null;
+    if jsonb_array_length(v_pending) > 0 then
+      -- Refused: nothing changes, but the decision is recorded (no exception, so the audit row commits).
+      insert into public.sub_audit (actor, action, subcontractor_id, invoice_id, new_data, reason)
+      values (v_actor, 'payment_blocked', v_old.subcontractor_id, p_invoice_id,
+              jsonb_build_object('requested_status', 'paid', 'pending_alert_ids', v_pending),
+              'Unacknowledged bank-change alert');
+      return jsonb_build_object('ok', false, 'error', 'bank_alert_pending', 'pending_alert_ids', v_pending,
+        'message', 'Payment blocked: the subcontractor changed their bank details through the personal link. '
+                || 'Review and acknowledge the bank-change alert in Admin before paying.');
+    end if;
   end if;
 
   update public.sub_invoices set
@@ -944,7 +1413,8 @@ begin
           jsonb_build_object('status', v_old.status, 'paid_at', v_old.paid_at, 'payment_method', v_old.payment_method,
                              'payment_reference', v_old.payment_reference),
           jsonb_build_object('status', p_status, 'paid_at', p_paid_at, 'payment_method', p_payment_method,
-                             'payment_reference', p_payment_reference),
+                             'payment_reference', p_payment_reference)
+            || case when p_status = 'paid' then jsonb_build_object('bank_alert_check', 'clear') else '{}'::jsonb end,
           nullif(btrim(p_note), ''));
   return jsonb_build_object('ok', true);
 end;
@@ -977,7 +1447,11 @@ grant execute on function
 to anon, authenticated;
 
 -- Submit + e-mail status: Edge Function only.
-grant execute on function public.sub_portal_submit(text), public.sub_record_email_status(uuid, text, text) to service_role;
+grant execute on function public.sub_portal_submit(text, boolean), public.sub_record_email_status(uuid, text, text),
+                          public.sub_claim_bank_alerts(text), public.sub_claim_due_bank_alerts(int),
+                          public.sub_record_alert_channel(bigint, uuid, text, text),
+                          public.sub_finish_alert_claim(bigint, uuid)
+to service_role;
 
 -- Admin actions (each re-checks sub_is_admin()).
 grant execute on function
@@ -987,6 +1461,10 @@ grant execute on function
   public.sub_admin_update_bank(uuid, text, text, text, text),
   public.sub_admin_get_bank(uuid),
   public.sub_admin_get_invoice_bank(uuid),
+  public.sub_admin_save_level(int, text, int, boolean, text),
+  public.sub_admin_save_job_type(int, text, boolean, text),
+  public.sub_admin_set_rate(int, int, numeric, text),
+  public.sub_admin_ack_notification(bigint),
   public.sub_admin_create_link(uuid, text, timestamptz),
   public.sub_admin_revoke_links(uuid),
   public.sub_admin_adjust_day(uuid, int, time, time, int, int, text),

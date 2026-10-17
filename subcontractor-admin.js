@@ -6,7 +6,7 @@
   'use strict';
 
   var db = null, root = null, portalUrl = '', currentFilter = 'pending';
-  var cache = { levels: [], jobs: [], rates: [], subs: [], links: [], invoices: [] };
+  var cache = { levels: [], jobs: [], rates: [], subs: [], links: [], invoices: [], alerts: [] };
   var STATUS_LABEL = { pending: 'Pending', approved: 'Approved', paid: 'Paid', cancelled: 'Cancelled' };
 
   function el(tag, attrs, children) {
@@ -46,11 +46,12 @@
       // bank details are NOT in this table; they are only fetched on demand via an audited RPC
       db.from('subcontractors').select('id,display_name,level_id,active,full_name,address,email,phone,abn,gst_registered,profile_updated_at').order('display_name'),
       db.from('sub_links').select('id,subcontractor_id,created_at,expires_at,revoked_at,last_used_at').is('revoked_at', null),
-      db.from('sub_invoices').select('*').order('submitted_at', { ascending: false }).limit(200)
+      db.from('sub_invoices').select('*').order('submitted_at', { ascending: false }).limit(200),
+      db.from('sub_notifications').select('id,kind,subcontractor_id,created_at,details,email_status,worker_email_status,delivery_state,attempts,gave_up_reason').is('acknowledged_at', null).order('created_at', { ascending: false })
     ]);
     r.forEach(function (x) { if (x.error) throw x.error; });
     cache.levels = r[0].data; cache.jobs = r[1].data; cache.rates = r[2].data;
-    cache.subs = r[3].data; cache.links = r[4].data; cache.invoices = r[5].data;
+    cache.subs = r[3].data; cache.links = r[4].data; cache.invoices = r[5].data; cache.alerts = r[6].data;
   }
   function subName(id) { var s = cache.subs.find(function (x) { return x.id === id; }); return s ? (s.full_name || s.display_name) : '?'; }
 
@@ -66,10 +67,34 @@
       el('b', { text: 'Work records' }), filter,
       el('button', { style: BTN, text: '⬇ CSV (expenses)', onclick: function () { exportCsv(filter.value); } })
     ]);
+    box.appendChild(alertsBox());
     box.appendChild(head); box.appendChild(list);
     var rows = cache.invoices.filter(function (i) { return filter.value === 'all' || i.status === filter.value; });
     if (!rows.length) list.appendChild(el('div', { style: 'color:#999;font-size:13px', text: 'No records.' }));
     rows.forEach(function (inv) { list.appendChild(invoiceCard(inv)); });
+  }
+
+  // Open alerts (e.g. bank details changed by a worker through the link). Values are masked.
+  function alertsBox() {
+    var box = el('div');
+    cache.alerts.forEach(function (a) {
+      var d = a.details || {}, o = d.old || {}, n = d.new || {};
+      box.appendChild(el('div', { style: 'background:#fff0f0;border:1px solid #fca5a5;border-radius:8px;padding:8px;margin-bottom:8px;font-size:12px' }, [
+        el('b', { text: '⚠ Bank details changed by ' + subName(a.subcontractor_id) }),
+        el('div', { text: String(a.created_at).slice(0, 16).replace('T', ' ') + ' · before: ' + [o.account_name, 'BSB ' + o.bsb, 'Acc ' + o.account_number].join(' ') +
+          ' · after: ' + [n.account_name, 'BSB ' + n.bsb, 'Acc ' + n.account_number].join(' ') + ' · admin e-mail: ' + (a.email_status || 'not sent yet') + ' · warning to worker (previous e-mail): ' + (a.worker_email_status || 'not sent yet') +
+          ' · delivery: ' + a.delivery_state + ' (attempts ' + a.attempts + ')' +
+          (a.gave_up_reason === 'retry_window_closed' ? ' · automatic e-mail retries stopped after 23 h (to avoid duplicates): contact the subcontractor directly' :
+           a.gave_up_reason === 'max_attempts' ? ' · e-mail retries stopped after the maximum attempts: contact the subcontractor directly' : '') +
+          (d.email_changed_in_same_save ? ' · ⚠ e-mail was changed in the same update' : '') }),
+        el('div', { text: 'Payments to this subcontractor are BLOCKED until this alert is acknowledged. If the change was not expected, revoke the link and confirm with the subcontractor first.' }),
+        el('button', { style: BTN, text: 'Acknowledge', onclick: async function () {
+          var r = await db.rpc('sub_admin_ack_notification', { p_id: a.id }); if (r.error) return fail(r.error);
+          toast('Alert acknowledged (recorded in history).'); await refresh();
+        } })
+      ]));
+    });
+    return box;
   }
 
   function invoiceCard(inv) {
@@ -95,14 +120,14 @@
     var w = inv.worker_snapshot || {};
     details.appendChild(el('div', { style: 'font-size:12px;color:#555;margin-bottom:6px', text:
       (w.address || '-') + ' · Email ' + (w.email || '-') + ' · Phone ' + (w.phone || '-') }));
-    details.appendChild(bankReveal(function () { return db.rpc('sub_admin_get_invoice_bank', { p_invoice_id: inv.id }); },
-      'Show bank details used for this record'));
     var editable = inv.status === 'pending' || inv.status === 'approved';
     r.data.forEach(function (d) { details.appendChild(dayRow(d, inv, editable)); });
     details.appendChild(el('div', { style: 'font-size:13px;margin:8px 0', text:
       'Labour ' + money(inv.labour_total) + ' · Travel ' + money(inv.travel_total) + ' · Subtotal ' + money(inv.subtotal) +
       ' · GST ' + money(inv.gst_amount) + ' · Total ' + money(inv.total) }));
     if (inv.paid_at) details.appendChild(el('div', { style: 'font-size:12px;color:#2a7a2a', text: 'Paid ' + inv.paid_at + ' · ' + (inv.payment_method || '') + ' · ' + (inv.payment_reference || '') }));
+    details.appendChild(el('div', { style: 'font-size:11px;color:#555;margin:4px 0', text:
+      'Declaration (' + (inv.declaration_version || '-') + ') accepted ' + String(inv.declaration_accepted_at || '').slice(0, 16).replace('T', ' ') + ': ' + (inv.declaration_text || '') }));
     if (inv.admin_notes) details.appendChild(el('div', { style: 'font-size:12px;color:#555', text: 'Notes: ' + inv.admin_notes }));
     details.appendChild(el('div', { style: 'font-size:11px;color:#999', text: 'E-mail copy: worker ' + (inv.worker_email_status || '-') + ' · admin ' + (inv.admin_email_status || '-') }));
     details.appendChild(statusActions(inv));
@@ -175,13 +200,23 @@
 
   function statusActions(inv) {
     var box = el('div', { style: 'margin-top:8px' });
+    // Pay with the bank details SAVED WITH THIS RECORD at submission (not the current profile). Viewing is logged.
+    box.appendChild(bankReveal(function () { return db.rpc('sub_admin_get_invoice_bank', { p_invoice_id: inv.id }); },
+      'Bank details saved with this record (use these to pay)'));
     async function set(status, extra) {
       var r = await db.rpc('sub_admin_set_status', Object.assign({ p_invoice_id: inv.id, p_status: status }, extra || {}));
       if (r.error) return fail(r.error);
+      // Refusals that are recorded in history come back as { ok:false, error, message } (no exception).
+      if (r.data && r.data.ok === false) { toast(r.data.message || r.data.error); await refresh(); return; }
       toast('Status: ' + STATUS_LABEL[status]); await refresh();
     }
     if (inv.status === 'pending') {
       box.appendChild(el('button', { style: BTN_G, text: 'Approve', onclick: function () { set('approved'); } }));
+    }
+    var blocked = cache.alerts.some(function (a) { return a.subcontractor_id === inv.subcontractor_id; });
+    if (blocked && (inv.status === 'pending' || inv.status === 'approved')) {
+      box.appendChild(el('div', { style: 'background:#fff0f0;border:1px solid #fca5a5;border-radius:6px;padding:6px;font-size:12px;margin:4px 0',
+        text: '⚠ Payment blocked: this subcontractor has an unacknowledged bank-change alert (see the top of Records).' }));
     }
     if (inv.status === 'pending' || inv.status === 'approved') {
       // Mark as paid: date + method required, reference optional.
@@ -316,7 +351,7 @@
     out.textContent = '';
     if (!r.data.length) out.appendChild(el('div', { style: 'font-size:12px;color:#999', text: 'No history.' }));
     r.data.forEach(function (a) {
-      var who = a.actor ? 'admin' : 'worker/system';
+      var who = a.actor ? 'admin ' + String(a.actor).slice(0, 8) : 'worker/system';
       var change = a.new_data && a.action !== 'day_adjusted' ? ' · ' + JSON.stringify(a.old_data || {}) + ' → ' + JSON.stringify(a.new_data) : '';
       out.appendChild(el('div', { style: 'font-size:11px;color:#555;border-top:1px solid #f0f0f0;padding:3px 0', text:
         String(a.at).slice(0, 16).replace('T', ' ') + ' · ' + a.action + ' (' + who + ')' + (a.reason ? ' · reason: ' + a.reason : '') + change }));
@@ -346,35 +381,70 @@
   // ------------------------------------------------------------------ rates
   function renderRates(box) {
     box.appendChild(el('b', { text: 'Rates (hourly, per job and level)' }));
-    box.appendChild(el('div', { style: 'font-size:11px;color:#888;margin-bottom:6px', text: 'Travel time is paid automatically at half of the job rate. New rates apply to days saved after the change.' }));
+    box.appendChild(el('div', { style: 'font-size:11px;color:#888;margin-bottom:6px', text:
+      'Every change asks for a reason and is saved in History. New rates apply to days saved after the change.' }));
     var lvlName = el('input', { style: INPUT, placeholder: 'New level' });
     var jobNameIn = el('input', { style: INPUT, placeholder: 'New job type' });
     box.appendChild(el('div', null, [lvlName, el('button', { style: BTN, text: '+ Level', onclick: async function () {
-      if (!lvlName.value.trim()) return; var r = await db.from('sub_levels').insert({ name: lvlName.value.trim() }); if (r.error) return fail(r.error); await refresh();
+      if (!lvlName.value.trim()) return; var reason = askReason('adding a level'); if (!reason) return;
+      var r = await db.rpc('sub_admin_save_level', { p_id: null, p_name: lvlName.value.trim(), p_sort_order: 0, p_active: true, p_reason: reason });
+      if (r.error) return fail(r.error); await refresh();
     } }), jobNameIn, el('button', { style: BTN, text: '+ Job', onclick: async function () {
-      if (!jobNameIn.value.trim()) return; var r = await db.from('sub_job_types').insert({ name: jobNameIn.value.trim() }); if (r.error) return fail(r.error); await refresh();
+      if (!jobNameIn.value.trim()) return; var reason = askReason('adding a job type'); if (!reason) return;
+      var r = await db.rpc('sub_admin_save_job_type', { p_id: null, p_name: jobNameIn.value.trim(), p_active: true, p_reason: reason });
+      if (r.error) return fail(r.error); await refresh();
     } })]));
     var table = el('table', { style: 'border-collapse:collapse;font-size:12px;margin-top:8px' });
-    table.appendChild(el('tr', null, [el('th', { text: 'Job \\ Level', style: 'text-align:left;padding:4px' })].concat(cache.levels.map(function (l) { return el('th', { text: l.name, style: 'padding:4px' }); })).concat([el('th', { text: 'Active' })])));
+    table.appendChild(el('tr', null, [el('th', { text: 'Job \\ Level', style: 'text-align:left;padding:4px' })].concat(cache.levels.map(function (l) {
+      var act = el('input', { type: 'checkbox', title: 'Level active' }); act.checked = l.active;
+      act.onchange = async function () {
+        var reason = askReason((act.checked ? 'activating' : 'deactivating') + ' level ' + l.name); if (!reason) { act.checked = !act.checked; return; }
+        var r = await db.rpc('sub_admin_save_level', { p_id: l.id, p_name: l.name, p_sort_order: l.sort_order, p_active: act.checked, p_reason: reason });
+        if (r.error) { act.checked = !act.checked; return fail(r.error); } await refresh();
+      };
+      return el('th', { style: 'padding:4px' }, [l.name, ' ', act]);
+    })).concat([el('th', { text: 'Active' })])));
     cache.jobs.forEach(function (j) {
       var tr = el('tr', null, [el('td', { text: j.name, style: 'padding:4px' })]);
       cache.levels.forEach(function (l) {
         var cur = cache.rates.find(function (r) { return r.job_type_id === j.id && r.level_id === l.id; });
-        var inp = el('input', { type: 'number', min: '0', step: '0.01', style: INPUT + ';width:80px', value: cur ? cur.hourly_rate : '' });
+        var original = cur ? String(cur.hourly_rate) : '';
+        var inp = el('input', { type: 'number', min: '0', step: '0.01', style: INPUT + ';width:80px', value: original });
         inp.onchange = async function () {
-          var v = Number(inp.value);
-          var r = inp.value === '' ? await db.from('sub_rates').delete().eq('job_type_id', j.id).eq('level_id', l.id)
-            : await db.from('sub_rates').upsert({ job_type_id: j.id, level_id: l.id, hourly_rate: v, updated_at: new Date().toISOString() });
-          if (r.error) return fail(r.error); toast('Rate saved.');
+          var reason = askReason('changing the rate ' + j.name + ' / ' + l.name); if (!reason) { inp.value = original; return; }
+          var r = await db.rpc('sub_admin_set_rate', { p_job_type_id: j.id, p_level_id: l.id,
+            p_hourly_rate: inp.value === '' ? null : Number(inp.value), p_reason: reason });
+          if (r.error) { inp.value = original; return fail(r.error); }
+          original = inp.value; toast(r.data && r.data.changed ? 'Rate saved and recorded in history.' : 'No change.');
         };
         tr.appendChild(el('td', null, [inp]));
       });
       var act = el('input', { type: 'checkbox' }); act.checked = j.active;
-      act.onchange = async function () { var r = await db.from('sub_job_types').update({ active: act.checked }).eq('id', j.id); if (r.error) fail(r.error); };
+      act.onchange = async function () {
+        var reason = askReason((act.checked ? 'activating' : 'deactivating') + ' job ' + j.name); if (!reason) { act.checked = !act.checked; return; }
+        var r = await db.rpc('sub_admin_save_job_type', { p_id: j.id, p_name: j.name, p_active: act.checked, p_reason: reason });
+        if (r.error) { act.checked = !act.checked; return fail(r.error); }
+      };
       tr.appendChild(el('td', { style: 'text-align:center' }, [act]));
       table.appendChild(tr);
     });
     box.appendChild(table);
+    box.appendChild(el('button', { style: BTN + ';margin-top:8px', text: 'Configuration history', onclick: async function () {
+      var out = this.nextSibling || box.appendChild(el('div'));
+      out.textContent = 'Loading…';
+      var r = await db.from('sub_audit').select('at,actor,action,old_data,new_data,reason')
+        .in('action', ['level_created', 'level_updated', 'job_type_created', 'job_type_updated', 'rate_changed'])
+        .order('at', { ascending: false }).limit(100);
+      if (r.error) { out.textContent = 'Error loading history.'; return; }
+      out.textContent = '';
+      r.data.forEach(function (a) {
+        out.appendChild(el('div', { style: 'font-size:11px;color:#555;border-top:1px solid #f0f0f0;padding:3px 0', text:
+          String(a.at).slice(0, 16).replace('T', ' ') + ' · ' + a.action + ' · by ' + String(a.actor || '').slice(0, 8) +
+          ' · ' + JSON.stringify(a.old_data || {}) + ' → ' + JSON.stringify(a.new_data || {}) + (a.reason ? ' · reason: ' + a.reason : '') }));
+      });
+      if (!r.data.length) out.textContent = 'No configuration changes yet.';
+    } }));
+    box.appendChild(el('div'));
   }
 
   // ------------------------------------------------------------------ main
