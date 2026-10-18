@@ -2,6 +2,22 @@
 # project_id here is a local label for the CLI, not the remote project ref.
 project_id = "deus-booking"
 
+[functions.sub-invoice-submit]
+# The platform JWT check must be OFF for this function:
+#   * the worker page calls it with the personal link token, and the worker has no
+#     Supabase account (no JWT);
+#   * the scheduled retry (pg_cron + pg_net) calls it with the x-retry-secret header,
+#     without apikey/Authorization.
+# With verify_jwt = true the gateway would reject both with 401 before the code runs.
+# The function authenticates every request itself and nothing else is reachable:
+#   * action submit / bank_changed -> link token, validated in the database
+#     (only the SHA-256 hash is stored; revoked/expired/inactive links are refused);
+#   * action retry_due -> ALERT_RETRY_SECRET (>= 32 chars, constant-time compare;
+#     disabled when unset). A JWT is never accepted as a substitute for either.
+# Equivalent when deploying without this file:
+#   supabase functions deploy sub-invoice-submit --no-verify-jwt --project-ref <ref>
+verify_jwt = false
+
 [functions.resend-email]
 # Keep the platform JWT check ON. It is not enough on its own (the public anon key is a
 # valid JWT), so the function also confirms the caller is a signed-in Admin.
