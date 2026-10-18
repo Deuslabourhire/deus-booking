@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://aaafpfkwpdpfamfuimki.supabase.co; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://aaafpfkwpdpfamfuimki.supabase.co; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
 <title>Work Record — Deus Labour Hire</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -79,15 +79,15 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       <input type="hidden" id="dId">
       <div class="row">
         <div class="field"><label>Date *</label><input id="dDate" type="date"></div>
-        <div class="field"><label>Job *</label><select id="dJob"></select></div>
+        <div class="field"><label>Role *</label><input id="dJob" list="roleList" maxlength="60" placeholder="e.g. Offsider" autocomplete="off"><datalist id="roleList"></datalist></div>
       </div>
       <div class="row">
         <div class="field"><label>Start *</label><input id="dStart" type="time"></div>
         <div class="field"><label>Finish *</label><input id="dFinish" type="time"></div>
       </div>
       <div class="row">
-        <div class="field"><label>Unpaid break (min)</label><input id="dBreak" type="number" min="0" max="600" value="0"></div>
-        <div class="field"><label>Travel time (min)</label><input id="dTravel" type="number" min="0" max="600" value="0"></div>
+        <div class="field"><label>Unpaid break</label><select id="dBreak"></select></div>
+        <div class="field"><label>Travel time</label><select id="dTravel"></select></div>
       </div>
       <div class="field"><label>Notes</label><textarea id="dNotes" rows="2" maxlength="500"></textarea></div>
       <button class="btn btn-green" id="saveDayBtn">Save day</button>
@@ -111,6 +111,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
   </div>
 </div>
 
+<script src="sub-shared.js"></script>
 <script>
 (function () {
   'use strict';
@@ -121,6 +122,9 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
 
   var ERRORS = {
     invalid_link: 'This link is not valid any more. Please ask the office for a new link.',
+    link_expired: 'This link has expired because it was not used for 7 days. Please ask the office for a new link. Work you already sent is safe.',
+    break_invalid: 'Choose the unpaid break from the list (10-minute steps, up to 2 hours).',
+    travel_invalid: 'Choose the travel time from the list (10-minute steps, up to 4 hours).',
     abn_invalid: 'The ABN is not valid. Please check the 11 digits.',
     name_required: 'Please enter your full name.',
     address_required: 'Please enter your address.',
@@ -133,7 +137,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     account_invalid: 'Account number must have 5 to 10 digits.',
     date_invalid: 'The date cannot be in the future.',
     date_too_old: 'That date is too old. Please contact the office.',
-    job_type_invalid: 'Please choose a job from the list.',
+    role_required: 'Please write the role you worked (e.g. Offsider, Driver).',
     finish_before_start: 'Finish time must be after start time.',
     break_too_long: 'The break is longer than the time worked.',
     day_duplicate: 'You already have a day with the same date and start time.',
@@ -146,7 +150,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     var m = /(?:^|&)t=([A-Za-z0-9_-]{43})(?:&|$)/.exec(location.hash.replace(/^#/, ''));
     return m ? m[1] : '';
   })();
-  var state = { profile: {}, jobTypes: [], openDays: [], invoices: [], gst: false };
+  var state = { profile: {}, roleSuggestions: [], openDays: [], invoices: [], gst: false };
 
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -154,6 +158,11 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
   function showMsg(text, ok) { var m = $('msg'); m.textContent = text; m.className = 'msg ' + (ok ? 'ok' : 'err'); window.scrollTo(0, 0); }
   function clearMsg() { $('msg').className = 'msg'; }
   function friendly(code) { return ERRORS[code] || 'Something went wrong. Please try again.'; }
+  // Expired or revoked link (checked by the database on every call): hide the forms, keep only the message.
+  function showError(code) {
+    if (code === 'link_expired' || code === 'invalid_link') { $('loading').style.display = 'none'; $('app').style.display = 'none'; }
+    showMsg(friendly(code));
+  }
 
   async function rpc(fn, args) {
     var res = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + fn, {
@@ -187,11 +196,12 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     state.gst = !!p.gst_registered;
   }
 
+  // Role is free text with a few suggestions; it is a description only (the rate is set by the office).
   function renderJobs() {
-    var s = $('dJob'); s.textContent = '';
-    s.appendChild(el('option', null, 'Choose…')).value = '';
-    state.jobTypes.forEach(function (j) { var o = el('option', null, j.name); o.value = j.id; s.appendChild(o); });
+    var dl = $('roleList'); dl.textContent = '';
+    state.roleSuggestions.forEach(function (r) { var o = el('option'); o.value = r; dl.appendChild(o); });
   }
+
 
   function renderDays() {
     var box = $('days'); box.textContent = '';
@@ -205,8 +215,8 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       top.appendChild(el('span', null, money(d.labour_amount)));
       c.appendChild(top);
       var info = d.start_time + '–' + d.finish_time + ' · ' + d.work_hours + ' h';
-      if (d.break_minutes) info += ' · break ' + d.break_minutes + ' min';
-      if (d.travel_minutes) info += ' · travel ' + d.travel_minutes + ' min';
+      if (d.break_minutes) info += ' · break ' + SubShared.durationLabel(d.break_minutes);
+      if (d.travel_minutes) info += ' · travel ' + SubShared.durationLabel(d.travel_minutes);
       c.appendChild(el('div', 'muted', info));
       if (d.notes) c.appendChild(el('div', 'muted', d.notes));
       var a = el('div', 'day-actions');
@@ -236,7 +246,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     state.invoices.forEach(function (i) {
       var wrap = el('div', 'day');
       var l = el('div', 'line'); l.style.cursor = 'pointer';
-      l.appendChild(el('span', null, i.invoice_number + ' · ' + String(i.submitted_at).slice(0, 10)));
+      l.appendChild(el('span', null, i.invoice_number + ' · ' + String(i.submitted_at).slice(0, 10) + (i.payment_number ? ' · ' + i.payment_number : '')));
       var r = el('span'); r.appendChild(el('span', 'badge ' + i.status, i.status)); r.appendChild(document.createTextNode(' ' + money(i.total)));
       l.appendChild(r);
       var detail = el('div'); detail.style.display = 'none';
@@ -256,7 +266,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       box.appendChild(el('div', 'muted', [w.full_name, 'ABN ' + w.abn, w.address, w.email, w.phone].filter(Boolean).join(' · ')));
       inv.days.forEach(function (d) {
         var l = el('div', 'line');
-        l.appendChild(el('span', null, d.work_date + ' · ' + d.job_type + ' · ' + d.start_time + '–' + d.finish_time + ' · ' + d.work_hours + ' h'));
+        l.appendChild(el('span', null, d.work_date + ' · ' + (d.role || d.job_type) + ' · ' + d.start_time + '–' + d.finish_time + ' · ' + d.work_hours + ' h'));
         l.appendChild(el('span', null, money(d.labour_amount)));
         box.appendChild(l);
       });
@@ -267,20 +277,24 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
         var l = el('div', 'line'); l.appendChild(el('span', null, r[0])); l.appendChild(el('span', null, money(r[1]))); box.appendChild(l);
       });
       var t = el('div', 'line total'); t.appendChild(el('span', null, 'Total')); t.appendChild(el('span', null, money(inv.total))); box.appendChild(t);
-      box.appendChild(el('p', 'muted', 'Status: ' + inv.status + (inv.paid_at ? ' · paid on ' + inv.paid_at : '')));
+      box.appendChild(el('p', 'muted', 'Status: ' + inv.status + (inv.paid_at ? ' · paid on ' + inv.paid_at : '') +
+        (inv.payment_number ? ' · payment ' + inv.payment_number : '') + (inv.payment_reference ? ' · ref. ' + inv.payment_reference : '')));
+      var view = el('button', 'btn btn-light', 'View / Print PDF'); view.style.marginTop = '6px';
+      view.onclick = function (ev) { ev.stopPropagation(); SubShared.openInvoice(inv); };
+      box.appendChild(view);
       if (inv.declaration_text) box.appendChild(el('p', 'muted', 'Declaration accepted ' + String(inv.declaration_accepted_at).slice(0, 16).replace('T', ' ') + ': ' + inv.declaration_text));
     } catch (e) { box.textContent = friendly(e.code); }
   }
 
   function resetDayForm() {
     $('dId').value = ''; $('dJob').value = ''; $('dStart').value = ''; $('dFinish').value = '';
-    $('dBreak').value = '0'; $('dTravel').value = '0'; $('dNotes').value = '';
+    SubShared.fillDuration($('dBreak'), 120, 0); SubShared.fillDuration($('dTravel'), 240, 0); $('dNotes').value = '';
     $('dayFormTitle').textContent = 'Add a work day'; $('cancelEditBtn').style.display = 'none';
   }
   function editDay(d) {
-    $('dId').value = d.id; $('dDate').value = d.work_date; $('dJob').value = String(d.job_type_id);
+    $('dId').value = d.id; $('dDate').value = d.work_date; $('dJob').value = d.role || d.job_type || '';
     $('dStart').value = d.start_time; $('dFinish').value = d.finish_time;
-    $('dBreak').value = d.break_minutes; $('dTravel').value = d.travel_minutes; $('dNotes').value = d.notes || '';
+    SubShared.fillDuration($('dBreak'), 120, d.break_minutes); SubShared.fillDuration($('dTravel'), 240, d.travel_minutes); $('dNotes').value = d.notes || '';
     $('dayFormTitle').textContent = 'Edit day'; $('cancelEditBtn').style.display = 'block';
     $('dDate').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
@@ -288,7 +302,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
   async function load() {
     var data = await rpc('sub_portal_get');
     $('declText').textContent = (data.declaration && data.declaration.text) || '';
-    state.profile = data.profile; state.jobTypes = data.job_types || []; state.openDays = data.open_days || []; state.invoices = data.invoices || [];
+    state.profile = data.profile; state.roleSuggestions = data.role_suggestions || []; state.openDays = data.open_days || []; state.invoices = data.invoices || [];
     renderCompany(data.company); renderProfile(data.profile); renderJobs(); renderDays(); renderSent();
     $('dDate').max = data.today; if (!$('dDate').value) $('dDate').value = data.today;
     $('loading').style.display = 'none'; $('app').style.display = 'block';
@@ -296,7 +310,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
 
   async function withButton(btn, fn) {
     btn.disabled = true; clearMsg();
-    try { await fn(); } catch (e) { showMsg(friendly(e.code)); } finally { btn.disabled = false; renderDays(); }
+    try { await fn(); } catch (e) { showError(e.code); } finally { btn.disabled = false; renderDays(); }
   }
 
   $('saveProfileBtn').onclick = function () {
@@ -319,9 +333,9 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
 
   $('saveDayBtn').onclick = function () {
     withButton(this, async function () {
-      if (!$('dDate').value || !$('dJob').value || !$('dStart').value || !$('dFinish').value) { showMsg('Please fill date, job, start and finish.'); return; }
+      if (!$('dDate').value || !$('dJob').value || !$('dStart').value || !$('dFinish').value) { showMsg('Please fill date, role, start and finish.'); return; }
       var r = await rpc('sub_portal_save_day', {
-        p_day_id: $('dId').value || null, p_work_date: $('dDate').value, p_job_type_id: Number($('dJob').value),
+        p_day_id: $('dId').value || null, p_work_date: $('dDate').value, p_role: $('dJob').value.trim(),
         p_start: $('dStart').value, p_finish: $('dFinish').value,
         p_break_minutes: Number($('dBreak').value || 0), p_travel_minutes: Number($('dTravel').value || 0),
         p_notes: $('dNotes').value
@@ -331,18 +345,21 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
   };
   $('cancelEditBtn').onclick = resetDayForm;
 
-  function deleteDay(d) {
-    if (!confirm('Delete the day ' + d.work_date + '?')) return;
+  async function deleteDay(d) {
+    if (!(await SubShared.dialog({ title: 'Delete the day ' + d.work_date + '?', message: 'This day has not been sent yet.',
+      confirmText: 'Delete day', cancelText: 'Keep it', danger: true }))) return;
     withButton($('saveDayBtn'), async function () {
       var r = await rpc('sub_portal_delete_day', { p_day_id: d.id });
       state.openDays = r.open_days || []; resetDayForm();
     });
   }
 
-  $('submitBtn').onclick = function () {
+  $('submitBtn').onclick = async function () {
+    var btn = this;
     if (!$('declAccept').checked) { showMsg(ERRORS.declaration_required); return; }
-    if (!confirm('Send ' + state.openDays.length + ' day(s) to the office? After sending you cannot change them.')) return;
-    withButton(this, async function () {
+    if (!(await SubShared.dialog({ title: 'Send ' + state.openDays.length + ' day(s) to the office?',
+      message: 'After sending you cannot change them.', confirmText: 'Send invoice', cancelText: 'Not yet' }))) return;
+    withButton(btn, async function () {
       var res = await fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token, action: 'submit', declaration_accepted: $('declAccept').checked === true }) });
       var data = null; try { data = await res.json(); } catch (e) { data = null; }
       if (!res.ok || !data || !data.ok) { var err = new Error('submit'); err.code = data && data.error; throw err; }
@@ -353,7 +370,8 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
   };
 
   if (!token) { $('loading').style.display = 'none'; showMsg(ERRORS.invalid_link); return; }
-  load().catch(function (e) { $('loading').style.display = 'none'; showMsg(friendly(e.code)); });
+  SubShared.fillDuration($('dBreak'), 120, 0); SubShared.fillDuration($('dTravel'), 240, 0);
+  load().catch(function (e) { $('loading').style.display = 'none'; showError(e.code); });
 })();
 </script>
 </body>

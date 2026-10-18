@@ -1,9 +1,11 @@
 // sub-invoice-submit — TEST FIRST (deus-authtest).
 // Platform JWT check OFF (supabase/config.toml: [functions.sub-invoice-submit]
-// verify_jwt = false). Neither caller has a Supabase JWT: the worker page sends the
-// personal link token (validated in the database), and the scheduled retry sends
-// x-retry-secret without apikey/Authorization. Every action authenticates itself;
-// an Authorization header is never read or accepted as a substitute.
+// verify_jwt = false). The worker page has no Supabase JWT: it sends the personal
+// link token (validated in the database), and the scheduled retry sends
+// x-retry-secret without apikey/Authorization. Every action authenticates itself:
+// a JWT is never accepted as a substitute for the link token or the retry secret.
+// Only "payment_notice" uses an Authorization header: the Admin's own session,
+// which is checked by the database (PostgREST verifies the JWT, the RPC checks admin).
 //
 // Actions (POST JSON):
 //   {token, action: "submit", declaration_accepted: true}
@@ -23,6 +25,15 @@
 //          Disabled (403) when ALERT_RETRY_SECRET is not set or shorter than 32 chars.
 //          The database only re-claims an alert within 23 h of its first attempt
 //          (sub_alert_retry_window), inside the provider's 24 h idempotency window.
+//   {action: "payment_notice", payment_id, confirm_unknown?, reason?}
+//   {action: "resend_email", kind: "record_worker"|"record_admin"|"payment_notice", id,
+//    confirm_unknown?, reason?}   + header Authorization: Bearer <admin session>
+//       -> rpc sub_admin_email_claim AS THE ADMIN (the database refuses non-admins and
+//          applies the resend rules: already sent, in progress, outcome unknown after the
+//          23 h idempotency window = confirmation + reason) -> ONE e-mail with the key the
+//          database chose -> rpc sub_record_email_result (service_role) for that attempt.
+//          payment_notice: record numbers, each amount, combined total (no rates, bank
+//          account masked). Record copies: same content and subject as at submit time.
 //
 // Overlapping calls are expected: pg_net sends asynchronously, so a scheduled run
 // can overlap a slow previous run, a worker-triggered call or a manual call. Safety
@@ -37,11 +48,11 @@
 // "sent" and "recorded" is de-duplicated by the provider.
 //
 // Secrets / env (never hard-coded):
-//   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  (provided by the platform)
+//   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY  (provided by the platform)
 //   ALLOWED_ORIGINS     comma-separated list of origins allowed by CORS
-//   EMAIL_MODE          "live" to really send; anything else = dry-run (default)
-//   RESEND_API_KEY      only read when EMAIL_MODE=live
-//   EMAIL_FROM          sender, e.g. "Deus Labour Hire <invoices@your-domain>" (live only)
+//   EMAIL_MODE, RESEND_API_KEY, EMAIL_FROM, EMAIL_REPLY_TO  read only by
+//                       ../_shared/email-transport.ts (the test build has a transport that
+//                       cannot send: scripts/build-email-functions.sh test)
 //   ADMIN_NOTIFY_EMAIL  optional; if unset admin e-mails are skipped ("not_configured");
 //                       the Admin still sees the record / alert in the CRM.
 //   COMPANY_NAME        optional; name used in the worker bank-change warning.
@@ -50,9 +61,13 @@
 // The token and e-mail bodies are never logged. The database never returns bank
 // numbers to this function, so they cannot appear in any e-mail.
 
+import { BodyError, cleanSubject, isPlainEmail, readJsonLimited } from "../_shared/request.ts";
+import { deliver } from "../_shared/email-transport.ts";
+
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 const KNOWN_ERRORS: Record<string, [number, string]> = {
   invalid_link: [401, "This link is not valid any more. Please ask the office for a new link."],
+  link_expired: [401, "This link has expired because it was not used for 7 days. Please ask the office for a new link."],
   declaration_required: [400, "Please confirm the declaration before sending."],
   profile_incomplete: [400, "Please complete your details (name, address, email, ABN and bank details) before sending."],
   no_open_days: [400, "There are no new days to send."],
@@ -87,7 +102,9 @@ function allowedOrigins(): string[] {
 function corsHeaders(origin: string | null): Record<string, string> {
   const h: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "content-type",
+    // supabase-js (functions.invoke, used by the Admin page) also sends apikey and x-client-info;
+    // without them in this list the browser blocks the request after the preflight.
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
     "Vary": "Origin",
   };
   if (origin && allowedOrigins().includes(origin)) h["Access-Control-Allow-Origin"] = origin;
@@ -190,24 +207,10 @@ ${emailNote}
 so the link can be revoked and no payment is made to the new account.</p></div>`;
 }
 
+// Status strings stored by the database: sent / dry_run / not_configured / failed_<code>.
 async function sendEmail(to: string, subject: string, html: string, idempotencyKey?: string): Promise<string> {
-  if ((Deno.env.get("EMAIL_MODE") ?? "dry_run") !== "live") return "dry_run";
-  const key = Deno.env.get("RESEND_API_KEY");
-  const from = Deno.env.get("EMAIL_FROM");
-  if (!key || !from) return "not_configured";
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`, "Content-Type": "application/json",
-        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
-      },
-      body: JSON.stringify({ from, to: [to], subject, html }),
-    });
-    return res.ok ? "sent" : `failed_${res.status}`;
-  } catch {
-    return "failed_network";
-  }
+  const out = await deliver({ to, subject: cleanSubject(subject), html, idempotencyKey });
+  return out.status === "failed" ? `failed_${out.code}` : out.status;
 }
 
 function errorReply(origin: string | null, data: unknown, fallback: string): Response {
@@ -232,14 +235,14 @@ async function handleSubmit(origin: string | null, token: string, declarationAcc
   }
 
   // From here the record is saved and locked; e-mail problems never undo it.
-  const workerEmail = typeof submitted.worker.email === "string" ? submitted.worker.email : "";
+  const workerEmail = isPlainEmail(submitted.worker.email) ? submitted.worker.email : "";
   const adminEmail = (Deno.env.get("ADMIN_NOTIFY_EMAIL") ?? "").trim();
   const subjectBase = `Work record ${submitted.invoice_number}`;
 
   const workerStatus = workerEmail
     ? await sendEmail(workerEmail, `${subjectBase} — copy`, workerHtml(submitted), `sub-record-${submitted.invoice_id}-worker`)
     : "no_worker_email";
-  const adminStatus = adminEmail
+  const adminStatus = isPlainEmail(adminEmail)
     ? await sendEmail(adminEmail, `${subjectBase} — ${String(submitted.worker.full_name ?? "")} — pending`, adminHtml(submitted), `sub-record-${submitted.invoice_id}-admin`)
     : "not_configured";
 
@@ -266,7 +269,7 @@ async function deliverAlerts(alerts: BankAlert[]): Promise<Record<string, unknow
   for (const a of alerts) {
     const result: Record<string, unknown> = { id: a.id, attempt: a.attempt };
     if (a.need_admin) {
-      const admin = adminEmail
+      const admin = isPlainEmail(adminEmail)
         ? await sendEmail(adminEmail, `Bank details changed — ${String(a.worker ?? a.display_name)}`, bankAlertHtml(a), `sub-alert-${a.id}-admin`)
         : "not_configured";
       result.admin = admin;
@@ -274,7 +277,7 @@ async function deliverAlerts(alerts: BankAlert[]): Promise<Record<string, unknow
     }
     if (a.need_worker) {
       // Only the address chosen by the database (pre-change) is used; nothing from the request body.
-      const worker = a.worker_notify_email
+      const worker = isPlainEmail(a.worker_notify_email)
         ? await sendEmail(a.worker_notify_email, "Your bank details were changed", workerBankWarningHtml(a, companyName), `sub-alert-${a.id}-worker`)
         : "no_previous_email";
       result.worker = worker;
@@ -327,6 +330,93 @@ async function handleRetryDue(origin: string | null, req: Request): Promise<Resp
   return reply(origin, 200, { ok: true, alerts: alerts.length, email: results });
 }
 
+type PaymentNotice = {
+  need_send?: boolean; notice_status?: string;
+  payment_id: string; payment_number: string; paid_at: string; payment_method: string;
+  payment_reference: string | null; total: number; email: string | null; worker: string; company: string;
+  bank_masked: Masked; invoices: { invoice_number: string; amount: number }[];
+};
+
+// Payment confirmation: record numbers, each amount, combined total. No rates; account masked.
+function paymentNoticeHtml(n: PaymentNotice): string {
+  const rows = n.invoices.map((i) =>
+    `<tr><td>${esc(i.invoice_number)}</td><td style="text-align:right">${money(i.amount)}</td></tr>`).join("");
+  const account = n.payment_method === "Bank transfer"
+    ? `<br>Account: ${esc(n.bank_masked.account_name)} · BSB ${esc(n.bank_masked.bsb)} · Acc ${esc(n.bank_masked.account_number)}` : "";
+  return `<div style="font-family:Arial,sans-serif;max-width:640px">
+<h2>Payment ${esc(n.payment_number)}</h2>
+<p>Hi ${esc(n.worker)}, ${esc(n.company)} has recorded a payment for the following work record${n.invoices.length > 1 ? "s" : ""}:</p>
+<table cellpadding="6" style="border-collapse:collapse;width:100%;font-size:13px">
+<tr style="background:#f0f0eb"><th align="left">Record</th><th align="right">Amount</th></tr>
+${rows}<tr><td><b>Total paid</b></td><td style="text-align:right"><b>${money(n.total)}</b></td></tr></table>
+<p>Date: ${esc(n.paid_at)}<br>Method: ${esc(n.payment_method)}${n.payment_reference ? `<br>Reference: ${esc(n.payment_reference)}` : ""}${account}</p>
+<p style="color:#888;font-size:12px">If something does not look right, contact the office.</p></div>`;
+}
+
+const SEND_KINDS = new Set(["record_worker", "record_admin", "payment_notice"]);
+const CLAIM_ERRORS: Record<string, number> = {
+  already_sent: 409, in_progress: 409, unknown_needs_confirmation: 409, reason_required: 400,
+  payment_voided: 400, invoice_closed: 400, not_found: 404,
+};
+type Claim = { kind: string; id: string; attempt_token: string; idem_key: string; to: string | null; data: unknown };
+
+// Admin-started send (first payment notice, or a resend). The database decides whether it is
+// allowed and which Idempotency-Key to use; this function only builds and sends the e-mail.
+async function handleAdminSend(origin: string | null, req: Request, kind: unknown, id: unknown,
+                               confirmUnknown: unknown, reason: unknown): Promise<Response> {
+  const auth = req.headers.get("Authorization") ?? "";
+  const url = Deno.env.get("SUPABASE_URL");
+  const anon = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!/^Bearer [A-Za-z0-9._-]+$/.test(auth)) return reply(origin, 401, { ok: false, error: "forbidden" });
+  if (typeof kind !== "string" || !SEND_KINDS.has(kind) || typeof id !== "string" || !/^[0-9a-f-]{36}$/.test(id) ||
+      (confirmUnknown !== undefined && typeof confirmUnknown !== "boolean") ||
+      (reason !== undefined && reason !== null && (typeof reason !== "string" || reason.length > 300))) {
+    return reply(origin, 400, { ok: false, error: "invalid_request" });
+  }
+  if (!url || !anon) return reply(origin, 500, { ok: false, error: "server_misconfigured" });
+  let c: Claim;
+  try {
+    // As the Admin: PostgREST verifies the session JWT; the RPC refuses anyone who is not admin.
+    const res = await fetch(`${url}/rest/v1/rpc/sub_admin_email_claim`, {
+      method: "POST",
+      headers: { apikey: anon, Authorization: auth, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_kind: kind, p_id: id, p_confirm_unknown: confirmUnknown === true, p_reason: reason ?? null }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      const msg = String((data as { message?: unknown } | null)?.message ?? "");
+      if (msg in CLAIM_ERRORS) return reply(origin, CLAIM_ERRORS[msg], { ok: false, error: msg });
+      return reply(origin, 403, { ok: false, error: "forbidden" });
+    }
+    c = data as Claim;
+  } catch {
+    return reply(origin, 503, { ok: false, error: "service_unavailable" });
+  }
+
+  let status: string;
+  if (kind === "record_admin") {
+    const adminEmail = (Deno.env.get("ADMIN_NOTIFY_EMAIL") ?? "").trim();
+    const s = c.data as Submitted;
+    status = isPlainEmail(adminEmail)
+      ? await sendEmail(adminEmail, `Work record ${s.invoice_number} — ${String(s.worker.full_name ?? "")} — pending`, adminHtml(s), c.idem_key)
+      : "not_configured";
+  } else if (kind === "record_worker") {
+    const s = c.data as Submitted;
+    status = isPlainEmail(c.to)
+      ? await sendEmail(c.to, `Work record ${s.invoice_number} — copy`, workerHtml(s), c.idem_key)
+      : "no_worker_email";
+  } else {
+    const n = c.data as PaymentNotice;
+    status = isPlainEmail(c.to)
+      ? await sendEmail(c.to, `Payment ${n.payment_number} — ${money(n.total)}`, paymentNoticeHtml(n), c.idem_key)
+      : "no_worker_email";
+  }
+  try {
+    await rpc("sub_record_email_result", { p_kind: kind, p_id: id, p_attempt_token: c.attempt_token, p_status: status });
+  } catch { /* stays "sending": shown as outcome unknown after 10 minutes */ }
+  return reply(origin, 200, { ok: true, kind, email: status });
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   const origin = req.headers.get("Origin");
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(origin) });
@@ -336,15 +426,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return reply(origin, 415, { ok: false, error: "unsupported_media_type" });
   }
 
-  let body: { token?: unknown; action?: unknown; declaration_accepted?: unknown };
+  let body: { token?: unknown; action?: unknown; declaration_accepted?: unknown; payment_id?: unknown;
+              kind?: unknown; id?: unknown; confirm_unknown?: unknown; reason?: unknown };
   try {
-    const raw = await req.text();
-    if (raw.length > 1024) return reply(origin, 413, { ok: false, error: "payload_too_large" });
-    body = JSON.parse(raw) ?? {};
-  } catch {
+    body = (await readJsonLimited(req, 1024) ?? {}) as typeof body;   // stops reading past 1 KB
+  } catch (e) {
+    if (e instanceof BodyError && e.message === "payload_too_large") return reply(origin, 413, { ok: false, error: "payload_too_large" });
     return reply(origin, 400, { ok: false, error: "invalid_json" });
   }
+  if (typeof body !== "object" || Array.isArray(body)) return reply(origin, 400, { ok: false, error: "invalid_json" });
   if (body.action === "retry_due") return handleRetryDue(origin, req);
+  if (body.action === "payment_notice") {
+    return handleAdminSend(origin, req, "payment_notice", body.payment_id, body.confirm_unknown, body.reason);
+  }
+  if (body.action === "resend_email") return handleAdminSend(origin, req, body.kind, body.id, body.confirm_unknown, body.reason);
   const token = String(body.token ?? "");
   if (!TOKEN_RE.test(token)) return reply(origin, 401, { ok: false, error: "invalid_link", message: KNOWN_ERRORS.invalid_link[1] });
 

@@ -3,8 +3,11 @@
 -- Target: deus-authtest (aaafpfkwpdpfamfuimki). NOT for production yet.
 --
 -- Model
---   * Admin defines experience levels, job types and the hourly rate for
---     each (job type, level). Each subcontractor has one level.
+--   * Same idea as the customer booking link: the Admin creates a personal
+--     link for each subcontractor and sets that subcontractor's hourly rate
+--     when creating it (like the rate typed on a customer invoice). There is
+--     no rates screen. The worker writes the role/function of each day as a
+--     description; it does not change the rate. The worker never sees the rate.
 --   * Each subcontractor has ONE active personal link. Only the SHA-256 hash
 --     of the link token is stored. The worker page calls the sub_portal_*
 --     RPCs with the raw token; every RPC resolves the token to exactly one
@@ -61,9 +64,9 @@
 -- block stay in place; the Admin contacts the subcontractor directly.
 -- An alert never claimed has never been sent, so its first claim is always allowed.
 --
--- Admin changes to a subcontractor (label, level, active, profile, bank) and
--- to configuration (levels, job types, rates) only go through RPCs that
--- require a reason and write sub_audit (old value, new value, who, when).
+-- Admin changes to a subcontractor (label, hourly rate, active, profile, bank)
+-- only go through RPCs that require a reason and write sub_audit (old value,
+-- new value, who, when).
 -- =====================================================================
 
 begin;
@@ -170,34 +173,11 @@ create table public.sub_settings (
   updated_at      timestamptz not null default now()
 );
 
-create table public.sub_levels (
-  id         smallint generated always as identity primary key,
-  name       text not null unique check (char_length(name) between 1 and 40),
-  sort_order smallint not null default 0,
-  active     boolean not null default true,
-  created_at timestamptz not null default now()
-);
-
-create table public.sub_job_types (
-  id         smallint generated always as identity primary key,
-  name       text not null unique check (char_length(name) between 1 and 60),
-  active     boolean not null default true,
-  created_at timestamptz not null default now()
-);
-
-create table public.sub_rates (
-  job_type_id smallint not null references public.sub_job_types(id) on delete restrict,
-  level_id    smallint not null references public.sub_levels(id) on delete restrict,
-  hourly_rate numeric(8,2) not null check (hourly_rate > 0 and hourly_rate < 1000),
-  updated_at  timestamptz not null default now(),
-  primary key (job_type_id, level_id)
-);
-
 -- Profile WITHOUT bank details.
 create table public.subcontractors (
   id                 uuid primary key default gen_random_uuid(),
   display_name       text not null check (char_length(display_name) between 1 and 80),
-  level_id           smallint not null references public.sub_levels(id) on delete restrict,
+  hourly_rate        numeric(8,2) not null check (hourly_rate > 0 and hourly_rate < 1000),  -- set by the Admin; never shown to the worker
   active             boolean not null default true,
   full_name          text check (char_length(full_name) <= 120),
   address            text check (char_length(address) <= 200),
@@ -276,7 +256,7 @@ create table public.sub_work_days (
   id               uuid primary key default gen_random_uuid(),
   subcontractor_id uuid not null references public.subcontractors(id) on delete restrict,
   work_date        date not null,
-  job_type_id      smallint not null references public.sub_job_types(id) on delete restrict,
+  role             text not null check (char_length(role) between 1 and 60),  -- function written by the worker (description only)
   start_time       time not null,
   finish_time      time not null,
   break_minutes    int not null default 0 check (break_minutes between 0 and 600),
@@ -359,9 +339,6 @@ values ('Deus Labour Hire Pty Ltd', '62 665 081 783', 'Unit 10/6 Grosvenor St, C
 -- Access control: RLS on everywhere, no anon access, admin via sub_is_admin()
 -- ---------------------------------------------------------------------
 alter table public.sub_settings     enable row level security;
-alter table public.sub_levels       enable row level security;
-alter table public.sub_job_types    enable row level security;
-alter table public.sub_rates        enable row level security;
 alter table public.subcontractors   enable row level security;
 alter table public.sub_bank_details enable row level security;
 alter table public.sub_links        enable row level security;
@@ -372,25 +349,21 @@ alter table public.sub_audit        enable row level security;
 alter table public.sub_notifications enable row level security;
 alter table public.sub_alert_attempts enable row level security;
 
-revoke all on public.sub_settings, public.sub_levels, public.sub_job_types, public.sub_rates,
+revoke all on public.sub_settings,
               public.subcontractors, public.sub_bank_details, public.sub_links, public.sub_invoices,
               public.sub_invoice_bank, public.sub_work_days, public.sub_audit, public.sub_notifications,
               public.sub_alert_attempts
   from anon, authenticated;
 revoke all on sequence public.sub_invoice_seq from anon, authenticated;
 
--- Configuration: read-only for admins; levels, job types and rates are changed
--- only through audited RPCs (reason required).
-grant select on public.sub_settings, public.sub_levels, public.sub_job_types, public.sub_rates to authenticated;
+-- Company details shown pre-filled on the link (read-only for admins too).
+grant select on public.sub_settings to authenticated;
 -- Records and profiles: read-only for admins; every write goes through audited RPCs.
 grant select on public.subcontractors, public.sub_links, public.sub_invoices, public.sub_work_days, public.sub_audit,
                 public.sub_notifications, public.sub_alert_attempts to authenticated;
 -- sub_bank_details and sub_invoice_bank: NO grants (RPC only).
 
 create policy sub_settings_admin_read  on public.sub_settings  for select to authenticated using (public.sub_is_admin());
-create policy sub_levels_admin_read    on public.sub_levels    for select to authenticated using (public.sub_is_admin());
-create policy sub_job_types_admin_read on public.sub_job_types for select to authenticated using (public.sub_is_admin());
-create policy sub_rates_admin_read     on public.sub_rates     for select to authenticated using (public.sub_is_admin());
 create policy subcontractors_admin_read on public.subcontractors for select to authenticated using (public.sub_is_admin());
 create policy sub_links_admin_read      on public.sub_links      for select to authenticated using (public.sub_is_admin());
 create policy sub_invoices_admin_read   on public.sub_invoices   for select to authenticated using (public.sub_is_admin());
@@ -584,13 +557,12 @@ security definer
 set search_path = ''
 as $$
   select coalesce(jsonb_agg(jsonb_build_object(
-           'id', d.id, 'work_date', d.work_date, 'job_type_id', d.job_type_id, 'job_type', j.name,
+           'id', d.id, 'work_date', d.work_date, 'role', d.role, 'job_type', d.role,
            'start_time', to_char(d.start_time, 'HH24:MI'), 'finish_time', to_char(d.finish_time, 'HH24:MI'),
            'break_minutes', d.break_minutes, 'travel_minutes', d.travel_minutes, 'notes', d.notes,
            'work_hours', d.work_hours, 'labour_amount', d.labour_amount, 'travel_amount', d.travel_amount)
          order by d.work_date, d.start_time), '[]'::jsonb)
   from public.sub_work_days d
-  join public.sub_job_types j on j.id = d.job_type_id
   where d.subcontractor_id = p_sub_id
     and d.invoice_id is not distinct from p_invoice_id;
 $$;
@@ -619,10 +591,8 @@ begin
         'email', v_sub.email, 'phone', v_sub.phone, 'abn', v_sub.abn, 'gst_registered', v_sub.gst_registered,
         -- the worker's OWN bank details (only reachable with their own link)
         'bank_account_name', v_bank.account_name, 'bank_bsb', v_bank.bsb, 'bank_account_number', v_bank.account_number),
-    'job_types', (select coalesce(jsonb_agg(jsonb_build_object('id', j.id, 'name', j.name) order by j.name), '[]'::jsonb)
-                  from public.sub_job_types j
-                  join public.sub_rates r on r.job_type_id = j.id and r.level_id = v_sub.level_id
-                  where j.active),
+    -- suggestions for the "Role" field only (free text; the rate does not depend on it)
+    'role_suggestions', jsonb_build_array('Removalist', 'Offsider', 'Driver', 'Cleaner'),
     'open_days', public.sub_days_json(v_sub_id, null),
     'invoices', (select coalesce(jsonb_agg(x.o order by x.submitted_at desc), '[]'::jsonb) from (
                    select i.submitted_at, jsonb_build_object('invoice_number', i.invoice_number,
@@ -687,7 +657,7 @@ end;
 $$;
 
 create or replace function public.sub_portal_save_day(
-  p_token text, p_day_id uuid, p_work_date date, p_job_type_id int,
+  p_token text, p_day_id uuid, p_work_date date, p_role text,
   p_start time, p_finish time, p_break_minutes int, p_travel_minutes int, p_notes text)
 returns jsonb
 language plpgsql
@@ -696,28 +666,26 @@ set search_path = ''
 as $$
 declare
   v_sub_id uuid;
-  v_level  smallint;
+  v_role   text := btrim(coalesce(p_role, ''));
   v_rate   numeric;
   c        record;
 begin
   v_sub_id := public.sub_resolve_token(p_token);
   if p_work_date is null or p_work_date > public.sub_today() then raise exception 'date_invalid' using errcode = 'P0001'; end if;
   if p_work_date < public.sub_today() - 120 then raise exception 'date_too_old' using errcode = 'P0001'; end if;
-  select level_id into v_level from public.subcontractors where id = v_sub_id;
-  select r.hourly_rate into v_rate
-  from public.sub_rates r join public.sub_job_types j on j.id = r.job_type_id
-  where r.job_type_id = p_job_type_id and r.level_id = v_level and j.active;
-  if v_rate is null then raise exception 'job_type_invalid' using errcode = 'P0001'; end if;
+  if v_role = '' or char_length(v_role) > 60 then raise exception 'role_required' using errcode = 'P0001'; end if;
+  -- rate set by the Admin for this subcontractor (captured on the day; later rate changes do not alter it)
+  select hourly_rate into v_rate from public.subcontractors where id = v_sub_id;
   select * into c from public.sub_calc_day(p_start, p_finish, coalesce(p_break_minutes, 0), coalesce(p_travel_minutes, 0), v_rate);
 
   if p_day_id is null then
-    insert into public.sub_work_days (subcontractor_id, work_date, job_type_id, start_time, finish_time,
+    insert into public.sub_work_days (subcontractor_id, work_date, role, start_time, finish_time,
       break_minutes, travel_minutes, notes, hourly_rate, travel_rate, work_hours, travel_hours, labour_amount, travel_amount)
-    values (v_sub_id, p_work_date, p_job_type_id, p_start, p_finish, coalesce(p_break_minutes, 0), coalesce(p_travel_minutes, 0),
+    values (v_sub_id, p_work_date, v_role, p_start, p_finish, coalesce(p_break_minutes, 0), coalesce(p_travel_minutes, 0),
       nullif(btrim(p_notes), ''), v_rate, c.travel_rate, c.work_hours, c.travel_hours, c.labour_amount, c.travel_amount);
   else
     update public.sub_work_days set
-      work_date = p_work_date, job_type_id = p_job_type_id, start_time = p_start, finish_time = p_finish,
+      work_date = p_work_date, role = v_role, start_time = p_start, finish_time = p_finish,
       break_minutes = coalesce(p_break_minutes, 0), travel_minutes = coalesce(p_travel_minutes, 0),
       notes = nullif(btrim(p_notes), ''), hourly_rate = v_rate, travel_rate = c.travel_rate,
       work_hours = c.work_hours, travel_hours = c.travel_hours, labour_amount = c.labour_amount,
@@ -1047,7 +1015,7 @@ begin
 end;
 $$;
 
-create or replace function public.sub_admin_create_subcontractor(p_display_name text, p_level_id int)
+create or replace function public.sub_admin_create_subcontractor(p_display_name text, p_hourly_rate numeric)
 returns uuid
 language plpgsql
 security definer
@@ -1057,16 +1025,18 @@ declare
   v_actor uuid := public.sub_require_admin(null, false);
   v_id uuid;
 begin
-  insert into public.subcontractors (display_name, level_id) values (btrim(p_display_name), p_level_id)
+  if p_hourly_rate is null or p_hourly_rate <= 0 or p_hourly_rate >= 1000 then raise exception 'rate_invalid' using errcode = 'P0001'; end if;
+  insert into public.subcontractors (display_name, hourly_rate) values (btrim(p_display_name), round(p_hourly_rate, 2))
   returning id into v_id;
   insert into public.sub_audit (actor, action, subcontractor_id, new_data)
-  values (v_actor, 'subcontractor_created', v_id, jsonb_build_object('display_name', btrim(p_display_name), 'level_id', p_level_id));
+  values (v_actor, 'subcontractor_created', v_id,
+          jsonb_build_object('display_name', btrim(p_display_name), 'hourly_rate', round(p_hourly_rate, 2)));
   return v_id;
 end;
 $$;
 
 create or replace function public.sub_admin_update_subcontractor(
-  p_id uuid, p_display_name text, p_level_id int, p_active boolean, p_reason text)
+  p_id uuid, p_display_name text, p_hourly_rate numeric, p_active boolean, p_reason text)
 returns jsonb
 language plpgsql
 security definer
@@ -1078,12 +1048,14 @@ declare
 begin
   select * into o from public.subcontractors where id = p_id for update;
   if o.id is null then raise exception 'not_found' using errcode = 'P0001'; end if;
-  update public.subcontractors set display_name = btrim(p_display_name), level_id = p_level_id,
+  if p_hourly_rate is null or p_hourly_rate <= 0 or p_hourly_rate >= 1000 then raise exception 'rate_invalid' using errcode = 'P0001'; end if;
+  -- a new rate applies to days saved after the change; days already saved keep their rate
+  update public.subcontractors set display_name = btrim(p_display_name), hourly_rate = round(p_hourly_rate, 2),
          active = p_active, updated_at = now() where id = p_id;
   insert into public.sub_audit (actor, action, subcontractor_id, old_data, new_data, reason)
   values (v_actor, 'subcontractor_updated_by_admin', p_id,
-          jsonb_build_object('display_name', o.display_name, 'level_id', o.level_id, 'active', o.active),
-          jsonb_build_object('display_name', btrim(p_display_name), 'level_id', p_level_id, 'active', p_active),
+          jsonb_build_object('display_name', o.display_name, 'hourly_rate', o.hourly_rate, 'active', o.active),
+          jsonb_build_object('display_name', btrim(p_display_name), 'hourly_rate', round(p_hourly_rate, 2), 'active', p_active),
           btrim(p_reason));
   return jsonb_build_object('ok', true);
 end;
@@ -1163,103 +1135,6 @@ begin
 end;
 $$;
 
--- ---- Configuration changes (reason required; old/new/who/when in sub_audit) ----
-create or replace function public.sub_admin_save_level(p_id int, p_name text, p_sort_order int, p_active boolean, p_reason text)
-returns int
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_actor uuid := public.sub_require_admin(p_reason, true);
-  o public.sub_levels%rowtype;
-  v_id int;
-begin
-  if p_id is null then
-    insert into public.sub_levels (name, sort_order, active) values (btrim(p_name), coalesce(p_sort_order, 0), coalesce(p_active, true))
-    returning id into v_id;
-    insert into public.sub_audit (actor, action, new_data, reason)
-    values (v_actor, 'level_created', jsonb_build_object('id', v_id, 'name', btrim(p_name), 'sort_order', coalesce(p_sort_order, 0), 'active', coalesce(p_active, true)), btrim(p_reason));
-  else
-    select * into o from public.sub_levels where id = p_id for update;
-    if o.id is null then raise exception 'not_found' using errcode = 'P0001'; end if;
-    update public.sub_levels set name = btrim(p_name), sort_order = coalesce(p_sort_order, 0), active = coalesce(p_active, true) where id = p_id;
-    v_id := p_id;
-    insert into public.sub_audit (actor, action, old_data, new_data, reason)
-    values (v_actor, 'level_updated', jsonb_build_object('id', o.id, 'name', o.name, 'sort_order', o.sort_order, 'active', o.active),
-            jsonb_build_object('id', p_id, 'name', btrim(p_name), 'sort_order', coalesce(p_sort_order, 0), 'active', coalesce(p_active, true)), btrim(p_reason));
-  end if;
-  return v_id;
-exception
-  when unique_violation then raise exception 'name_duplicate' using errcode = 'P0001';
-end;
-$$;
-
-create or replace function public.sub_admin_save_job_type(p_id int, p_name text, p_active boolean, p_reason text)
-returns int
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_actor uuid := public.sub_require_admin(p_reason, true);
-  o public.sub_job_types%rowtype;
-  v_id int;
-begin
-  if p_id is null then
-    insert into public.sub_job_types (name, active) values (btrim(p_name), coalesce(p_active, true)) returning id into v_id;
-    insert into public.sub_audit (actor, action, new_data, reason)
-    values (v_actor, 'job_type_created', jsonb_build_object('id', v_id, 'name', btrim(p_name), 'active', coalesce(p_active, true)), btrim(p_reason));
-  else
-    select * into o from public.sub_job_types where id = p_id for update;
-    if o.id is null then raise exception 'not_found' using errcode = 'P0001'; end if;
-    update public.sub_job_types set name = btrim(p_name), active = coalesce(p_active, true) where id = p_id;
-    v_id := p_id;
-    insert into public.sub_audit (actor, action, old_data, new_data, reason)
-    values (v_actor, 'job_type_updated', jsonb_build_object('id', o.id, 'name', o.name, 'active', o.active),
-            jsonb_build_object('id', p_id, 'name', btrim(p_name), 'active', coalesce(p_active, true)), btrim(p_reason));
-  end if;
-  return v_id;
-exception
-  when unique_violation then raise exception 'name_duplicate' using errcode = 'P0001';
-end;
-$$;
-
--- p_hourly_rate null = remove the rate (the job is then not offered to that level).
--- Existing days keep the rate captured when they were saved.
-create or replace function public.sub_admin_set_rate(p_job_type_id int, p_level_id int, p_hourly_rate numeric, p_reason text)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_actor uuid := public.sub_require_admin(p_reason, true);
-  v_old numeric;
-begin
-  if p_hourly_rate is not null and (p_hourly_rate <= 0 or p_hourly_rate >= 1000) then
-    raise exception 'rate_invalid' using errcode = 'P0001';
-  end if;
-  select hourly_rate into v_old from public.sub_rates where job_type_id = p_job_type_id and level_id = p_level_id for update;
-  if v_old is not distinct from round(p_hourly_rate, 2) then return jsonb_build_object('ok', true, 'changed', false); end if;
-  if p_hourly_rate is null then
-    delete from public.sub_rates where job_type_id = p_job_type_id and level_id = p_level_id;
-  else
-    insert into public.sub_rates (job_type_id, level_id, hourly_rate, updated_at)
-    values (p_job_type_id, p_level_id, round(p_hourly_rate, 2), now())
-    on conflict (job_type_id, level_id) do update set hourly_rate = excluded.hourly_rate, updated_at = now();
-  end if;
-  insert into public.sub_audit (actor, action, old_data, new_data, reason)
-  values (v_actor, 'rate_changed',
-          jsonb_build_object('job_type_id', p_job_type_id, 'level_id', p_level_id, 'hourly_rate', v_old),
-          jsonb_build_object('job_type_id', p_job_type_id, 'level_id', p_level_id, 'hourly_rate', round(p_hourly_rate, 2)),
-          btrim(p_reason));
-  return jsonb_build_object('ok', true, 'changed', true);
-exception
-  when foreign_key_violation then raise exception 'not_found' using errcode = 'P0001';
-end;
-$$;
-
 create or replace function public.sub_admin_create_link(p_subcontractor_id uuid, p_token_hash text, p_expires_at timestamptz default null)
 returns uuid
 language plpgsql
@@ -1300,7 +1175,7 @@ end;
 $$;
 
 create or replace function public.sub_admin_adjust_day(
-  p_day_id uuid, p_job_type_id int, p_start time, p_finish time,
+  p_day_id uuid, p_role text, p_start time, p_finish time,
   p_break_minutes int, p_travel_minutes int, p_reason text)
 returns jsonb
 language plpgsql
@@ -1311,28 +1186,22 @@ declare
   v_actor uuid := public.sub_require_admin(p_reason, true);
   d      public.sub_work_days%rowtype;
   v_stat text;
-  v_rate numeric;
+  v_role text := btrim(coalesce(p_role, ''));
   c      record;
 begin
+  if v_role = '' or char_length(v_role) > 60 then raise exception 'role_required' using errcode = 'P0001'; end if;
   select * into d from public.sub_work_days where id = p_day_id for update;
   if d.id is null or d.invoice_id is null then raise exception 'day_not_submitted' using errcode = 'P0001'; end if;
   select status into v_stat from public.sub_invoices where id = d.invoice_id for update;
   if v_stat not in ('pending', 'approved') then raise exception 'invoice_closed' using errcode = 'P0001'; end if;
 
-  if p_job_type_id = d.job_type_id then
-    v_rate := d.hourly_rate;               -- keep the rate snapshot taken when the day was recorded
-  else
-    select r.hourly_rate into v_rate from public.sub_rates r
-    join public.subcontractors s on s.level_id = r.level_id and s.id = d.subcontractor_id
-    where r.job_type_id = p_job_type_id;
-    if v_rate is null then raise exception 'job_type_invalid' using errcode = 'P0001'; end if;
-  end if;
-  select * into c from public.sub_calc_day(p_start, p_finish, coalesce(p_break_minutes, 0), coalesce(p_travel_minutes, 0), v_rate);
+  -- corrections keep the rate captured when the day was recorded
+  select * into c from public.sub_calc_day(p_start, p_finish, coalesce(p_break_minutes, 0), coalesce(p_travel_minutes, 0), d.hourly_rate);
 
   update public.sub_work_days set
-    job_type_id = p_job_type_id, start_time = p_start, finish_time = p_finish,
+    role = v_role, start_time = p_start, finish_time = p_finish,
     break_minutes = coalesce(p_break_minutes, 0), travel_minutes = coalesce(p_travel_minutes, 0),
-    hourly_rate = v_rate, travel_rate = c.travel_rate, work_hours = c.work_hours, travel_hours = c.travel_hours,
+    travel_rate = c.travel_rate, work_hours = c.work_hours, travel_hours = c.travel_hours,
     labour_amount = c.labour_amount, travel_amount = c.travel_amount, admin_adjusted = true, updated_at = now()
   where id = p_day_id;
   perform public.sub_recalc_invoice(d.invoice_id);
@@ -1442,7 +1311,7 @@ grant execute on function
   public.sub_portal_get(text),
   public.sub_portal_get_invoice(text, text),
   public.sub_portal_save_profile(text, text, text, text, text, text, boolean, text, text, text),
-  public.sub_portal_save_day(text, uuid, date, int, time, time, int, int, text),
+  public.sub_portal_save_day(text, uuid, date, text, time, time, int, int, text),
   public.sub_portal_delete_day(text, uuid)
 to anon, authenticated;
 
@@ -1455,19 +1324,16 @@ to service_role;
 
 -- Admin actions (each re-checks sub_is_admin()).
 grant execute on function
-  public.sub_admin_create_subcontractor(text, int),
-  public.sub_admin_update_subcontractor(uuid, text, int, boolean, text),
+  public.sub_admin_create_subcontractor(text, numeric),
+  public.sub_admin_update_subcontractor(uuid, text, numeric, boolean, text),
   public.sub_admin_update_profile(uuid, text, text, text, text, text, boolean, text),
   public.sub_admin_update_bank(uuid, text, text, text, text),
   public.sub_admin_get_bank(uuid),
   public.sub_admin_get_invoice_bank(uuid),
-  public.sub_admin_save_level(int, text, int, boolean, text),
-  public.sub_admin_save_job_type(int, text, boolean, text),
-  public.sub_admin_set_rate(int, int, numeric, text),
   public.sub_admin_ack_notification(bigint),
   public.sub_admin_create_link(uuid, text, timestamptz),
   public.sub_admin_revoke_links(uuid),
-  public.sub_admin_adjust_day(uuid, int, time, time, int, int, text),
+  public.sub_admin_adjust_day(uuid, text, time, time, int, int, text),
   public.sub_admin_set_status(uuid, text, date, text, text, text)
 to authenticated;
 
