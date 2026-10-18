@@ -1230,7 +1230,9 @@ async function sendBookingLink(id){
       })
     });
     var data = await res.json();
-    if(data.id || res.ok){
+    if(res.ok && data.dry_run){
+      showToast('Test mode (dry-run): link NOT sent', 5000);
+    }else if(res.ok && data.id){
       showToast('Link sent ✓');
     }else{
       showToast('Error sending: ' + (data && data.message ? data.message : 'unknown error'), 5000);
@@ -2394,7 +2396,8 @@ async function sendInvoiceEmail(){
       })
     });
     var data = await res.json();
-    if(data.id||res.ok){ showToast('Invoice sent to '+email+' ✓'); }
+    if(res.ok && data.dry_run){ showToast('Test mode (dry-run): e-mail NOT sent to '+email, 5000); }
+    else if(res.ok && data.id){ showToast('Invoice sent to '+email+' ✓'); }
     else { throw new Error(data.message||'Failed'); }
   }catch(e){ showToast('Error: '+e.message); }
 }

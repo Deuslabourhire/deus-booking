@@ -1,0 +1,5 @@
+{
+  "imports": {
+    "sanitize-html": "npm:sanitize-html@2.18.0"
+  }
+}
