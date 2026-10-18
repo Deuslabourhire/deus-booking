@@ -17,3 +17,9 @@ project_id = "deus-booking"
 # Equivalent when deploying without this file:
 #   supabase functions deploy sub-invoice-submit --no-verify-jwt --project-ref <ref>
 verify_jwt = false
+
+[functions.resend-email]
+# Keep the platform JWT check ON. It is not enough on its own (the public anon key is a
+# valid JWT), so the function also confirms the caller is a signed-in Admin.
+# Deploy the output of scripts/build-email-functions.sh (test or live), not this folder directly.
+verify_jwt = true
