@@ -6,7 +6,7 @@
   'use strict';
 
   var db = null, root = null, portalUrl = '', currentFilter = 'pending';
-  var cache = { payments: [], subs: [], links: [], invoices: [], alerts: [] };
+  var cache = { payments: [], subs: [], links: [], invoices: [], alerts: [], waiting: [] };
   var STATUS_LABEL = { pending: 'Pending', approved: 'Approved', paid: 'Paid', cancelled: 'Cancelled' };
 
   function el(tag, attrs, children) {
@@ -44,7 +44,13 @@
     invoice_not_payable: 'This record is no longer Pending/Approved.',
     already_voided: 'This payment was already undone.',
     email_in_progress: 'An e-mail for this is being sent right now. Wait a minute and try again.',
-    not_found: 'This record no longer exists. The list was refreshed.'
+    not_found: 'This record no longer exists. The list was refreshed.',
+    day_not_available: 'One of the days is already in an invoice (or was not sent by the subcontractor). The list was refreshed.',
+    no_days_selected: 'Tick at least one day.',
+    too_many_days: 'Select at most 100 days for one invoice.',
+    mixed_subcontractors: 'One invoice can only include days of one subcontractor.',
+    bank_alert_pending: 'This subcontractor changed their bank details. Review and acknowledge the bank-change alert first, then create the invoice.',
+    profile_incomplete: 'The subcontractor\'s details are incomplete (name, address, e-mail, ABN or bank details).'
   };
   function fail(e) { var c = e && (e.message || e.code); toast(ERRORS[c] || ('The database refused the change: ' + (c || 'unknown error') + '.'), true); }
   var BTN = 'padding:6px 10px;border-radius:7px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:12px;margin:2px';
@@ -69,17 +75,22 @@
       db.from('sub_links').select('id,subcontractor_id,created_at,expires_at,revoked_at,last_used_at,last_activity_at').is('revoked_at', null),
       db.from('sub_invoices').select('*').order('submitted_at', { ascending: false }).limit(200),
       db.from('sub_notifications').select('id,kind,subcontractor_id,created_at,details,email_status,worker_email_status,delivery_state,attempts,gave_up_reason').is('acknowledged_at', null).order('created_at', { ascending: false }),
-      db.from('sub_payments').select('id,payment_number,subcontractor_id,paid_at,payment_method,payment_reference,total,invoice_count,notice_status,notice_attempts,voided_at,void_reason,created_at').order('created_at', { ascending: false }).limit(300)
+      db.from('sub_payments').select('id,payment_number,subcontractor_id,paid_at,payment_method,payment_reference,total,invoice_count,notice_status,notice_attempts,voided_at,void_reason,created_at').order('created_at', { ascending: false }).limit(300),
+      // days sent by the workers and not in an invoice yet
+      db.from('sub_work_days').select('*').is('invoice_id', null).not('sent_at', 'is', null).order('work_date').order('start_time').limit(1000)
     ]);
     r.forEach(function (x) { if (x.error) throw x.error; });
     cache.subs = r[0].data; cache.links = r[1].data; cache.invoices = r[2].data; cache.alerts = r[3].data; cache.payments = r[4].data;
-    // keep only selections that can still be paid
+    cache.waiting = r[5].data;
+    // keep only selections that can still be paid / invoiced
     selected = selected.filter(function (id) { var i = invById(id); return i && payable(i); });
+    daySel = daySel.filter(function (id) { return !!dayById(id); });
   }
   function invById(id) { return cache.invoices.find(function (x) { return x.id === id; }); }
   function payById(id) { return cache.payments.find(function (x) { return x.id === id; }); }
   function payable(inv) { return inv.status === 'pending' || inv.status === 'approved'; }
   function subName(id) { var s = cache.subs.find(function (x) { return x.id === id; }); return s ? (s.full_name || s.display_name) : '?'; }
+  function dayById(id) { return cache.waiting.find(function (x) { return x.id === id; }); }
 
   // ------------------------------------------------------------------ one payment for several records
   // Tick records of ONE subcontractor; the bar shows the automatic sum and records a single
@@ -142,6 +153,115 @@
     payBar.appendChild(el('div', { style: 'font-size:11px;color:#666', text:
       'Pay to the bank details saved with the records (open a record → 🔒 Bank details). All ticked records must have been sent with the same bank details. ' +
       'The subcontractor gets ONE confirmation e-mail with the record numbers and the total.' }));
+  }
+
+  // ------------------------------------------------------------------ one invoice from several sent days
+  // Tick sent days of ONE subcontractor (any weeks). Confirming creates ONE invoice with ONE number;
+  // each day is a line and the total is their sum (+ GST if the subcontractor is registered).
+  var daySel = [];
+  var dayBar = el('div');
+  function dayAmountCents(d) { return cents(d.labour_amount) + cents(d.travel_amount); }
+  function dayTotals(ids) {
+    var sub = ids.reduce(function (a, id) { return a + dayAmountCents(dayById(id)); }, 0);
+    var s = cache.subs.find(function (x) { return x.id === dayById(ids[0]).subcontractor_id; }) || {};
+    var gst = s.gst_registered ? Math.round(sub / 10) : 0;     // 10 %, rounded like the database
+    return { subtotal: sub / 100, gst: gst / 100, total: (sub + gst) / 100, gstRegistered: !!s.gst_registered };
+  }
+  function toggleDay(d, cb) {
+    if (cb.checked) {
+      var first = daySel.length ? dayById(daySel[0]) : null;
+      if (first && first.subcontractor_id !== d.subcontractor_id) {
+        cb.checked = false;
+        return toast('One invoice = one subcontractor. Clear the selection to invoice ' + subName(d.subcontractor_id) + '.');
+      }
+      if (daySel.indexOf(d.id) < 0) daySel.push(d.id);
+    } else {
+      daySel = daySel.filter(function (id) { return id !== d.id; });
+    }
+    renderDayBar();
+  }
+  function dayLine(d) {
+    return d.work_date + ' · ' + (d.role || '?') + ' · ' + money(dayAmountCents(d) / 100);
+  }
+  function renderDayBar() {
+    dayBar.textContent = '';
+    dayBar.style.cssText = 'position:sticky;top:0;z-index:5;background:#eef4ff;border:1px solid #b9cdf3;border-radius:10px;padding:10px;margin-bottom:10px;font-size:13px';
+    if (!daySel.length) {
+      dayBar.appendChild(el('span', { style: 'color:#555', text: '🧾 To make an invoice, tick the sent days of one subcontractor (any weeks). ONE invoice with ONE number is created for all ticked days.' }));
+      return;
+    }
+    var days = daySel.map(dayById).sort(function (a, b) { return a.work_date < b.work_date ? -1 : 1; });
+    var subId = days[0].subcontractor_id, t = dayTotals(daySel);
+    dayBar.appendChild(el('div', null, [el('b', { text: '🧾 Invoice for ' + subName(subId) }), ' · ' + days.length + ' day' + (days.length > 1 ? 's' : '')]));
+    dayBar.appendChild(el('div', { style: 'font-size:12px;color:#444;margin:2px 0', text: days.map(dayLine).join('  |  ') }));
+    dayBar.appendChild(el('div', { style: 'font-size:18px;font-weight:bold;margin:4px 0', text: 'Total: ' + money(t.total) +
+      (t.gstRegistered ? ' (incl. GST ' + money(t.gst) + ')' : '') }));
+    var others = cache.waiting.filter(function (d) { return d.subcontractor_id === subId && daySel.indexOf(d.id) < 0; });
+    if (others.length) {
+      dayBar.appendChild(el('button', { style: BTN, text: 'Add all ' + others.length + ' other waiting day(s) of ' + subName(subId), onclick: function () {
+        others.forEach(function (d) { daySel.push(d.id); }); refresh();
+      } }));
+    }
+    dayBar.appendChild(el('button', { style: BTN, text: 'Clear selection', onclick: function () { daySel = []; refresh(); } }));
+    if (cache.alerts.some(function (a) { return a.subcontractor_id === subId; })) {
+      dayBar.appendChild(el('div', { style: 'background:#fff0f0;border:1px solid #fca5a5;border-radius:6px;padding:6px;margin:4px 0',
+        text: '⚠ This subcontractor has an unacknowledged bank-change alert (see above). Acknowledge it before creating the invoice.' }));
+    }
+    dayBar.appendChild(el('button', { style: BTN_G, text: 'Create ONE invoice for ' + money(t.total), onclick: function () { createInvoice(this); } }));
+  }
+  async function createInvoice(btn) {
+    var ids = daySel.slice(), days = ids.map(dayById), t = dayTotals(ids), subId = days[0].subcontractor_id;
+    var ok = await SubShared.dialog({ title: 'Create one invoice for ' + money(t.total) + '?', confirmText: 'Create invoice',
+      message: 'Subcontractor: ' + subName(subId) + '\n' + days.map(dayLine).join('\n') +
+        '\n\nSubtotal ' + money(t.subtotal) + (t.gstRegistered ? ' · GST ' + money(t.gst) : '') + ' · Total ' + money(t.total) +
+        '\n\nOne invoice number for all these days. The days cannot be put in another invoice (unless you cancel this one). ' +
+        'The subcontractor sees the same invoice on their link. A copy is e-mailed to the subcontractor and to the office.' });
+    if (!ok) return;
+    btn.disabled = true;
+    var r = await db.rpc('sub_admin_create_invoice', { p_day_ids: ids, p_expected_total: t.total });
+    if (r.error) {
+      btn.disabled = false;
+      toast(r.error.message === 'total_changed' ? 'A day was changed since you opened this page. The list was refreshed: check the new total and try again.'
+        : (ERRORS[r.error.message] || ('The database refused the invoice: ' + r.error.message + '.')), true);
+      return refresh();
+    }
+    daySel = [];
+    var copy = await sendRecordCopy('record_worker', r.data.invoice_id);
+    var office = await sendRecordCopy('record_admin', r.data.invoice_id);
+    toast('Invoice ' + r.data.invoice_number + ' created: ' + r.data.days + ' day(s), ' + money(r.data.total) +
+      '. Copy to the subcontractor: ' + copy + '. Copy to the office: ' + office + '.');
+    await refresh();
+  }
+  // First copies of a new invoice (same path and rules as "Send copy" in a record).
+  async function sendRecordCopy(kind, invoiceId) {
+    try {
+      var r = await db.functions.invoke('sub-invoice-submit', { body: { action: 'resend_email', kind: kind, id: invoiceId } });
+      if (r.error || !r.data || !r.data.ok) return 'not sent (you can send it from the record)';
+      return noticeLabel(r.data.email);
+    } catch (e) { return 'not sent (you can send it from the record)'; }
+  }
+  function waitingBox() {
+    var box = el('div', { style: 'margin-bottom:12px' });
+    box.appendChild(el('b', { text: 'Days sent, waiting for an invoice (' + cache.waiting.length + ')' }));
+    box.appendChild(dayBar); renderDayBar();
+    if (!cache.waiting.length) { box.appendChild(el('div', { style: 'color:#999;font-size:13px', text: 'No days waiting.' })); return box; }
+    var bySub = {};
+    cache.waiting.forEach(function (d) { (bySub[d.subcontractor_id] = bySub[d.subcontractor_id] || []).push(d); });
+    Object.keys(bySub).forEach(function (subId) {
+      var list = bySub[subId];
+      var card = el('div', { style: CARD }, [el('div', null, [el('b', { text: subName(subId) }), ' · ' + list.length + ' day(s) · ' +
+        money(list.reduce(function (a, d) { return a + dayAmountCents(d); }, 0) / 100) + ' before GST'])]);
+      list.forEach(function (d) {
+        var cb = el('input', { type: 'checkbox', title: 'Select for the invoice', style: 'width:18px;height:18px;margin:2px 8px 0 0;flex:none' });
+        cb.checked = daySel.indexOf(d.id) >= 0;
+        cb.addEventListener('change', function () { toggleDay(d, cb); });
+        var row = dayRow(d, null, true);
+        row.insertBefore(el('div', { style: 'font-size:11px;color:#888', text: 'sent ' + String(d.sent_at).slice(0, 16).replace('T', ' ') }), row.firstChild);
+        card.appendChild(el('div', { style: 'display:flex;align-items:flex-start' }, [cb, el('div', { style: 'flex:1' }, [row])]));
+      });
+      box.appendChild(card);
+    });
+    return box;
   }
 
   var PAY_ERRORS = {
@@ -248,6 +368,7 @@
       el('button', { style: BTN, text: '⬇ CSV (expenses)', onclick: function () { exportCsv(filter.value); } })
     ]);
     box.appendChild(alertsBox());
+    box.appendChild(waitingBox());
     box.appendChild(head); box.appendChild(payBar); box.appendChild(list);
     renderPayBar();
     var rows = cache.invoices.filter(function (i) { return filter.value === 'all' || i.status === filter.value; });
@@ -304,13 +425,17 @@
   async function toggle(details, inv) {
     if (details.style.display === 'block') { details.style.display = 'none'; return; }
     details.textContent = 'Loading…'; details.style.display = 'block';
-    var r = await db.from('sub_work_days').select('*').eq('invoice_id', inv.id).order('work_date').order('start_time');
+    // A cancelled invoice made in Admin shows its ORIGINAL lines (frozen at cancellation; its days were released).
+    var r = inv.cancelled_lines ? { data: inv.cancelled_lines }
+      : await db.from('sub_work_days').select('*').eq('invoice_id', inv.id).order('work_date').order('start_time');
     if (r.error) { details.textContent = 'Error loading days.'; return; }
     details.textContent = '';
     var w = inv.worker_snapshot || {};
     details.appendChild(el('div', { style: 'font-size:12px;color:#555;margin-bottom:6px', text:
       (w.address || '-') + ' · Email ' + (w.email || '-') + ' · Phone ' + (w.phone || '-') }));
-    var editable = inv.status === 'pending' || inv.status === 'approved';
+    if (inv.cancelled_lines) details.appendChild(el('div', { style: 'font-size:12px;color:#b91c1c;margin-bottom:4px', text:
+      'Original lines of this cancelled invoice (kept for the records). These days were released and can be in a new invoice.' }));
+    var editable = !inv.cancelled_lines && (inv.status === 'pending' || inv.status === 'approved');
     r.data.forEach(function (d) { details.appendChild(dayRow(d, inv, editable)); });
     details.appendChild(el('div', { style: 'font-size:13px;margin:8px 0', text:
       'Labour ' + money(inv.labour_total) + ' · Travel ' + money(inv.travel_total) + ' · Subtotal ' + money(inv.subtotal) +
@@ -318,7 +443,8 @@
     details.appendChild(el('button', { style: BTN, text: '🧾 View / Print PDF', onclick: function () {
       var p = inv.payment_id ? payById(inv.payment_id) : null;
       SubShared.openInvoice(Object.assign({}, inv, { worker: inv.worker_snapshot, company: inv.company_snapshot,
-        payment_number: p ? p.payment_number : null, days: r.data }));
+        payment_number: p ? p.payment_number : null, days: r.data,      // r.data = frozen lines when cancelled
+        grouped: !!inv.grouped_by }));                                  // one line per day only for invoices made in Admin
     } }));
     if (inv.payment_id) details.appendChild(paymentBox(inv));
     details.appendChild(el('div', { style: 'font-size:11px;color:#555;margin:4px 0', text:
@@ -334,7 +460,9 @@
   }
 
   // History of one record: when, who, what (before → after) and why.
-  var ACTION_LABEL = { submitted: 'Sent by the subcontractor', day_adjusted: 'Day corrected', status_changed: 'Status changed',
+  var ACTION_LABEL = { submitted: 'Sent by the subcontractor', invoice_created: 'Invoice created in Admin from sent days',
+    days_released: 'Cancelled: days released for a new invoice',
+    day_adjusted: 'Day corrected', status_changed: 'Status changed',
     bank_viewed: 'Bank details viewed', payment_blocked: 'Payment blocked', email_send_started: 'E-mail sent again', email_result: 'E-mail result' };
   var FIELD_LABEL = { role: 'job', start_time: 'start', finish_time: 'finish', break_minutes: 'unpaid break (min)',
     travel_minutes: 'travel (min)', work_hours: 'hours', labour_amount: 'labour $', travel_amount: 'travel $',
@@ -413,11 +541,18 @@
   }
 
 
+  // inv null = a sent day waiting for an invoice. Days of invoices made in Admin (and waiting days) show
+  // the day total first; days of older records keep their original line.
   function dayRow(d, inv, editable) {
+    var calc = d.work_hours + 'h × ' + money(d.hourly_rate) + ' = ' + money(d.labour_amount) +
+      ' · travel ' + d.travel_minutes + 'm × ' + money(d.travel_rate) + '/h = ' + money(d.travel_amount) + (d.admin_adjusted ? ' · ✎ adjusted' : '');
     var row = el('div', { style: 'border-top:1px solid #f0f0f0;padding:6px 0;font-size:12px' }, [
-      el('div', { text: d.work_date + ' · ' + (d.role || '?') + ' · ' + d.start_time.slice(0, 5) + '–' + d.finish_time.slice(0, 5) +
-        ' (break ' + d.break_minutes + 'm) · ' + d.work_hours + 'h × ' + money(d.hourly_rate) + ' = ' + money(d.labour_amount) +
-        ' · travel ' + d.travel_minutes + 'm × ' + money(d.travel_rate) + '/h = ' + money(d.travel_amount) + (d.admin_adjusted ? ' · ✎ adjusted' : '') }),
+      !inv || inv.grouped_by
+        ? el('div', null, [el('b', { text: d.work_date + ' · ' + (d.role || '?') + ' · day total ' + money(SubShared.dayAmount(d)) }),
+            el('span', { style: 'color:#666', text: ' — ' + String(d.start_time).slice(0, 5) + '–' + String(d.finish_time).slice(0, 5) +
+              ' (break ' + d.break_minutes + 'm) · ' + calc })])
+        : el('div', { text: d.work_date + ' · ' + (d.role || '?') + ' · ' + d.start_time.slice(0, 5) + '–' + d.finish_time.slice(0, 5) +
+            ' (break ' + d.break_minutes + 'm) · ' + calc }),
       d.notes ? el('div', { style: 'color:#888', text: d.notes }) : null
     ]);
     if (editable) row.appendChild(el('button', { style: BTN, text: '✎ Correct hours / job', onclick: function () { adjustForm(row, d, inv); } }));
@@ -446,7 +581,9 @@
       var r = await db.rpc('sub_admin_adjust_day', { p_day_id: d.id, p_role: job.value.trim(), p_start: st.value, p_finish: fi.value,
         p_break_minutes: Number(br.value || 0), p_travel_minutes: Number(tr.value || 0), p_reason: reason.value.trim() });
       if (r.error) return fail(r.error);
-      toast(r.data && r.data.amounts_changed
+      toast(r.data && r.data.status === 'awaiting_invoice'
+        ? 'Correction saved. This day is not in an invoice yet; the new amount is used when you create the invoice.'
+        : r.data && r.data.amounts_changed
         ? 'Correction saved. Record total: ' + money(r.data.total_before) + ' → ' + money(r.data.total_after) + '. Status unchanged.'
         : 'Correction saved (job/role only). Total unchanged. Status unchanged.');
       await refresh();
@@ -493,7 +630,10 @@
         var note = await askReason('', { title: 'Cancel ' + inv.invoice_number + '?', confirmText: 'Cancel record', danger: true,
           placeholder: 'e.g. Duplicate of another record',
           message: subName(inv.subcontractor_id) + ' · ' + money(inv.total) + ' · ' + STATUS_LABEL[inv.status] +
-            '\n\nThe record is NOT deleted: it is kept with its days and history, marked Cancelled, and can no longer be corrected or paid.' });
+            (inv.grouped_by
+              ? '\n\nThe invoice is NOT deleted: it is kept with its number, original lines and history, marked Cancelled. ' +
+                'Its days go back to "waiting for an invoice" so you can put them in a NEW invoice (new number). This number is never reused.'
+              : '\n\nThe record is NOT deleted: it is kept with its days and history, marked Cancelled, and can no longer be corrected or paid.') });
         if (!note) return;   // went back: nothing was changed
         btn.disabled = true;
         await set('cancelled', { p_note: note });

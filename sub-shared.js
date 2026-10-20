@@ -1,8 +1,9 @@
 // Shared by subcontractor.html (worker) and subcontractor-admin.js (Admin/CRM):
 //   SubShared.fillDuration(select, maxMinutes, value)  — duration list in 10-minute steps
 //   SubShared.openInvoice(data)                         — on-screen invoice with Print / Save as PDF
-// The invoice shows hours and amounts, ONE travel-time line (total time and amount) and
-// totals. It never shows rates or bank details. All text is set with textContent.
+// Invoices made in Admin from sent days (data.grouped) show ONE line per day (date, work, time,
+// hours, the day's amount including travel) and the totals. Older records keep their original
+// layout (days + ONE travel-time line). Never rates or bank details. All text is set with textContent.
 (function () {
   'use strict';
 
@@ -13,6 +14,8 @@
     return e;
   }
   function money(n) { return '$' + Number(n || 0).toFixed(2); }
+  // Amount of one day: work + travel (lists from the database also carry it as "amount").
+  function dayAmount(d) { return d.amount != null ? Number(d.amount) : Number(d.labour_amount || 0) + Number(d.travel_amount || 0); }
   function label(min) {
     if (!min) return 'None';
     var h = Math.floor(min / 60), m = min % 60;
@@ -50,8 +53,9 @@
 
   // data: { invoice_number, submitted_at, status, paid_at, payment_number, payment_method, payment_reference,
   //         worker{full_name,address,email,phone,abn,gst_registered}, company{name,abn,address},
-  //         days[{work_date, role|job_type, start_time, finish_time, break_minutes, travel_minutes, work_hours, labour_amount}],
-  //         labour_total, travel_total, subtotal, gst_amount, total, declaration_text, declaration_accepted_at }
+  //         days[{work_date, role|job_type, start_time, finish_time, break_minutes, travel_minutes, work_hours, labour_amount, travel_amount, amount?}],
+  //         labour_total, travel_total, subtotal, gst_amount, total, declaration_text, declaration_accepted_at,
+  //         grouped (true = invoice made in Admin from sent days: one line per day) }
   function openInvoice(data) {
     ensureStyle();
     var old = document.getElementById('subInvoiceView'); if (old) old.remove();
@@ -95,27 +99,47 @@
 
     var t = el('table');
     var hr = el('tr');
-    [['Date'], ['Role'], ['Time'], ['Unpaid break'], ['Hours', 1], ['Amount', 1]].forEach(function (h) { hr.appendChild(el('th', h[1] ? 'text-align:right' : null, h[0])); });
-    t.appendChild(hr);
-    var travelMin = 0;
-    (data.days || []).forEach(function (d) {
-      travelMin += Number(d.travel_minutes || 0);
-      var tr = el('tr');
-      tr.appendChild(el('td', null, d.work_date));
-      tr.appendChild(el('td', null, d.role || d.job_type || ''));
-      tr.appendChild(el('td', null, String(d.start_time).slice(0, 5) + '–' + String(d.finish_time).slice(0, 5)));
-      tr.appendChild(el('td', null, label(Number(d.break_minutes || 0))));
-      tr.appendChild(el('td', 'text-align:right', Number(d.work_hours).toFixed(2) + ' h'));
-      tr.appendChild(el('td', 'text-align:right', money(d.labour_amount)));
-      t.appendChild(tr);
-    });
-    if (Number(data.travel_total) > 0 || travelMin > 0) {
-      var trv = el('tr');
-      trv.appendChild(el('td', null, 'Travel time'));
-      trv.appendChild(el('td')); trv.appendChild(el('td')); trv.appendChild(el('td'));
-      trv.appendChild(el('td', 'text-align:right', label(travelMin)));
-      trv.appendChild(el('td', 'text-align:right', money(data.travel_total)));
-      t.appendChild(trv);
+    if (data.grouped) {
+      [['Date'], ['Work'], ['Time'], ['Hours', 1], ['Amount', 1]].forEach(function (h) { hr.appendChild(el('th', h[1] ? 'text-align:right' : null, h[0])); });
+      t.appendChild(hr);
+      (data.days || []).forEach(function (d) {
+        var tr = el('tr');
+        tr.appendChild(el('td', null, d.work_date));
+        var work = el('td', null, d.role || d.job_type || '');
+        var extra = [];
+        if (Number(d.break_minutes)) extra.push('unpaid break ' + label(Number(d.break_minutes)));
+        if (Number(d.travel_minutes)) extra.push('incl. travel ' + label(Number(d.travel_minutes)));
+        if (extra.length) work.appendChild(el('div', 'font-size:11px;color:#666', extra.join(' · ')));
+        tr.appendChild(work);
+        tr.appendChild(el('td', null, String(d.start_time).slice(0, 5) + '–' + String(d.finish_time).slice(0, 5)));
+        tr.appendChild(el('td', 'text-align:right', Number(d.work_hours).toFixed(2) + ' h'));
+        tr.appendChild(el('td', 'text-align:right', money(dayAmount(d))));
+        t.appendChild(tr);
+      });
+    } else {
+      // Older records keep their original layout.
+      [['Date'], ['Role'], ['Time'], ['Unpaid break'], ['Hours', 1], ['Amount', 1]].forEach(function (h) { hr.appendChild(el('th', h[1] ? 'text-align:right' : null, h[0])); });
+      t.appendChild(hr);
+      var travelMin = 0;
+      (data.days || []).forEach(function (d) {
+        travelMin += Number(d.travel_minutes || 0);
+        var tr = el('tr');
+        tr.appendChild(el('td', null, d.work_date));
+        tr.appendChild(el('td', null, d.role || d.job_type || ''));
+        tr.appendChild(el('td', null, String(d.start_time).slice(0, 5) + '–' + String(d.finish_time).slice(0, 5)));
+        tr.appendChild(el('td', null, label(Number(d.break_minutes || 0))));
+        tr.appendChild(el('td', 'text-align:right', Number(d.work_hours).toFixed(2) + ' h'));
+        tr.appendChild(el('td', 'text-align:right', money(d.labour_amount)));
+        t.appendChild(tr);
+      });
+      if (Number(data.travel_total) > 0 || travelMin > 0) {
+        var trv = el('tr');
+        trv.appendChild(el('td', null, 'Travel time'));
+        trv.appendChild(el('td')); trv.appendChild(el('td')); trv.appendChild(el('td'));
+        trv.appendChild(el('td', 'text-align:right', label(travelMin)));
+        trv.appendChild(el('td', 'text-align:right', money(data.travel_total)));
+        t.appendChild(trv);
+      }
     }
     sheet.appendChild(t);
 
@@ -212,6 +236,6 @@
     return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
   }
 
-  window.SubShared = { fillDuration: fillDuration, openInvoice: openInvoice, durationLabel: label,
+  window.SubShared = { fillDuration: fillDuration, openInvoice: openInvoice, durationLabel: label, dayAmount: dayAmount,
     dialog: dialog, toast: toast, localToday: localToday };
 })();

@@ -100,13 +100,18 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       <div id="totals"></div>
       <label class="check" style="align-items:flex-start;margin-top:12px"><input type="checkbox" id="declAccept" style="margin-top:2px">
         <span id="declText" style="font-size:13px"></span></label>
-      <button class="btn btn-green" id="submitBtn" style="margin-top:4px">Send invoice</button>
-      <p class="muted" style="margin-top:8px">After sending, these days are locked and can only be corrected by the office. You can keep using this link for future days.</p>
+      <button class="btn btn-green" id="submitBtn" style="margin-top:4px">Send all days</button>
+      <p class="muted" style="margin-top:8px">You can send each day on its own (button on the day) or all of them at once. After sending, a day is locked and can only be corrected by the office. The office puts your sent days into an invoice. You can keep using this link for future days.</p>
     </div>
 
     <div class="card">
-      <h2>Sent</h2>
-      <div id="sent" class="muted">Nothing sent yet.</div>
+      <h2>Sent — waiting for the invoice</h2>
+      <div id="waiting" class="muted">No days waiting.</div>
+    </div>
+
+    <div class="card">
+      <h2>Invoices</h2>
+      <div id="sent" class="muted">No invoices yet.</div>
     </div>
   </div>
 </div>
@@ -143,14 +148,17 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     day_duplicate: 'You already have a day with the same date and start time.',
     day_locked_or_missing: 'This day was already sent and can no longer be changed.',
     profile_incomplete: 'Please complete your details (name, address, email, ABN and bank details) before sending.',
-    no_open_days: 'There are no new days to send.'
+    no_open_days: 'There are no new days to send.',
+    too_many_days: 'Please send at most 100 days at a time.',
+    flow_changed: 'This page was updated. Please reload it and send your days again.',
+    new_flow_paused: 'Sending days this way is paused by the office. Please reload the page and try again.'
   };
 
   var token = (function () {
     var m = /(?:^|&)t=([A-Za-z0-9_-]{43})(?:&|$)/.exec(location.hash.replace(/^#/, ''));
     return m ? m[1] : '';
   })();
-  var state = { profile: {}, roleSuggestions: [], openDays: [], invoices: [], gst: false };
+  var state = { profile: {}, roleSuggestions: [], openDays: [], sentDays: [], invoices: [], gst: false };
 
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -212,7 +220,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       var c = el('div', 'day');
       var top = el('div', 'day-top');
       top.appendChild(el('span', null, d.work_date + ' · ' + d.job_type));
-      top.appendChild(el('span', null, money(d.labour_amount)));
+      top.appendChild(el('span', null, money(SubShared.dayAmount(d))));
       c.appendChild(top);
       var info = d.start_time + '–' + d.finish_time + ' · ' + d.work_hours + ' h';
       if (d.break_minutes) info += ' · break ' + SubShared.durationLabel(d.break_minutes);
@@ -222,31 +230,47 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       var a = el('div', 'day-actions');
       var eb = el('button', null, 'Edit'); eb.type = 'button'; eb.onclick = function () { editDay(d); };
       var db = el('button', null, 'Delete'); db.type = 'button'; db.onclick = function () { deleteDay(d); };
-      a.appendChild(eb); a.appendChild(db); c.appendChild(a);
+      var sb = el('button', null, 'Send this day'); sb.type = 'button'; sb.onclick = function () { sendDays([d]); };
+      a.appendChild(eb); a.appendChild(db); a.appendChild(sb); c.appendChild(a);
       box.appendChild(c);
     });
     var t = $('totals'); t.textContent = '';
     if (state.openDays.length) {
       var sub = Math.round((labour + travel) * 100) / 100;
       var gst = state.gst ? Math.round(sub * 10) / 100 : 0;
-      [['Work', labour], ['Travel time', travel]].forEach(function (r) {
-        if (r[0] === 'Travel time' && !travel) return;
-        var l = el('div', 'line'); l.appendChild(el('span', null, r[0])); l.appendChild(el('span', null, money(r[1]))); t.appendChild(l);
-      });
+      var l = el('div', 'line'); l.appendChild(el('span', null, 'Days (travel included)')); l.appendChild(el('span', null, money(sub))); t.appendChild(l);
       if (state.gst) { var g = el('div', 'line'); g.appendChild(el('span', null, 'GST')); g.appendChild(el('span', null, money(gst))); t.appendChild(g); }
       var tot = el('div', 'line total'); tot.appendChild(el('span', null, 'Total')); tot.appendChild(el('span', null, money(sub + gst))); t.appendChild(tot);
       t.appendChild(el('p', 'muted', 'Estimate. The final amount is calculated by the office system when you send.'));
     }
     $('submitBtn').disabled = !state.openDays.length;
+    $('submitBtn').textContent = state.openDays.length > 1 ? 'Send all ' + state.openDays.length + ' days' : 'Send day';
+  }
+
+  // Sent days are locked for the worker; the office groups them into an invoice.
+  function renderWaiting() {
+    var box = $('waiting'); box.textContent = '';
+    if (!state.sentDays.length) { box.textContent = 'No days waiting.'; return; }
+    state.sentDays.forEach(function (d) {
+      var c = el('div', 'day');
+      var top = el('div', 'day-top');
+      top.appendChild(el('span', null, d.work_date + ' · ' + (d.role || d.job_type)));
+      top.appendChild(el('span', null, money(SubShared.dayAmount(d))));
+      c.appendChild(top);
+      c.appendChild(el('div', 'muted', d.start_time + '–' + d.finish_time + ' · ' + d.work_hours + ' h' +
+        (d.travel_minutes ? ' · travel ' + SubShared.durationLabel(d.travel_minutes) : '') + ' · sent ' + String(d.sent_at).slice(0, 10)));
+      box.appendChild(c);
+    });
+    box.appendChild(el('p', 'muted', 'The office will put these days into an invoice. It will appear under Invoices.'));
   }
 
   function renderSent() {
     var box = $('sent'); box.textContent = '';
-    if (!state.invoices.length) { box.textContent = 'Nothing sent yet.'; return; }
+    if (!state.invoices.length) { box.textContent = 'No invoices yet.'; return; }
     state.invoices.forEach(function (i) {
       var wrap = el('div', 'day');
       var l = el('div', 'line'); l.style.cursor = 'pointer';
-      l.appendChild(el('span', null, i.invoice_number + ' · ' + String(i.submitted_at).slice(0, 10) + (i.payment_number ? ' · ' + i.payment_number : '')));
+      l.appendChild(el('span', null, i.invoice_number + ' · ' + String(i.submitted_at).slice(0, 10) + (i.days ? ' · ' + i.days + (i.days > 1 ? ' days' : ' day') : '') + (i.payment_number ? ' · ' + i.payment_number : '')));
       var r = el('span'); r.appendChild(el('span', 'badge ' + i.status, i.status)); r.appendChild(document.createTextNode(' ' + money(i.total)));
       l.appendChild(r);
       var detail = el('div'); detail.style.display = 'none';
@@ -264,13 +288,25 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       box.textContent = '';
       var w = inv.worker || {};
       box.appendChild(el('div', 'muted', [w.full_name, 'ABN ' + w.abn, w.address, w.email, w.phone].filter(Boolean).join(' · ')));
-      inv.days.forEach(function (d) {
-        var l = el('div', 'line');
-        l.appendChild(el('span', null, d.work_date + ' · ' + (d.role || d.job_type) + ' · ' + d.start_time + '–' + d.finish_time + ' · ' + d.work_hours + ' h'));
-        l.appendChild(el('span', null, money(d.labour_amount)));
-        box.appendChild(l);
-      });
-      var rows = [['Travel time', inv.travel_total], ['Subtotal', inv.subtotal]];
+      if (inv.grouped) {
+        // invoice made by the office from sent days: one line per day with the day's amount (travel included)
+        inv.days.forEach(function (d) {
+          var l = el('div', 'line');
+          l.appendChild(el('span', null, d.work_date + ' · ' + (d.role || d.job_type) + ' · ' + d.start_time + '–' + d.finish_time + ' · ' + d.work_hours + ' h' +
+            (Number(d.travel_minutes) ? ' · incl. travel ' + SubShared.durationLabel(d.travel_minutes) : '')));
+          l.appendChild(el('span', null, money(SubShared.dayAmount(d))));
+          box.appendChild(l);
+        });
+      } else {
+        // older records: original layout (work per day + one travel-time line)
+        inv.days.forEach(function (d) {
+          var l = el('div', 'line');
+          l.appendChild(el('span', null, d.work_date + ' · ' + (d.role || d.job_type) + ' · ' + d.start_time + '–' + d.finish_time + ' · ' + d.work_hours + ' h'));
+          l.appendChild(el('span', null, money(d.labour_amount)));
+          box.appendChild(l);
+        });
+      }
+      var rows = [['Travel time', inv.grouped ? 0 : inv.travel_total], ['Subtotal', inv.subtotal]];
       if (inv.worker && inv.worker.gst_registered) rows.push(['GST', inv.gst_amount]);
       rows.forEach(function (r) {
         if (r[0] === 'Travel time' && !Number(r[1])) return;
@@ -302,8 +338,8 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
   async function load() {
     var data = await rpc('sub_portal_get');
     $('declText').textContent = (data.declaration && data.declaration.text) || '';
-    state.profile = data.profile; state.roleSuggestions = data.role_suggestions || []; state.openDays = data.open_days || []; state.invoices = data.invoices || [];
-    renderCompany(data.company); renderProfile(data.profile); renderJobs(); renderDays(); renderSent();
+    state.profile = data.profile; state.roleSuggestions = data.role_suggestions || []; state.openDays = data.open_days || []; state.sentDays = data.sent_days || []; state.invoices = data.invoices || [];
+    renderCompany(data.company); renderProfile(data.profile); renderJobs(); renderDays(); renderWaiting(); renderSent();
     $('dDate').max = data.today; if (!$('dDate').value) $('dDate').value = data.today;
     $('loading').style.display = 'none'; $('app').style.display = 'block';
   }
@@ -354,20 +390,22 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     });
   }
 
-  $('submitBtn').onclick = async function () {
-    var btn = this;
-    if (!$('declAccept').checked) { showMsg(ERRORS.declaration_required); return; }
-    if (!(await SubShared.dialog({ title: 'Send ' + state.openDays.length + ' day(s) to the office?',
-      message: 'After sending you cannot change them.', confirmText: 'Send invoice', cancelText: 'Not yet' }))) return;
-    withButton(btn, async function () {
-      var res = await fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token, action: 'submit', declaration_accepted: $('declAccept').checked === true }) });
-      var data = null; try { data = await res.json(); } catch (e) { data = null; }
-      if (!res.ok || !data || !data.ok) { var err = new Error('submit'); err.code = data && data.error; throw err; }
+  // Sends the given days (or all days not sent yet). No invoice is created here: the office does that.
+  async function sendDays(days) {
+    if (!$('declAccept').checked) { showMsg(ERRORS.declaration_required); $('declAccept').focus(); return; }
+    var list = days || state.openDays;
+    var title = list.length === 1 ? 'Send the day ' + list[0].work_date + ' to the office?' : 'Send ' + list.length + ' days to the office?';
+    if (!(await SubShared.dialog({ title: title, message: 'After sending you cannot change ' + (list.length === 1 ? 'it' : 'them') + '. The office puts sent days into an invoice.',
+      confirmText: 'Send', cancelText: 'Not yet' }))) return;
+    withButton($('submitBtn'), async function () {
+      var r = await rpc('sub_portal_send_days', { p_day_ids: days ? days.map(function (d) { return d.id; }) : null, p_declaration_accepted: $('declAccept').checked === true });
       $('declAccept').checked = false;
+      if ($('dId').value && list.some(function (d) { return d.id === $('dId').value; })) resetDayForm();
       await load();
-      showMsg('Sent: ' + data.invoice_number + ' — total ' + money(data.total) + '. Status: pending.', true);
+      showMsg('Sent: ' + r.sent + (r.sent > 1 ? ' days' : ' day') + '. The office will put ' + (r.sent > 1 ? 'them' : 'it') + ' into an invoice.', true);
     });
-  };
+  }
+  $('submitBtn').onclick = function () { sendDays(null); };
 
   if (!token) { $('loading').style.display = 'none'; showMsg(ERRORS.invalid_link); return; }
   SubShared.fillDuration($('dBreak'), 120, 0); SubShared.fillDuration($('dTravel'), 240, 0);
