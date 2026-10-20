@@ -465,7 +465,7 @@
     day_adjusted: 'Day corrected', status_changed: 'Status changed',
     bank_viewed: 'Bank details viewed', payment_blocked: 'Payment blocked', email_send_started: 'E-mail sent again', email_result: 'E-mail result' };
   var FIELD_LABEL = { role: 'job', start_time: 'start', finish_time: 'finish', break_minutes: 'unpaid break (min)',
-    travel_minutes: 'travel (min)', work_hours: 'hours', labour_amount: 'labour $', travel_amount: 'travel $',
+    travel_minutes: 'travel (min)', hourly_rate: 'hourly rate $/h', travel_rate: 'travel rate $/h', work_hours: 'hours', travel_hours: 'travel hours', labour_amount: 'labour $', travel_amount: 'travel $',
     record_total: 'record total $', status: 'status', paid_at: 'paid on', payment_method: 'method',
     payment_reference: 'reference', payment_number: 'payment', kind: 'e-mail', attempt: 'attempt' };
   function histValue(k, v) { return v == null ? '—' : String(v).slice(0, /_time$/.test(k) ? 5 : 45); }
@@ -555,7 +555,7 @@
             ' (break ' + d.break_minutes + 'm) · ' + calc }),
       d.notes ? el('div', { style: 'color:#888', text: d.notes }) : null
     ]);
-    if (editable) row.appendChild(el('button', { style: BTN, text: '✎ Correct hours / job', onclick: function () { adjustForm(row, d, inv); } }));
+    if (editable) row.appendChild(el('button', { style: BTN, text: '✎ Correct hours / job / rate', onclick: function () { adjustForm(row, d, inv); } }));
     return row;
   }
 
@@ -566,11 +566,12 @@
     var fi = el('input', { type: 'time', style: INPUT, value: d.finish_time.slice(0, 5), title: 'Finish' });
     var br = el('select', { style: INPUT, title: 'Unpaid break' }); SubShared.fillDuration(br, 120, d.break_minutes);
     var tr = el('select', { style: INPUT, title: 'Travel time' }); SubShared.fillDuration(tr, 240, d.travel_minutes);
+    var rate = el('input', { type: 'number', min: '1', max: '999.99', step: '0.01', style: INPUT, value: Number(d.hourly_rate).toFixed(2), title: 'Hourly rate for this job' });
     var reason = el('input', { style: INPUT + ';width:100%', placeholder: 'Reason for the correction (required, saved in history)', maxlength: '500' });
     var lab = function (t, f) { return el('label', { style: 'display:inline-block;margin:2px 6px 2px 0;font-size:11px;color:#555' }, [t, el('br'), f]); };
     var form = el('form', { style: 'margin-top:6px;background:#fafafa;padding:6px;border-radius:6px' }, [
-      lab('Job / role', job), lab('Start', st), lab('Finish', fi), lab('Unpaid break', br), lab('Travel time', tr), reason,
-      el('div', { style: 'font-size:11px;color:#666;margin:2px 0', text: 'The record keeps its status. Amounts change only if the hours change.' }),
+      lab('Job / role', job), lab('Start', st), lab('Finish', fi), lab('Unpaid break', br), lab('Travel time', tr), lab('Hourly rate ($/h)', rate), reason,
+      el('div', { style: 'font-size:11px;color:#666;margin:2px 0', text: 'This changes the rate for this job only. Travel is recalculated at half the hourly rate. The reason is saved in history.' }),
       el('button', { type: 'submit', style: BTN_G, text: 'Save correction' }),
       el('button', { type: 'button', style: BTN, text: 'Close', onclick: function () { form.remove(); } })
     ]);
@@ -578,13 +579,15 @@
       ev.preventDefault();
       if (reason.value.trim().length < 3) { reason.focus(); return toast(ERRORS.reason_required); }
       if (!job.value.trim()) { job.focus(); return toast(ERRORS.role_required); }
-      var r = await db.rpc('sub_admin_adjust_day', { p_day_id: d.id, p_role: job.value.trim(), p_start: st.value, p_finish: fi.value,
-        p_break_minutes: Number(br.value || 0), p_travel_minutes: Number(tr.value || 0), p_reason: reason.value.trim() });
+      var rateValue = Math.round(Number(rate.value) * 100) / 100;   // the database stores cents
+      if (!(rateValue > 0 && rateValue < 1000)) { rate.focus(); return toast(ERRORS.rate_invalid); }
+      var r = await db.rpc('sub_admin_adjust_day_rate', { p_day_id: d.id, p_role: job.value.trim(), p_start: st.value, p_finish: fi.value,
+        p_break_minutes: Number(br.value || 0), p_travel_minutes: Number(tr.value || 0), p_hourly_rate: rateValue, p_reason: reason.value.trim() });
       if (r.error) return fail(r.error);
       toast(r.data && r.data.status === 'awaiting_invoice'
         ? 'Correction saved. This day is not in an invoice yet; the new amount is used when you create the invoice.'
         : r.data && r.data.amounts_changed
-        ? 'Correction saved. Record total: ' + money(r.data.total_before) + ' → ' + money(r.data.total_after) + '. Status unchanged.'
+        ? 'Correction saved. Record total: ' + money(r.data.total_before) + ' → ' + money(r.data.total_after) + '. Status unchanged. The worker\'s link already shows the corrected record; copies already e-mailed are not sent again.'
         : 'Correction saved (job/role only). Total unchanged. Status unchanged.');
       await refresh();
     };
