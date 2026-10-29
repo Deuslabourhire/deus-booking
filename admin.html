@@ -169,6 +169,7 @@
       <button class="tab" onclick="switchTab(&#39;Calc&#39;,this)">🧮 Calc</button>
       <button class="tab" onclick="switchTab(&#39;Invoice&#39;,this)">🧾 Invoice</button>
       <button class="tab" onclick="switchTab('Draw',this)">🎁 Draw</button>
+      <button class="tab" onclick="switchTab('Subs',this)">🧑‍🔧 Subcontractors</button>
     </div>
   
     <div id="tabCalendar">
@@ -525,6 +526,7 @@
       </div>
     </div>
   
+    <div id="tabSubs" style="display:none"></div>
   <div class="modal-overlay" id="modalOverlay">
     <div class="modal">
       <h3 id="modalTitle">Add New Job</h3>
@@ -554,6 +556,8 @@
   </div>
   
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./sub-shared.js"></script>
+  <script src="./subcontractor-admin.js"></script>
   <script>
   const SUPABASE_URL='https://amnacoyjgdfykdfepkze.supabase.co';
   const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtbmFjb3lqZ2RmeWtkZmVwa3plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxODI4MzAsImV4cCI6MjA5MDc1ODgzMH0.ma37AnfeaDdIN42TNUpt7EVoNYvT6nHQFJra-4XS_Pc';
@@ -796,7 +800,7 @@
     closeModal();renderAll();
   }
   
-  function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Calendar','Clients','Docs','Calc','Invoice','Draw'].forEach(t=>$('tab'+t).style.display='none');$('tab'+name).style.display='block';}
+  function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Calendar','Clients','Docs','Calc','Invoice','Draw','Subs'].forEach(t=>$('tab'+t).style.display='none');$('tab'+name).style.display='block';if(name==='Subs'&&window.SubAdmin){SubAdmin.init(db,$('tabSubs'));}}
   function switchDoc(name){$('docContent').textContent=name==='tc'?TERMS_TEXT:SA_TEXT;$('docTabTC').className='doc-tab-btn'+(name==='tc'?' active':'');$('docTabSA').className='doc-tab-btn'+(name==='sa'?' active':'');}
   function fmtTime(t){if(!t)return '';const[h,m]=t.split(':'),hr=parseInt(h);return `${hr>12?hr-12:hr||12}:${m} ${hr>=12?'PM':'AM'}`;}
   $('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
