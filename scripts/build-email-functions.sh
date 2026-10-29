@@ -13,7 +13,36 @@ transport="$root/_shared/email-transport.ts"
 [[ "$target" == test ]] && transport="$root/_shared/email-transport.dryrun.ts"
 
 declare -A shared=( [resend-email]="request.ts sanitize-email-html.ts" [sub-invoice-submit]="request.ts" )
-rm -rf "$out"; mkdir -p "$out"
+
+# Output folder safety. The folder is emptied before each build, so only a folder this script
+# made itself is ever deleted:
+#   * the parent folder must already exist; the last part cannot be empty, "." or "..";
+#   * the folder cannot be a symlink, "/", $HOME, the repository, or any folder that contains them;
+#   * if it already exists and is not empty, it must carry the marker file written by an earlier
+#     build. Any other existing folder is refused, never deleted.
+fail() { echo "FAIL: $*" >&2; exit 2; }
+marker=".email-functions-build"
+while [[ "$out" == */ ]]; do out="${out%/}"; done
+[[ -n "$out" ]] || fail "output folder cannot be /"
+name="$(basename -- "$out")"; parent="$(dirname -- "$out")"
+[[ "$name" != "." && "$name" != ".." ]] || fail "output folder cannot end in . or .."
+[[ -d "$parent" ]] || fail "parent folder does not exist: $parent"
+parent="$(cd -- "$parent" && pwd -P)"; out="${parent%/}/$name"
+repo="$(cd "$(dirname "$0")/.." && pwd -P)"
+for keep in / "$repo" "${HOME:+$(cd -- "$HOME" 2>/dev/null && pwd -P)}"; do
+  [[ -n "$keep" ]] || continue
+  [[ "$out" != "$keep" && "${keep%/}/" != "$out/"* ]] || fail "refusing to use $out (it is or contains $keep)"
+done
+if [[ -L "$out" ]]; then fail "output folder is a symlink: $out"; fi
+if [[ -e "$out" ]]; then
+  [[ -d "$out" ]] || fail "output path exists and is not a folder: $out"
+  if [[ -n "$(ls -A -- "$out")" && ! -f "$out/$marker" ]]; then
+    fail "$out is not empty and was not made by this script (no $marker); choose a new or empty folder"
+  fi
+  rm -rf -- "$out"
+fi
+mkdir -- "$out"
+: > "$out/$marker"
 built=()
 for fn in "${!shared[@]}"; do
   [[ -d "$root/$fn" ]] || continue   # a function that is not in this branch yet is skipped
