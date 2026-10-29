@@ -36,6 +36,7 @@
     travel_invalid: 'Travel time: choose a value from the list (10-minute steps, up to 4 h).',
     invoice_closed: 'This record is Paid or Cancelled, so it can no longer be corrected.',
     day_not_submitted: 'This day is not part of a sent record.',
+    day_changed: 'This day was moved to or from an invoice by another action while you were editing. Nothing was saved. The list was refreshed: check the day and try again.',
     transition_not_allowed: 'That status change is not allowed for this record.',
     use_void_payment: 'This record is Paid. Undo the payment first (in the record), then you can cancel it.',
     use_record_payment: 'Use the payment bar to record a payment.',
@@ -52,7 +53,12 @@
     bank_alert_pending: 'This subcontractor changed their bank details. Review and acknowledge the bank-change alert first, then create the invoice.',
     profile_incomplete: 'The subcontractor\'s details are incomplete (name, address, e-mail, ABN or bank details).'
   };
-  function fail(e) { var c = e && (e.message || e.code); toast(ERRORS[c] || ('The database refused the change: ' + (c || 'unknown error') + '.'), true); }
+  // Postgres deadlock (SQLSTATE 40P01): the database cancelled this transaction, so nothing was saved.
+  var DEADLOCK_MSG = 'Another change was being saved at the same moment, so this one was not saved. Please try again.';
+  function fail(e) {
+    if (e && e.code === '40P01') return toast(DEADLOCK_MSG, true);
+    var c = e && (e.message || e.code); toast(ERRORS[c] || ('The database refused the change: ' + (c || 'unknown error') + '.'), true);
+  }
   var BTN = 'padding:6px 10px;border-radius:7px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:12px;margin:2px';
   var BTN_G = 'padding:6px 10px;border-radius:7px;border:none;background:#1a8a1a;color:#fff;cursor:pointer;font-size:12px;margin:2px';
   var CARD = 'background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:12px;margin-bottom:10px';
@@ -583,7 +589,12 @@
       if (!(rateValue > 0 && rateValue < 1000)) { rate.focus(); return toast(ERRORS.rate_invalid); }
       var r = await db.rpc('sub_admin_adjust_day_rate', { p_day_id: d.id, p_role: job.value.trim(), p_start: st.value, p_finish: fi.value,
         p_break_minutes: Number(br.value || 0), p_travel_minutes: Number(tr.value || 0), p_hourly_rate: rateValue, p_reason: reason.value.trim() });
-      if (r.error) return fail(r.error);
+      if (r.error) {
+        fail(r.error);
+        // The day's invoice link changed under us: the form shows stale data, so reload the list.
+        if (r.error.message === 'day_changed') await refresh();
+        return;
+      }
       toast(r.data && r.data.status === 'awaiting_invoice'
         ? 'Correction saved. This day is not in an invoice yet; the new amount is used when you create the invoice.'
         : r.data && r.data.amounts_changed
