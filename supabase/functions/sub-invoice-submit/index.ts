@@ -9,9 +9,10 @@
 //
 // Actions (POST JSON):
 //   {token, action: "submit", declaration_accepted: true}
-//       -> rpc sub_portal_submit (service_role only; the database re-checks the
-//          declaration) -> record created, open days locked -> worker copy +
-//          optional admin copy -> rpc sub_record_email_status.
+//       -> OLD flow, switched off by migration 20261020120000: the database answers
+//          flow_changed (409, "reload the page"). Workers now send days with the RPC
+//          sub_portal_send_days, and the Admin creates the invoice from sent days; the
+//          copy of that invoice to the worker goes through "resend_email" below.
 //   {token, action: "bank_changed"}
 //       -> rpc sub_claim_bank_alerts (alerts already queued by the database when
 //          the worker changed existing bank details) -> admin e-mail alert AND a
@@ -71,13 +72,14 @@ const KNOWN_ERRORS: Record<string, [number, string]> = {
   declaration_required: [400, "Please confirm the declaration before sending."],
   profile_incomplete: [400, "Please complete your details (name, address, email, ABN and bank details) before sending."],
   no_open_days: [400, "There are no new days to send."],
+  flow_changed: [409, "This page was updated. Please reload it and send your days again."],
 };
 
 // Day lines as returned by the database: hours and amounts only (no rates, no bank data).
 type Day = {
   work_date: string; job_type: string; start_time: string; finish_time: string;
   break_minutes: number; work_hours: number; labour_amount: number;
-  travel_minutes: number; travel_amount: number;
+  travel_minutes: number; travel_amount: number; amount?: number;
 };
 type Submitted = {
   invoice_id: string; invoice_number: string; submitted_at: string;
@@ -85,6 +87,7 @@ type Submitted = {
   labour_total: number; travel_total: number; subtotal: number; gst_amount: number; total: number;
   declaration_text: string; declaration_accepted_at: string;
   days: Day[];
+  grouped?: boolean;   // invoice made by the Admin from sent days
 };
 type Masked = { account_name: string | null; bsb: string | null; account_number: string | null };
 type BankAlert = {
@@ -123,6 +126,15 @@ function esc(v: unknown): string {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }
 const money = (n: number) => "$" + Number(n).toFixed(2);
+// Amount of one day: work + travel (the database also sends it as "amount").
+const dayAmount = (d: Day) => d.amount ?? Number(d.labour_amount) + Number(d.travel_amount);
+// One line per day: date, work (+ travel time included), time, hours, the day's amount.
+function dayRows(days: Day[]): string {
+  return days.map((d) =>
+    `<tr><td>${esc(d.work_date)}</td><td>${esc(d.job_type)}${Number(d.travel_minutes) ? ` <small>(incl. travel ${esc(d.travel_minutes)} min)</small>` : ""}</td>` +
+    `<td>${esc(d.start_time)}–${esc(d.finish_time)}</td>` +
+    `<td style="text-align:right">${esc(d.work_hours)} h</td><td style="text-align:right">${money(dayAmount(d))}</td></tr>`).join("");
+}
 
 async function rpc(fn: string, args: Record<string, unknown>): Promise<{ ok: boolean; data: unknown }> {
   const url = Deno.env.get("SUPABASE_URL");
@@ -139,9 +151,10 @@ async function rpc(fn: string, args: Record<string, unknown>): Promise<{ ok: boo
   return { ok: res.ok, data };
 }
 
+// Older records (sent by the worker with the old flow): ORIGINAL layout, unchanged.
 // Worker copy: worker details, days with amounts, ONE travel-time line, totals,
 // and the accepted declaration. No rates, no bank details.
-function workerHtml(s: Submitted): string {
+function legacyWorkerHtml(s: Submitted): string {
   const w = s.worker;
   const rows = s.days.map((d) =>
     `<tr><td>${esc(d.work_date)}</td><td>${esc(d.job_type)}</td><td>${esc(d.start_time)}–${esc(d.finish_time)}</td>` +
@@ -165,7 +178,7 @@ ${rows}${travel}</table>
 }
 
 // Admin copy: summary only (no bank details, no rates). Full detail is in Admin → Subcontractors.
-function adminHtml(s: Submitted): string {
+function legacyAdminHtml(s: Submitted): string {
   const w = s.worker;
   const rows = s.days.map((d) =>
     `<tr><td>${esc(d.work_date)}</td><td>${esc(d.job_type)}</td><td>${esc(d.start_time)}–${esc(d.finish_time)}</td>` +
@@ -180,6 +193,44 @@ function adminHtml(s: Submitted): string {
 <p>Declaration accepted on ${esc(s.declaration_accepted_at)}.</p>
 <p>Review, correct and mark as paid in Admin → Subcontractors.</p></div>`;
 }
+
+// Invoice made by the Admin from sent days (s.grouped): one line per day, the amount includes
+// travel; totals and the accepted declaration. No rates, no bank details.
+function groupedWorkerHtml(s: Submitted): string {
+  const w = s.worker;
+  const gst = w.gst_registered ? `<p>GST: <b>${money(s.gst_amount)}</b></p>` : "";
+  return `<div style="font-family:Arial,sans-serif;max-width:640px">
+<h2>Work record ${esc(s.invoice_number)}</h2>
+<p>Copy of your invoice with ${esc(s.company.name)} (ABN ${esc(s.company.abn)}), made by the office from the days you sent.<br>
+This is a payment record, not a tax invoice.</p>
+<p><b>${esc(w.full_name)}</b> — ABN ${esc(w.abn)}${w.gst_registered ? " — registered for GST" : ""}<br>
+${esc(w.address)}<br>${esc(w.email)}${w.phone ? " · " + esc(w.phone) : ""}</p>
+<table cellpadding="6" style="border-collapse:collapse;width:100%;font-size:13px">
+<tr style="background:#f0f0eb"><th align="left">Date</th><th align="left">Work</th><th align="left">Time</th><th align="right">Hours</th><th align="right">Amount</th></tr>
+${dayRows(s.days)}</table>
+<p>Subtotal: <b>${money(s.subtotal)}</b></p>${gst}<p>Total: <b>${money(s.total)}</b></p>
+<p style="font-size:12px;border-top:1px solid #eee;padding-top:8px">Declaration accepted on ${esc(s.declaration_accepted_at)}:<br>
+<i>${esc(s.declaration_text)}</i></p>
+<p style="color:#888;font-size:12px">Status: pending. The office may correct hours before payment.</p></div>`;
+}
+
+// Office copy of an invoice made by the Admin: same lines (no bank details, no rates).
+function groupedAdminHtml(s: Submitted): string {
+  const w = s.worker;
+  return `<div style="font-family:Arial,sans-serif;max-width:640px">
+<h2>Subcontractor invoice ${esc(s.invoice_number)} — pending</h2>
+<p><b>${esc(w.full_name)}</b> — ABN ${esc(w.abn)} — GST registered: ${w.gst_registered ? "yes" : "no"}</p>
+<table cellpadding="6" border="1" style="border-collapse:collapse;font-size:12px">
+<tr><th>Date</th><th>Work</th><th>Time</th><th>Hours</th><th>Amount</th></tr>${dayRows(s.days)}</table>
+<p>Subtotal ${money(s.subtotal)} · GST ${money(s.gst_amount)} · <b>Total ${money(s.total)}</b></p>
+<p>Declaration accepted on ${esc(s.declaration_accepted_at)}.</p>
+<p>Review, correct and mark as paid in Admin → Subcontractors.</p></div>`;
+}
+
+// The layout follows the record: invoices made by the Admin (grouped) use one line per day;
+// older records keep their original e-mail.
+const workerHtml = (s: Submitted) => s.grouped ? groupedWorkerHtml(s) : legacyWorkerHtml(s);
+const adminHtml = (s: Submitted) => s.grouped ? groupedAdminHtml(s) : legacyAdminHtml(s);
 
 // Admin alert: bank details changed through the personal link. Masked values only.
 function bankAlertHtml(a: BankAlert): string {
