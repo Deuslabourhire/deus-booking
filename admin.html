@@ -139,6 +139,12 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
   .quote-row span{display:block;padding:2px 0;word-break:break-word}
   .quote-row span::before{content:attr(data-label) ": ";font-weight:700;color:#6b7a6b}
 }
+@media (max-width:640px){
+  /* Below 16px, iPhones zoom the page on focus. Small rows of buttons need a finger-sized target. */
+  input,select,textarea{font-size:16px!important}
+  .inv-row button,.quote-row button,#tabSubs button,#dayModalContent button,.action-btn,.tab{min-height:44px}
+  .cal-event{font-size:10px}
+}
 </style>
 </head>
 <body>
