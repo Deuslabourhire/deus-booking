@@ -401,6 +401,8 @@ const EDGE_FUNCTION_URL='https://amnacoyjgdfykdfepkze.supabase.co/functions/v1/c
 let formData={};
 const quoteIdFromUrl = new URLSearchParams(window.location.search).get('quote_id') || null;
 const TOTAL_CHECKS=14;
+function sydneyToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Sydney'}).format(new Date());}
+document.getElementById('date').min=sydneyToday();
 
 function $(id){return document.getElementById(id);}
 function showToast(msg,dur=3500){const el=$('toast');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',dur);}
@@ -427,7 +429,9 @@ function goStep2(){
   if(!name){setFieldError('name',true);ok=false;}else setFieldError('name',false);
   if(!validatePhone(phone)){setFieldError('phone',true);ok=false;}else setFieldError('phone',false);
   if(!validateEmail(email)){setFieldError('email',true);ok=false;}else setFieldError('email',false);
-  if(!date){setFieldError('date',true);ok=false;}else setFieldError('date',false);
+  const dateError=!date?'Select a date.':date<sydneyToday()?'The move date cannot be in the past. Please choose today or a later date.':'';
+  $('f-date').querySelector('.field-error').textContent=dateError||'Select a date.';
+  setFieldError('date',!!dateError);if(dateError)ok=false;
   if(!time){setFieldError('time',true);ok=false;}else setFieldError('time',false);
   if(!pickup){setFieldError('pickup',true);ok=false;}else setFieldError('pickup',false);
   if(!dropoff){setFieldError('dropoff',true);ok=false;}else setFieldError('dropoff',false);
