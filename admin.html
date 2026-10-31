@@ -1503,6 +1503,13 @@ async function saveJob(){
 
 function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Calendar','Clients','Docs','Calc','Invoice','Draw','Quotes','Subs'].forEach(t=>$('tab'+t).style.display='none');$('tab'+name).style.display='block';if(name==='Invoice'){currentInvoiceBookingId=null;currentInvoiceCustomerId=null;}if(name==='Subs'&&window.SubAdmin){SubAdmin.init(db,$('tabSubs'));}}
 function switchDoc(name){$('docContent').textContent=name==='tc'?TERMS_TEXT:SA_TEXT;$('docTabTC').className='doc-tab-btn'+(name==='tc'?' active':'');$('docTabSA').className='doc-tab-btn'+(name==='sa'?' active':'');}
+function fmtT(h,m){ return (h>12?h-12:(h||12))+':'+(m<10?'0'+m:m)+' '+(h>=12?'PM':'AM'); }
+function fmtD(str){ if(!str)return '-'; var d=new Date(str+'T00:00:00'); return d.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}); }
+// One line of the invoice table. The arguments are HTML: callers escape what comes from the form or the database.
+function invRow(desc,qty,rate,amount){
+  var td='<td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">';
+  return '<tr>'+td+desc+'</td>'+td+qty+'</td>'+td+rate+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">'+amount+'</td></tr>';
+}
 function fmtTime(t){if(!t)return '';const[h,m]=t.split(':'),hr=parseInt(h);return `${hr>12?hr-12:hr||12}:${m} ${hr>=12?'PM':'AM'}`;}
 $('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
 $('docContent').textContent=TERMS_TEXT;
@@ -1533,7 +1540,6 @@ function calcJob(){
   var gstAmt=gst?subtotal*0.1:0,total=subtotal+gstAmt;
   var hrs=Math.floor(totalMins/60),mins=totalMins%60;
   var durStr=hrs>0?(mins>0?hrs+'h '+mins+'min':hrs+'h'):mins+'min';
-  function fmtT(h,m){return (h>12?h-12:(h||12))+':'+('0'+m).slice(-2)+' '+(h>=12?'PM':'AM');}
   document.getElementById('calcDuration').textContent='Duration: '+durStr;
   var rows='';
   rows+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #2a3a2a"><span style="font-size:12px;color:#9aaa9a">Hours</span><span style="font-size:13px;font-weight:600;color:#e8f0e8">'+hours.toFixed(2)+'h</span></div>';
@@ -1780,8 +1786,6 @@ function generateAdminInvoice(){
   var callout = parseFloat(document.getElementById('inv_callout').value)||0;
   var desc = document.getElementById('inv_desc').value.trim()||'Removal Service';
 
-  function fmtT(h,m){ return (h>12?h-12:(h||12))+':'+(m<10?'0'+m:m)+' '+(h>=12?'PM':'AM'); }
-  function fmtD(str){ if(!str)return '-'; var d=new Date(str+'T00:00:00'); return d.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}); }
 
   var extras=[], extraWithoutDesc=false;
   document.querySelectorAll('#inv_extras > div').forEach(function(el){
@@ -1798,7 +1802,7 @@ function generateAdminInvoice(){
     if(!fixedAmt){ showToast('Please enter fixed price amount.'); return; }
     var fixedDesc = document.getElementById('inv_fixed_desc').value.trim()||'Removal Service — Fixed Price';
     subtotal = fixedAmt + extTotal;
-    rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(fixedDesc)+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Fixed</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+fixedAmt.toFixed(2)+'</td></tr>';
+    rows += invRow(esc(fixedDesc),'1','Fixed','$'+fixedAmt.toFixed(2));
     durStr = '—';
   } else {
     if(!start||!finish){ showToast('Please enter start and finish times.'); return; }
@@ -1812,11 +1816,11 @@ function generateAdminInvoice(){
     durStr = hrs>0?(mins>0?hrs+'h '+mins+'min':hrs+'h'):mins+'min';
     var labour=hours*rate;
     subtotal=labour+callout+extTotal;
-    rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(desc)+'<br><small style="color:#888">'+fmtT(sh,sm)+' – '+fmtT(fh,fm)+'</small></td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+hours.toFixed(2)+'h</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+rate.toFixed(2)+'/hr</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+labour.toFixed(2)+'</td></tr>';
-    if(callout>0) rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Call Out Fee</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+callout.toFixed(2)+'</td></tr>';
+    rows+=invRow(esc(desc)+'<br><small style="color:#888">'+fmtT(sh,sm)+' – '+fmtT(fh,fm)+'</small>',hours.toFixed(2)+'h','$'+rate.toFixed(2)+'/hr','$'+labour.toFixed(2));
+    if(callout>0) rows+=invRow('Call Out Fee','1','—','$'+callout.toFixed(2));
   }
 
-  extras.forEach(function(e){ rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(e.desc)+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+e.amt.toFixed(2)+'</td></tr>'; });
+  extras.forEach(function(e){ rows+=invRow(esc(e.desc),'1','—','$'+e.amt.toFixed(2)); });
 
   var discountType = document.getElementById('inv_discount_type').value;
   var discountValue = parseFloat(document.getElementById('inv_discount_value').value)||0;
@@ -2254,12 +2258,10 @@ async function openInvoice(id){
     };
 
     // Render the preview from the saved data (mirrors generateAdminInvoice()'s preview markup, fed from DB values instead of live form fields)
-    function fmtT(h,m){ return (h>12?h-12:(h||12))+':'+(m<10?'0'+m:m)+' '+(h>=12?'PM':'AM'); }
-    function fmtD(str){ if(!str)return '-'; var d=new Date(str+'T00:00:00'); return d.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}); }
 
     var rows = '';
     if(isFixed){
-      rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(inv.fixed_description||'Removal Service — Fixed Price')+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Fixed</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(inv.fixed_amount||0).toFixed(2)+'</td></tr>';
+      rows += invRow(esc(inv.fixed_description||'Removal Service — Fixed Price'),'1','Fixed','$'+Number(inv.fixed_amount||0).toFixed(2));
     } else {
       var timeLabel = '';
       if(ss.start_time && inv.finish_time){
@@ -2267,10 +2269,10 @@ async function openInvoice(id){
         var fh=parseInt(inv.finish_time.split(':')[0]),fm=parseInt(inv.finish_time.split(':')[1]);
         timeLabel = '<br><small style="color:#888">'+fmtT(sh,sm)+' – '+fmtT(fh,fm)+'</small>';
       }
-      rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(inv.description||'Removal Service')+timeLabel+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+Number(inv.hours_worked||0).toFixed(2)+'h</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+Number(inv.hourly_rate||0).toFixed(2)+'/hr</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(inv.labour_amount||0).toFixed(2)+'</td></tr>';
-      if((ss.callout_fee||0)>0) rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Call Out Fee</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(ss.callout_fee).toFixed(2)+'</td></tr>';
+      rows += invRow(esc(inv.description||'Removal Service')+timeLabel,Number(inv.hours_worked||0).toFixed(2)+'h','$'+Number(inv.hourly_rate||0).toFixed(2)+'/hr','$'+Number(inv.labour_amount||0).toFixed(2));
+      if((ss.callout_fee||0)>0) rows += invRow('Call Out Fee','1','—','$'+Number(ss.callout_fee).toFixed(2));
     }
-    extras.forEach(function(e){ rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(e.desc)+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+e.amt.toFixed(2)+'</td></tr>'; });
+    extras.forEach(function(e){ rows += invRow(esc(e.desc),'1','—','$'+e.amt.toFixed(2)); });
 
     document.getElementById('inv_p_num').textContent = inv.invoice_number;
     document.getElementById('inv_p_client').textContent = cs.name || '';
