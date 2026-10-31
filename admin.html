@@ -2072,6 +2072,10 @@ async function submitAddPayment(){
 
   var amount = parsePaymentAmount(document.getElementById('pay_amount').value);
   if(!isFinite(amount) || amount <= 0){ showToast('Enter the amount like 1,500 or 1500.50, greater than 0. A comma only separates thousands.', 6000); return; }
+  if(lastInvoiceCalc && lastInvoiceCalc.totalAmount != null){
+    var outstanding = calculatePaymentTotals(lastLoadedPaymentsRows, lastInvoiceCalc.totalAmount).outstandingBalance;
+    if(Math.round(amount*100) > Math.round(outstanding*100)){ showToast('That is more than the outstanding balance of $'+outstanding.toFixed(2)+'.', 6000); return; }
+  }
 
   var method = document.getElementById('pay_method').value;
   var validMethods = ['bank_transfer','cash','card','other'];
