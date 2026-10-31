@@ -887,11 +887,14 @@ function renderInvoicesList(){
 async function markInvoiceAsSent(id){
   if(!confirm('Mark this invoice as Sent?')) return;
   try{
-    const {error} = await db.from('invoices')
+    // .select(): a filter that matches nothing is not an error, so success has to be checked.
+    const {data, error} = await db.from('invoices')
       .update({ status: 'sent', sent_date: SubShared.sydneyDate() })
       .eq('id', id)
-      .eq('status', 'draft');
+      .eq('status', 'draft')
+      .select('id');
     if(error) throw error;
+    if(!data || !data.length){ showToast('This invoice is no longer a draft. The list was refreshed.', 5000); await loadInvoicesList(); return; }
     showToast('Invoice marked as Sent ✓');
     await loadInvoicesList();
     if(id === currentInvoiceId){
@@ -911,11 +914,13 @@ async function cancelInvoice(id){
   var invoiceNumber = cancelled ? cancelled.invoice_number : '';
   if(!confirm('Cancel invoice '+invoiceNumber+'? This cannot be undone from this screen.')) return;
   try{
-    const {error} = await db.from('invoices')
+    const {data, error} = await db.from('invoices')
       .update({ status: 'cancelled' })
       .eq('id', id)
-      .in('status', ['draft','sent']);
+      .in('status', ['draft','sent'])
+      .select('id');
     if(error) throw error;
+    if(!data || !data.length){ showToast('This invoice can no longer be cancelled: its status changed. The list was refreshed.', 5000); await loadInvoicesList(); return; }
     showToast('Invoice '+invoiceNumber+' cancelled ✓');
     if(id === currentInvoiceId){
       resetAdminInvoice();
@@ -1164,8 +1169,9 @@ async function resumeAutomation(id){
 // re-derives to "Automation Active" as soon as loadQuotes() reloads below.
 async function acceptQuote(id){
   try{
-    const {error} = await db.from('quotes').update({ status: 'accepted', human_takeover_until: null }).eq('id', id).eq('status', 'sent');
+    const {data, error} = await db.from('quotes').update({ status: 'accepted', human_takeover_until: null }).eq('id', id).eq('status', 'sent').select('id');
     if(error) throw error;
+    if(!data || !data.length){ showToast('This quote already changed. The list was refreshed.', 5000); await loadQuotes(); return; }
     showToast('Quote marked as accepted ✓');
     await loadQuotes();
   }catch(e){
@@ -1175,8 +1181,9 @@ async function acceptQuote(id){
 
 async function declineQuote(id){
   try{
-    const {error} = await db.from('quotes').update({ status: 'declined', human_takeover_until: null }).eq('id', id).eq('status', 'sent');
+    const {data, error} = await db.from('quotes').update({ status: 'declined', human_takeover_until: null }).eq('id', id).eq('status', 'sent').select('id');
     if(error) throw error;
+    if(!data || !data.length){ showToast('This quote already changed. The list was refreshed.', 5000); await loadQuotes(); return; }
     showToast('Quote marked as declined ✓');
     await loadQuotes();
   }catch(e){
