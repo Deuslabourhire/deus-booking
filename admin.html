@@ -1673,6 +1673,7 @@ function downloadDoc(id){
 var invExtraCount = 0;
 // True after the form changes: totals and the preview only update on Generate, so they would be out of date.
 var invoiceFormDirty = false;
+var invoicePreviewUnsaved = false; // the preview was generated but not saved: it has no real number yet
 var INVOICE_DIRTY_MSG = 'The form changed. Click Generate Invoice again first.';
 ['input','change'].forEach(function(type){
   $('tabInvoice').addEventListener(type, function(e){ if(/^inv(_|ex)/.test(e.target.id||'')) invoiceFormDirty = true; });
@@ -1859,6 +1860,7 @@ function generateAdminInvoice(){
     durationLabel: durStr
   };
   invoiceFormDirty = false;
+  invoicePreviewUnsaved = true;
 }
 
 function resetAdminInvoice(){
@@ -1883,6 +1885,7 @@ function resetAdminInvoice(){
   currentInvoiceCustomerId = null;
   lastInvoiceCalc = null;
   invoiceFormDirty = false;
+  invoicePreviewUnsaved = false;
   currentInvoiceId = null;
   currentInvoiceStatus = null;
   document.getElementById('inv_num').value = 'PENDING';
@@ -2271,6 +2274,7 @@ async function openInvoice(id){
 
     document.getElementById('inv_preview').style.display='block';
     invoiceFormDirty = false;
+    invoicePreviewUnsaved = false;
 
     document.getElementById('inv_num').value = inv.invoice_number;
     var btnSave = document.getElementById('btnSaveInvoice');
@@ -2349,6 +2353,7 @@ async function saveAdminInvoice(){
         .eq('status', 'draft')
         .select().single();
       if(error || !data){ showToast('Could not update — invoice may no longer be a draft.'); return; }
+      invoicePreviewUnsaved = false;
       showToast('Invoice '+data.invoice_number+' updated ✓');
       document.getElementById('inv_num').value = data.invoice_number;
       document.getElementById('inv_p_num').textContent = data.invoice_number;
@@ -2365,6 +2370,7 @@ async function saveAdminInvoice(){
     const {data,error} = await db.from('invoices').insert(payload).select().single();
     if(error) throw error;
     currentInvoiceId = data.id;
+    invoicePreviewUnsaved = false;
     showToast('Invoice '+data.invoice_number+' saved as draft ✓');
     document.getElementById('inv_num').value = data.invoice_number;
     document.getElementById('inv_p_num').textContent = data.invoice_number;
@@ -2443,6 +2449,7 @@ async function sendInvoiceEmail(){
   var num = document.getElementById('inv_num').value;
   if(!email){ showToast('Please enter client email first.'); return; }
   if(invoiceFormDirty){ showToast(INVOICE_DIRTY_MSG, 5000); return; }
+  if(!currentInvoiceId || invoicePreviewUnsaved){ showToast('Save the invoice first, so it has its real number.', 5000); return; }
 
   var preview = document.getElementById('inv_preview');
   var previewClone = preview.cloneNode(true);
