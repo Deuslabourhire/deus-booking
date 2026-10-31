@@ -62,7 +62,7 @@
 // The token and e-mail bodies are never logged. The database never returns bank
 // numbers to this function, so they cannot appear in any e-mail.
 
-import { BodyError, cleanSubject, isPlainEmail, readJsonLimited } from "../_shared/request.ts";
+import { allowedOrigins, BodyError, cleanSubject, corsHeaders, isPlainEmail, readJsonLimited, reply } from "../_shared/request.ts";
 import { deliver } from "../_shared/email-transport.ts";
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
@@ -97,34 +97,11 @@ type BankAlert = {
   details: { old: Masked; new: Masked; email_changed_in_same_save?: boolean };
 };
 
-function allowedOrigins(): string[] {
-  return (Deno.env.get("ALLOWED_ORIGINS") ?? "https://deuslabourhire.github.io")
-    .split(",").map((s) => s.trim()).filter(Boolean);
-}
-
-function corsHeaders(origin: string | null): Record<string, string> {
-  const h: Record<string, string> = {
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    // supabase-js (functions.invoke, used by the Admin page) also sends apikey and x-client-info;
-    // without them in this list the browser blocks the request after the preflight.
-    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
-    "Vary": "Origin",
-  };
-  if (origin && allowedOrigins().includes(origin)) h["Access-Control-Allow-Origin"] = origin;
-  return h;
-}
-
-function reply(origin: string | null, status: number, body: Record<string, unknown>): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders(origin), "Content-Type": "application/json", "Cache-Control": "no-store" },
-  });
-}
-
 function esc(v: unknown): string {
   return String(v ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }
+const maskedAccount = (x: Masked) => `${esc(x.account_name)} · BSB ${esc(x.bsb)} · Acc ${esc(x.account_number)}`;
 const money = (n: number) => "$" + Number(n).toFixed(2);
 // Amount of one day: work + travel (the database also sends it as "amount").
 const dayAmount = (d: Day) => d.amount ?? Number(d.labour_amount) + Number(d.travel_amount);
@@ -234,7 +211,7 @@ const adminHtml = (s: Submitted) => s.grouped ? groupedAdminHtml(s) : legacyAdmi
 
 // Admin alert: bank details changed through the personal link. Masked values only.
 function bankAlertHtml(a: BankAlert): string {
-  const m = (x: Masked) => `${esc(x.account_name)} · BSB ${esc(x.bsb)} · Acc ${esc(x.account_number)}`;
+  const m = maskedAccount;
   return `<div style="font-family:Arial,sans-serif;max-width:640px">
 <h2>Bank details changed by a subcontractor</h2>
 <p><b>${esc(a.worker ?? a.display_name)}</b> changed their bank details through the personal link on ${esc(a.created_at)}.</p>
@@ -245,7 +222,7 @@ Open Admin → Subcontractors to review and acknowledge this alert.</p></div>`;
 
 // Worker warning: sent to the address on file BEFORE the change. Masked values only.
 function workerBankWarningHtml(a: BankAlert, companyName: string): string {
-  const m = (x: Masked) => `${esc(x.account_name)} · BSB ${esc(x.bsb)} · Acc ${esc(x.account_number)}`;
+  const m = maskedAccount;
   const emailNote = a.details.email_changed_in_same_save
     ? `<p><b>The contact e-mail on your profile was also changed in the same update.</b></p>` : "";
   return `<div style="font-family:Arial,sans-serif;max-width:640px">
@@ -393,7 +370,7 @@ function paymentNoticeHtml(n: PaymentNotice): string {
   const rows = n.invoices.map((i) =>
     `<tr><td>${esc(i.invoice_number)}</td><td style="text-align:right">${money(i.amount)}</td></tr>`).join("");
   const account = n.payment_method === "Bank transfer"
-    ? `<br>Account: ${esc(n.bank_masked.account_name)} · BSB ${esc(n.bank_masked.bsb)} · Acc ${esc(n.bank_masked.account_number)}` : "";
+    ? `<br>Account: ${maskedAccount(n.bank_masked)}` : "";
   return `<div style="font-family:Arial,sans-serif;max-width:640px">
 <h2>Payment ${esc(n.payment_number)}</h2>
 <p>Hi ${esc(n.worker)}, ${esc(n.company)} has recorded a payment for the following work record${n.invoices.length > 1 ? "s" : ""}:</p>

@@ -1,5 +1,30 @@
 // Request helpers shared by the e-mail functions.
 
+// Only https origins count: the Authorization header makes CORS the barrier against other pages.
+export function allowedOrigins(): string[] {
+  return (Deno.env.get("ALLOWED_ORIGINS") ?? "https://deuslabourhire.github.io")
+    .split(",").map((s) => s.trim()).filter((s) => s.startsWith("https://"));
+}
+
+export function corsHeaders(origin: string | null): Record<string, string> {
+  const h: Record<string, string> = {
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    // supabase-js in the browser also sends apikey and x-client-info; without them in this list
+    // the browser blocks the request after the preflight.
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+    "Vary": "Origin",
+  };
+  if (origin && allowedOrigins().includes(origin)) h["Access-Control-Allow-Origin"] = origin;
+  return h;
+}
+
+export function reply(origin: string | null, status: number, body: Record<string, unknown>): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders(origin), "Content-Type": "application/json", "Cache-Control": "no-store" },
+  });
+}
+
 export class BodyError extends Error {}
 
 // Reads at most maxBytes of the body. Stops (and cancels the upload) as soon as the limit
