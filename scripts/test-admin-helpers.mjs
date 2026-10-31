@@ -44,4 +44,11 @@ const at = (iso) => class extends Date { constructor(...a) { super(...(a.length 
 const [today, due] = new Function("Date", dates + "; return [todayStr, dueStr];")(at("2026-10-30T22:00:00Z"));
 assert.deepEqual([today, due], ["2026-10-31", "2026-11-07"]);
 
+// Only the official phone number reaches clients.
+for (const page of ["admin.html", "booking.html", "invoice.html", "subcontractor.html"]) {
+  const text = readFileSync(new URL("../" + page, import.meta.url), "utf8");
+  assert.doesNotMatch(text, /406[ .-]?832[ .-]?721/, page);
+}
+assert.match(readFileSync(new URL("../booking.html", import.meta.url), "utf8"), /wa\.me\/61430008700/);
+
 console.log("ok");

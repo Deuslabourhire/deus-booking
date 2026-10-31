@@ -9,7 +9,7 @@ If you have another move coming up, we'd love to help again. As a returning cust
 Best regards,
 Jefferson Deus
 Deus Labour Hire
-0406 832 721
+0430 008 700
 deus.labour.hire@gmail.com`;
 module.exports = async ({ run, open, sleep }) => {
   await open('admin.html');
