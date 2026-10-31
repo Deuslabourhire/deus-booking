@@ -258,7 +258,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       top.appendChild(el('span', null, money(SubShared.dayAmount(d))));
       c.appendChild(top);
       c.appendChild(el('div', 'muted', d.start_time + '–' + d.finish_time + ' · ' + d.work_hours + ' h' +
-        (d.travel_minutes ? ' · travel ' + SubShared.durationLabel(d.travel_minutes) : '') + ' · sent ' + String(d.sent_at).slice(0, 10)));
+        (d.travel_minutes ? ' · travel ' + SubShared.durationLabel(d.travel_minutes) : '') + ' · sent ' + SubShared.sydneyDate(d.sent_at)));
       box.appendChild(c);
     });
     box.appendChild(el('p', 'muted', 'The office will put these days into an invoice. It will appear under Invoices.'));
@@ -270,7 +270,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
     state.invoices.forEach(function (i) {
       var wrap = el('div', 'day');
       var l = el('div', 'line'); l.style.cursor = 'pointer';
-      l.appendChild(el('span', null, i.invoice_number + ' · ' + String(i.submitted_at).slice(0, 10) + (i.days ? ' · ' + i.days + (i.days > 1 ? ' days' : ' day') : '') + (i.payment_number ? ' · ' + i.payment_number : '')));
+      l.appendChild(el('span', null, i.invoice_number + ' · ' + SubShared.sydneyDate(i.submitted_at) + (i.days ? ' · ' + i.days + (i.days > 1 ? ' days' : ' day') : '') + (i.payment_number ? ' · ' + i.payment_number : '')));
       var r = el('span'); r.appendChild(el('span', 'badge ' + i.status, i.status)); r.appendChild(document.createTextNode(' ' + money(i.total)));
       l.appendChild(r);
       var detail = el('div'); detail.style.display = 'none';
@@ -318,7 +318,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       var view = el('button', 'btn btn-light', 'View / Print PDF'); view.style.marginTop = '6px';
       view.onclick = function (ev) { ev.stopPropagation(); SubShared.openInvoice(inv); };
       box.appendChild(view);
-      if (inv.declaration_text) box.appendChild(el('p', 'muted', 'Declaration accepted ' + String(inv.declaration_accepted_at).slice(0, 16).replace('T', ' ') + ': ' + inv.declaration_text));
+      if (inv.declaration_text) box.appendChild(el('p', 'muted', 'Declaration accepted ' + SubShared.sydneyDateTime(inv.declaration_accepted_at) + ': ' + inv.declaration_text));
     } catch (e) { box.textContent = friendly(e.code); }
   }
 

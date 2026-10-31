@@ -73,7 +73,7 @@
     var left = el('div');
     left.appendChild(el('div', 'font-size:22px;font-weight:bold', 'INVOICE'));
     left.appendChild(el('div', 'font-size:15px;margin-top:2px', data.invoice_number));
-    left.appendChild(el('div', 'color:#666;margin-top:2px', 'Submitted ' + String(data.submitted_at || '').slice(0, 10)));
+    left.appendChild(el('div', 'color:#666;margin-top:2px', 'Submitted ' + sydneyDate(data.submitted_at)));
     var st = el('div', 'text-align:right');
     var paid = data.status === 'paid';
     st.appendChild(el('div', 'display:inline-block;padding:4px 10px;border:2px solid ' + (paid ? '#1a8a1a;color:#1a8a1a' : '#b45309;color:#b45309') +
@@ -155,7 +155,7 @@
 
     if (data.declaration_text) {
       sheet.appendChild(el('p', 'font-size:11px;color:#555;margin-top:20px;border-top:1px solid #eee;padding-top:8px',
-        'Declaration accepted ' + String(data.declaration_accepted_at || '').slice(0, 16).replace('T', ' ') + ': ' + data.declaration_text));
+        'Declaration accepted ' + sydneyDateTime(data.declaration_accepted_at) + ': ' + data.declaration_text));
     }
     sheet.appendChild(el('p', 'font-size:11px;color:#888', 'Payment record — not a tax invoice.'));
 
@@ -230,12 +230,22 @@
     t._timer = setTimeout(function () { t.style.display = 'none'; }, 8000);
   }
 
-  // Today's date on this device (YYYY-MM-DD), not UTC.
-  function localToday() {
-    var d = new Date();
-    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  // Sydney time, like sub_today() in the database. Timestamps arrive in UTC, so cutting the text gives the wrong day.
+  var SYDNEY = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Australia/Sydney', dateStyle: 'short', timeStyle: 'short' });
+  // 'YYYY-MM-DD HH:MM', or '' when there is no valid value.
+  function sydneyDateTime(v) {
+    var d = new Date(v);
+    return v == null || v === '' || isNaN(d) ? '' : SYDNEY.format(d);
+  }
+  // 'YYYY-MM-DD'. Without an argument: today.
+  function sydneyDate(v) { return sydneyDateTime(v === undefined ? Date.now() : v).slice(0, 10); }
+  // Calendar arithmetic on 'YYYY-MM-DD', so no time zone can move the day.
+  function addDays(ymd, n) {
+    var d = new Date(ymd + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
   }
 
   window.SubShared = { fillDuration: fillDuration, openInvoice: openInvoice, durationLabel: label, dayAmount: dayAmount,
-    dialog: dialog, toast: toast, localToday: localToday };
+    dialog: dialog, toast: toast, sydneyDateTime: sydneyDateTime, sydneyDate: sydneyDate, addDays: addDays };
 })();

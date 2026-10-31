@@ -150,7 +150,7 @@
       payBar.appendChild(el('div', { style: 'background:#fff0f0;border:1px solid #fca5a5;border-radius:6px;padding:6px;margin:4px 0',
         text: '⚠ Payment blocked: this subcontractor has an unacknowledged bank-change alert (see above).' }));
     }
-    var date = el('input', { type: 'date', style: INPUT, value: SubShared.localToday(), max: SubShared.localToday() });
+    var date = el('input', { type: 'date', style: INPUT, value: SubShared.sydneyDate(), max: SubShared.sydneyDate() });
     var method = el('select', { style: INPUT }, [el('option', { value: '', text: 'Payment method *' })]
       .concat(PAY_METHODS.map(function (m) { return el('option', { value: m, text: m }); })));
     var ref = el('input', { style: INPUT, placeholder: 'Reference (optional)', maxlength: '120' });
@@ -262,7 +262,7 @@
         cb.checked = daySel.indexOf(d.id) >= 0;
         cb.addEventListener('change', function () { toggleDay(d, cb); });
         var row = dayRow(d, null, true);
-        row.insertBefore(el('div', { style: 'font-size:11px;color:#888', text: 'sent ' + String(d.sent_at).slice(0, 16).replace('T', ' ') }), row.firstChild);
+        row.insertBefore(el('div', { style: 'font-size:11px;color:#888', text: 'sent ' + SubShared.sydneyDateTime(d.sent_at) }), row.firstChild);
         card.appendChild(el('div', { style: 'display:flex;align-items:flex-start' }, [cb, el('div', { style: 'flex:1' }, [row])]));
       });
       box.appendChild(card);
@@ -335,7 +335,7 @@
     if (!s.can_resend) return toast(SEND_ERRORS[s.class === 'done' ? 'already_sent' : 'in_progress'], true);
     if (s.needs_confirmation) {
       var why = await askReason('', { title: 'Send ' + what + ' again?', confirmText: 'Send again', danger: true,
-        message: 'The last attempt (' + String(s.last_attempt_at || '').slice(0, 16).replace('T', ' ') + ') ended without a clear result, and it was more than 23 hours ago, ' +
+        message: 'The last attempt (' + SubShared.sydneyDateTime(s.last_attempt_at) + ') ended without a clear result, and it was more than 23 hours ago, ' +
           'so the e-mail service can no longer recognise a duplicate. It MAY already have been delivered.\n\n' +
           'Before sending again, check the e-mail service log or ask the recipient. Write what you checked.' });
       if (!why) return;
@@ -389,7 +389,7 @@
       var d = a.details || {}, o = d.old || {}, n = d.new || {};
       box.appendChild(el('div', { style: 'background:#fff0f0;border:1px solid #fca5a5;border-radius:8px;padding:8px;margin-bottom:8px;font-size:12px' }, [
         el('b', { text: '⚠ Bank details changed by ' + subName(a.subcontractor_id) }),
-        el('div', { text: String(a.created_at).slice(0, 16).replace('T', ' ') + ' · before: ' + [o.account_name, 'BSB ' + o.bsb, 'Acc ' + o.account_number].join(' ') +
+        el('div', { text: SubShared.sydneyDateTime(a.created_at) + ' · before: ' + [o.account_name, 'BSB ' + o.bsb, 'Acc ' + o.account_number].join(' ') +
           ' · after: ' + [n.account_name, 'BSB ' + n.bsb, 'Acc ' + n.account_number].join(' ') + ' · admin e-mail: ' + (a.email_status || 'not sent yet') + ' · warning to worker (previous e-mail): ' + (a.worker_email_status || 'not sent yet') +
           ' · delivery: ' + a.delivery_state + ' (attempts ' + a.attempts + ')' +
           (a.gave_up_reason === 'retry_window_closed' ? ' · automatic e-mail retries stopped after 23 h (to avoid duplicates): contact the subcontractor directly' :
@@ -420,7 +420,7 @@
       el('div', { style: 'display:flex;justify-content:space-between;gap:8px;cursor:pointer', onclick: function () { toggle(details, inv); } }, [
         pick,
         el('div', { style: 'flex:1' }, [el('b', { text: inv.invoice_number }), ' · ', w.full_name || subName(inv.subcontractor_id),
-          el('div', { style: 'font-size:11px;color:#888', text: String(inv.submitted_at).slice(0, 10) + ' · ABN ' + (w.abn || '-') + (inv.gst_registered ? ' · GST' : ' · no GST') })]),
+          el('div', { style: 'font-size:11px;color:#888', text: SubShared.sydneyDate(inv.submitted_at) + ' · ABN ' + (w.abn || '-') + (inv.gst_registered ? ' · GST' : ' · no GST') })]),
         el('div', { style: 'text-align:right' }, [el('b', { text: money(inv.total) }), el('div', { style: 'font-size:11px', text: STATUS_LABEL[inv.status] + (pay ? ' · ' + pay.payment_number : '') })])
       ]),
       details
@@ -454,7 +454,7 @@
     } }));
     if (inv.payment_id) details.appendChild(paymentBox(inv));
     details.appendChild(el('div', { style: 'font-size:11px;color:#555;margin:4px 0', text:
-      'Declaration (' + (inv.declaration_version || '-') + ') accepted ' + String(inv.declaration_accepted_at || '').slice(0, 16).replace('T', ' ') + ': ' + (inv.declaration_text || '') }));
+      'Declaration (' + (inv.declaration_version || '-') + ') accepted ' + SubShared.sydneyDateTime(inv.declaration_accepted_at) + ': ' + (inv.declaration_text || '') }));
     if (inv.admin_notes) details.appendChild(el('div', { style: 'font-size:12px;color:#555', text: 'Notes: ' + inv.admin_notes }));
     if (inv.status !== 'cancelled') {
       details.appendChild(emailLine('Copy to the subcontractor', inv.worker_email_status, 'record_worker', inv.id, 'copy to the subcontractor'));
@@ -488,7 +488,7 @@
       if (n.payment_voided) changes.push('payment ' + n.payment_voided + ' undone');
       if (a.action === 'day_adjusted' && n.work_date) changes.unshift('day ' + n.work_date);
       box.appendChild(el('div', { style: 'padding:3px 0;border-bottom:1px dotted #eee' }, [
-        el('span', { style: 'color:#888', text: String(a.at).slice(0, 16).replace('T', ' ') + ' · ' }),
+        el('span', { style: 'color:#888', text: SubShared.sydneyDateTime(a.at) + ' · ' }),
         el('b', { text: ACTION_LABEL[a.action] || a.action }),
         ' · by ' + (a.by || (a.by_admin ? 'Admin' : 'subcontractor / system')),
         changes.length ? el('div', { text: changes.join(' · ') }) : null,
@@ -687,9 +687,9 @@
   function linkExpired(link) { return !!link && linkExpiry(link) <= new Date(); }
   function linkStatus(link) {
     if (!link) return 'none';
-    var last = 'last activity ' + String(link.last_activity_at || link.created_at).slice(0, 10);
+    var last = 'last activity ' + SubShared.sydneyDate(link.last_activity_at || link.created_at);
     if (linkExpired(link)) return 'EXPIRED (no activity for ' + LINK_IDLE_DAYS + ' days, ' + last + ') — create a new link';
-    return 'active, ' + last + ', expires ' + linkExpiry(link).toISOString().slice(0, 10) + ' if not used';
+    return 'active, ' + last + ', expires ' + SubShared.sydneyDate(linkExpiry(link)) + ' if not used';
   }
   function renderSubs(box) {
     box.appendChild(el('b', { text: 'Subcontractors' }));
@@ -792,7 +792,7 @@
       var who = a.actor ? 'admin ' + String(a.actor).slice(0, 8) : 'worker/system';
       var change = a.new_data && a.action !== 'day_adjusted' ? ' · ' + JSON.stringify(a.old_data || {}) + ' → ' + JSON.stringify(a.new_data) : '';
       out.appendChild(el('div', { style: 'font-size:11px;color:#555;border-top:1px solid #f0f0f0;padding:3px 0', text:
-        String(a.at).slice(0, 16).replace('T', ' ') + ' · ' + a.action + ' (' + who + ')' + (a.reason ? ' · reason: ' + a.reason : '') + change }));
+        SubShared.sydneyDateTime(a.at) + ' · ' + a.action + ' (' + who + ')' + (a.reason ? ' · reason: ' + a.reason : '') + change }));
     });
   }
 
