@@ -1432,6 +1432,8 @@ function invRow(desc,qty,rate,amount){
   var td='<td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">';
   return '<tr>'+td+desc+'</td>'+td+qty+'</td>'+td+rate+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">'+amount+'</td></tr>';
 }
+// Every invoice line is rounded to cents and the total is the sum of the lines.
+function roundMoney(n){ return Math.round((Number(n)+Number.EPSILON)*100)/100; }
 function fmtTime(t){if(!t)return '';const[h,m]=t.split(':'),hr=parseInt(h);return `${hr>12?hr-12:hr||12}:${m} ${hr>=12?'PM':'AM'}`;}
 $('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
 $('docContent').textContent=TERMS_TEXT;
@@ -1447,8 +1449,8 @@ function calcJob(){
   var start=document.getElementById('cStart').value;
   var finish=document.getElementById('cFinish').value;
   var rate=parseFloat(document.getElementById('cRate').value);
-  var callout=parseFloat(document.getElementById('cCallout').value)||0;
-  var extras=parseFloat(document.getElementById('cExtras').value)||0;
+  var callout=roundMoney(parseFloat(document.getElementById('cCallout').value)||0);
+  var extras=roundMoney(parseFloat(document.getElementById('cExtras').value)||0);
   var clientName=document.getElementById('cClientName').value.trim();
   var gst=document.getElementById('cGST').checked;
   if(!start||!finish){showToast('Please enter both start and finish times.');return;}
@@ -1458,8 +1460,8 @@ function calcJob(){
   var sM=sh*60+sm,fM=fh*60+fm;
   if(fM<sM)fM+=1440;
   var totalMins=fM-sM,hours=totalMins/60;
-  var labour=hours*rate,subtotal=labour+callout+extras;
-  var gstAmt=gst?subtotal*0.1:0,total=subtotal+gstAmt;
+  var labour=roundMoney(hours*rate),subtotal=roundMoney(labour+callout+extras);
+  var gstAmt=gst?roundMoney(subtotal*0.1):0,total=roundMoney(subtotal+gstAmt);
   var hrs=Math.floor(totalMins/60),mins=totalMins%60;
   var durStr=hrs>0?(mins>0?hrs+'h '+mins+'min':hrs+'h'):mins+'min';
   document.getElementById('calcDuration').textContent='Duration: '+durStr;
@@ -1682,25 +1684,25 @@ function generateAdminInvoice(){
 
   var gst = document.getElementById('inv_gst').checked;
   var rate = parseFloat(document.getElementById('inv_rate').value);
-  var callout = parseFloat(document.getElementById('inv_callout').value)||0;
+  var callout = roundMoney(parseFloat(document.getElementById('inv_callout').value)||0);
   var desc = document.getElementById('inv_desc').value.trim()||'Removal Service';
 
 
   var extras=[], extraWithoutDesc=false;
   document.querySelectorAll('#inv_extras > div').forEach(function(el){
     var d=el.querySelector('[id$="d"]'), a=el.querySelector('[id$="a"]');
-    if(d&&a){ var dv=d.value.trim(),av=parseFloat(a.value)||0; if(av>0&&!dv) extraWithoutDesc=true; if(dv&&av>0) extras.push({desc:dv,amt:av}); }
+    if(d&&a){ var dv=d.value.trim(),av=parseFloat(a.value)||0; if(av>0&&!dv) extraWithoutDesc=true; if(dv&&av>0) extras.push({desc:dv,amt:roundMoney(av)}); }
   });
   if(extraWithoutDesc){ showToast('An additional charge has an amount but no description. Add one or remove the item.', 6000); return; }
-  var extTotal = extras.reduce(function(s,e){return s+e.amt;},0);
+  var extTotal = roundMoney(extras.reduce(function(s,e){return s+e.amt;},0));
 
   var subtotal, rows='', durStr='-';
 
   if(isFixed){
-    var fixedAmt = parseFloat(document.getElementById('inv_fixed_amt').value)||0;
+    var fixedAmt = roundMoney(parseFloat(document.getElementById('inv_fixed_amt').value)||0);
     if(!fixedAmt){ showToast('Please enter fixed price amount.'); return; }
     var fixedDesc = document.getElementById('inv_fixed_desc').value.trim()||'Removal Service — Fixed Price';
-    subtotal = fixedAmt + extTotal;
+    subtotal = roundMoney(fixedAmt + extTotal);
     rows += invRow(esc(fixedDesc),'1','Fixed','$'+fixedAmt.toFixed(2));
     durStr = '—';
   } else {
@@ -1713,8 +1715,8 @@ function generateAdminInvoice(){
     var totalMins=fM-sM, hours=totalMins/60;
     var hrs=Math.floor(hours),mins=totalMins%60;
     durStr = hrs>0?(mins>0?hrs+'h '+mins+'min':hrs+'h'):mins+'min';
-    var labour=hours*rate;
-    subtotal=labour+callout+extTotal;
+    var labour=roundMoney(hours*rate);
+    subtotal=roundMoney(labour+callout+extTotal);
     rows+=invRow(esc(desc)+'<br><small style="color:#888">'+fmtT(sh,sm)+' – '+fmtT(fh,fm)+'</small>',hours.toFixed(2)+'h','$'+rate.toFixed(2)+'/hr','$'+labour.toFixed(2));
     if(callout>0) rows+=invRow('Call Out Fee','1','—','$'+callout.toFixed(2));
   }
@@ -1725,10 +1727,10 @@ function generateAdminInvoice(){
   var discountValue = parseFloat(document.getElementById('inv_discount_value').value)||0;
   var discountDesc = document.getElementById('inv_discount_desc').value.trim();
   var discountAmt = discountType==='percent' ? subtotal*(discountValue/100) : discountValue;
-  discountAmt = Math.max(0, Math.min(discountAmt, subtotal));
-  var taxableSubtotal = subtotal - discountAmt;
+  discountAmt = roundMoney(Math.max(0, Math.min(discountAmt, subtotal)));
+  var taxableSubtotal = roundMoney(subtotal - discountAmt);
 
-  var gstAmt=gst?taxableSubtotal*0.1:0, total=taxableSubtotal+gstAmt;
+  var gstAmt=gst?roundMoney(taxableSubtotal*0.1):0, total=roundMoney(taxableSubtotal+gstAmt);
 
   // Fill preview
   var num=document.getElementById('inv_num').value;
