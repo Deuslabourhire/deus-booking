@@ -360,8 +360,15 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       state.gst = $('pGst').checked;
       // Bank details replaced: the office alert is already recorded by the database; this asks for the e-mail alert.
       if (r && r.bank_alert) {
-        try { await fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token, action: 'bank_changed' }) }); } catch (e) { /* alert stays queued */ }
-        showMsg('Your details were saved. Because your bank details changed, the office was notified and a warning was sent to your previous e-mail address.', true);
+        var mailed = false;
+        try {
+          var res = await fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token, action: 'bank_changed' }) });
+          var out = await res.json();
+          var notDone = /^(failed|not_configured)/;
+          mailed = res.ok && out.ok && out.alerts > 0 && out.email.every(function (m) { return !notDone.test(m.admin || '') && !notDone.test(m.worker || ''); });
+        } catch (e) { /* the alert stays queued */ }
+        showMsg(mailed ? 'Your details were saved. Because your bank details changed, the office was notified and a warning was sent to your previous e-mail address.'
+          : 'Your details were saved and the office can see the change. The warning e-mail could not be sent yet.', true);
         return;
       }
       showMsg('Your details were saved.', true);
