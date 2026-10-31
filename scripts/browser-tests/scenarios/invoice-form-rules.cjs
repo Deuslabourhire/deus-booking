@@ -1,4 +1,4 @@
-// Invoice rules in admin.html and invoice.html, with the database stubbed.
+// Invoice rules in admin.html, with the database stubbed.
 const assert = require('assert/strict');
 const fill = `
   window.__t = []; window.showToast = (m) => window.__t.push(m); window.alert = (m) => window.__t.push(m);
@@ -30,13 +30,4 @@ module.exports = async ({ run, open }) => {
   r = await run(`(() => { window.showToast = (m) => (window.__c = m); $('cStart').value = '09:00'; $('cFinish').value = '10:00'; $('cRate').value = '0'; $('calcTotal').textContent = 'x'; calcJob(); return [window.__c, $('calcTotal').textContent]; })()`);
   assert.match(r[0], /hourly rate/); assert.equal(r[1], 'x');
 
-  await open('invoice.html');
-  const inv = `document.getElementById('clientName').value = 'Ana'; document.getElementById('startTime').value = '09:00'; document.getElementById('finishTime').value = '10:00';`;
-  r = await run(`(() => { window.__t = []; window.alert = (m) => __t.push(m); ${inv}
-    document.getElementById('addExtraBtn').click(); document.querySelector('.extra-item [id$="a"]').value = '80';
-    document.getElementById('genBtn').click(); return [__t.at(-1), document.getElementById('invoicePreview').style.display]; })()`);
-  assert.match(r[0], /no description/); assert.notEqual(r[1], 'block');
-  r = await run(`(() => { window.__t = []; document.getElementById('extrasList').innerHTML = ''; document.getElementById('rate').value = '0';
-    document.getElementById('genBtn').click(); return [__t.at(-1), document.getElementById('invoicePreview').style.display]; })()`);
-  assert.match(r[0], /hourly rate/); assert.notEqual(r[1], 'block');
 };

@@ -15,14 +15,6 @@ module.exports = async ({ run, open }) => {
   assert.equal(await run(columns('.row')), 1);
   assert.ok((await run(overflow)) <= 0, 'subcontractor overflow');
 
-  await open('invoice.html', 320);
-  assert.equal(await run(font('#clientName')), 16);
-  await run(`(() => { const $ = (i) => document.getElementById(i);
-    $('clientName').value = 'Ana Lee'; $('startTime').value = '09:00'; $('finishTime').value = '17:30'; $('jobDesc').value = 'Removal service from Croydon to Bondi'; $('gstToggle').checked = true;
-    $('genBtn').click(); })()`);
-  assert.ok((await run(overflow)) <= 0, 'invoice overflow: ' + await run(overflow));
-  const box = await run(`(() => { const r = document.querySelector('.inv-totals').getBoundingClientRect(); return { right: r.right, width: innerWidth }; })()`);
-  assert.ok(box.right <= box.width, JSON.stringify(box));
 
   await open('admin.html', 320);
   assert.equal(await run(font('#emailInput')), 16);

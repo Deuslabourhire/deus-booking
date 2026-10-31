@@ -37,15 +37,9 @@ assert.equal(addDays("2026-10-31", 7), "2026-11-07");
 assert.equal(addDays("2028-02-28", 1), "2028-02-29");
 assert.equal(addDays("2026-12-31", 7), "2027-01-07");
 
-// invoice.html: 9 am in Sydney is still the previous day in UTC.
-const invoice = readFileSync(new URL("../invoice.html", import.meta.url), "utf8");
-const dates = invoice.match(/var today = new Date\(\);[\s\S]*?var dueStr = .*/)[0];
-const at = (iso) => class extends Date { constructor(...a) { super(...(a.length ? a : [iso])); } };
-const [today, due] = new Function("Date", dates + "; return [todayStr, dueStr];")(at("2026-10-30T22:00:00Z"));
-assert.deepEqual([today, due], ["2026-10-31", "2026-11-07"]);
 
 // Only the official phone number reaches clients.
-for (const page of ["admin.html", "booking.html", "invoice.html", "subcontractor.html"]) {
+for (const page of ["admin.html", "booking.html", "subcontractor.html"]) {
   const text = readFileSync(new URL("../" + page, import.meta.url), "utf8");
   assert.doesNotMatch(text, /406[ .-]?832[ .-]?721/, page);
 }
