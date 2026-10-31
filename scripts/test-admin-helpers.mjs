@@ -17,6 +17,12 @@ for (const [typed, value] of [["1,500", 1500], ["1,500.50", 1500.5], ["12,345,67
 for (const typed of ["1,50", "150,50", "1,5000", "1,50,000", "1.500", "1.500,50", "1,500,50", "1,500.505", "0,500", ",500",
   "1,", ".50", "5.", "", "   ", "abc", "$150", "-5", "1e3", "1 500", null]) assert.ok(Number.isNaN(parseAmount(typed)), String(typed));
 
+// Payment totals: only completed payments count, and the balance never goes below zero.
+const totals = new Function(html.match(/function calculatePaymentTotals\([\s\S]*?\r?\n\}/)[0] + "; return calculatePaymentTotals;")();
+assert.deepEqual(totals([{ status: "completed", amount: "100" }, { status: "failed", amount: 50 }, { status: "completed", amount: 25.5 }], 200), { totalPaid: 125.5, outstandingBalance: 74.5 });
+assert.deepEqual(totals(null, "80"), { totalPaid: 0, outstandingBalance: 80 });
+assert.equal(totals([{ status: "completed", amount: 90 }], 80).outstandingBalance, 0);
+
 // Sydney dates. The results must not depend on this machine's time zone.
 const win = {};
 new Function("window", readFileSync(new URL("../sub-shared.js", import.meta.url), "utf8"))(win);
