@@ -1376,7 +1376,54 @@ function renderClients(){
 
 function toggleCard(id){const body=$('body_'+id),chev=$('chev_'+id);if(!body||!chev)return;const open=body.classList.toggle('open');chev.textContent=open?'▲':'▼';}
 async function markDone(id){bookings=bookings.map(b=>String(b.id)===String(id)?{...b,status:'completed'}:b);await saveToSupabase({status:'completed'},id);renderAll();showToast('Job marked as completed ✓');}
-async function sendReminder(id){bookings=bookings.map(b=>String(b.id)===String(id)?{...b,reminder_sent:true}:b);await saveToSupabase({reminder_sent:true},id);const b=bookings.find(b=>String(b.id)===String(id));renderAll();showToast(`Reminder sent to ${b?b.name:'client'} ✓`);}
+var remindersSending = {}; // a double click must not e-mail the client twice
+async function sendReminder(id){
+  var b = bookings.find(function(x){ return String(x.id)===String(id); });
+  if(!b || remindersSending[id]) return;
+  if(!b.email){ showToast('This client has no email on file.', 5000); return; }
+
+  var html = ''
+    +'<p>Hi '+esc((b.name||'').split(' ')[0] || 'there')+',</p>'
+    +'<p>It has been about a year since your move with Deus Labour Hire. Thank you for choosing us!</p>'
+    +'<p>If you have another move coming up, we would like to offer you <strong>10% off</strong>. Just contact us and mention this offer.</p>'
+    +'<p>Deus Labour Hire<br>0406 832 721<br>deus.labour.hire@gmail.com</p>';
+
+  remindersSending[id] = true;
+  showToast('Sending email...');
+  try{
+    var sessionResult = await db.auth.getSession();
+    var token = sessionResult && sessionResult.data && sessionResult.data.session
+                ? sessionResult.data.session.access_token : null;
+    if(!token){ showToast('Session expired — please log in again.'); return; }
+
+    var res = await fetch('https://amnacoyjgdfykdfepkze.supabase.co/functions/v1/resend-email',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+token
+      },
+      body:JSON.stringify({
+        to: b.email,
+        subject: 'A 10% discount on your next move — Deus Labour Hire',
+        invoiceHtml: html
+      })
+    });
+    var data = await res.json();
+    if(res.ok && data.dry_run){ showToast('Test mode (dry-run): offer NOT sent', 5000); return; }
+    if(!res.ok || !data.id) throw new Error(data.message || 'Failed');
+
+    // Marked as sent even if saving fails, so this screen does not offer to e-mail the client again.
+    bookings = bookings.map(function(x){ return String(x.id)===String(id) ? {...x, reminder_sent:true} : x; });
+    renderAll();
+    var saved = await saveToSupabase({reminder_sent:true}, id);
+    if(saved) showToast('Offer sent to '+b.name+' ✓');
+    else showToast('Offer sent, but it could not be recorded. It may appear as not sent after a reload.', 8000);
+  }catch(e){
+    showToast('Error sending offer: '+(e.message||'unknown error'), 5000);
+  }finally{
+    delete remindersSending[id];
+  }
+}
 async function deleteJob(id){
   if(!confirm('Delete this booking? This cannot be undone.'))return;
   try{
