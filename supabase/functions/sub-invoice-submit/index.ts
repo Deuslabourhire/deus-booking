@@ -8,9 +8,9 @@
 // which is checked by the database (PostgREST verifies the JWT, the RPC checks admin).
 //
 // Actions (POST JSON):
-//   {token, action: "submit", declaration_accepted: true}
-//       -> OLD flow, switched off by migration 20261020120000: the database answers
-//          flow_changed (409, "reload the page"). Workers now send days with the RPC
+//   {token, action: "submit"}
+//       -> OLD flow, switched off by the grouped-invoices migration: answers flow_changed
+//          (409, "reload the page") for pages still open. Workers now send days with the RPC
 //          sub_portal_send_days, and the Admin creates the invoice from sent days; the
 //          copy of that invoice to the worker goes through "resend_email" below.
 //   {token, action: "bank_changed"}
@@ -248,46 +248,6 @@ function errorReply(origin: string | null, data: unknown, fallback: string): Res
   return reply(origin, 500, { ok: false, error: fallback });
 }
 
-async function handleSubmit(origin: string | null, token: string, declarationAccepted: unknown): Promise<Response> {
-  // Checked here for a clear message AND again in the database (authoritative).
-  if (declarationAccepted !== true) {
-    return reply(origin, 400, { ok: false, error: "declaration_required", message: KNOWN_ERRORS.declaration_required[1] });
-  }
-  let submitted: Submitted;
-  try {
-    const r = await rpc("sub_portal_submit", { p_token: token, p_declaration_accepted: true });
-    if (!r.ok) return errorReply(origin, r.data, "submit_failed");
-    submitted = r.data as Submitted;
-  } catch {
-    return reply(origin, 503, { ok: false, error: "service_unavailable" });
-  }
-
-  // From here the record is saved and locked; e-mail problems never undo it.
-  const workerEmail = isPlainEmail(submitted.worker.email) ? submitted.worker.email : "";
-  const adminEmail = (Deno.env.get("ADMIN_NOTIFY_EMAIL") ?? "").trim();
-  const subjectBase = `Work record ${submitted.invoice_number}`;
-
-  const workerStatus = workerEmail
-    ? await sendEmail(workerEmail, `${subjectBase} — copy`, workerHtml(submitted), `sub-record-${submitted.invoice_id}-worker`)
-    : "no_worker_email";
-  const adminStatus = isPlainEmail(adminEmail)
-    ? await sendEmail(adminEmail, `${subjectBase} — ${String(submitted.worker.full_name ?? "")} — pending`, adminHtml(submitted), `sub-record-${submitted.invoice_id}-admin`)
-    : "not_configured";
-
-  try {
-    await rpc("sub_record_email_status", { p_invoice_id: submitted.invoice_id, p_worker: workerStatus, p_admin: adminStatus });
-  } catch { /* status bookkeeping only */ }
-
-  return reply(origin, 200, {
-    ok: true,
-    invoice_number: submitted.invoice_number,
-    subtotal: submitted.subtotal,
-    gst_amount: submitted.gst_amount,
-    total: submitted.total,
-    email: { worker: workerStatus, admin: adminStatus },
-  });
-}
-
 // Sends the channels still needed for each claimed alert, records each result against
 // the claim token, then closes the claim (done / back to pending / gave_up).
 async function deliverAlerts(alerts: BankAlert[]): Promise<Record<string, unknown>[]> {
@@ -454,7 +414,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return reply(origin, 415, { ok: false, error: "unsupported_media_type" });
   }
 
-  let body: { token?: unknown; action?: unknown; declaration_accepted?: unknown; payment_id?: unknown;
+  let body: { token?: unknown; action?: unknown; payment_id?: unknown;
               kind?: unknown; id?: unknown; confirm_unknown?: unknown; reason?: unknown };
   try {
     body = (await readJsonLimited(req, 1024) ?? {}) as typeof body;   // stops reading past 1 KB
@@ -472,7 +432,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!TOKEN_RE.test(token)) return reply(origin, 401, { ok: false, error: "invalid_link", message: KNOWN_ERRORS.invalid_link[1] });
 
   const action = String(body.action ?? "submit");
-  if (action === "submit") return handleSubmit(origin, token, body.declaration_accepted);
+  if (action === "submit") return reply(origin, 409, { ok: false, error: "flow_changed", message: KNOWN_ERRORS.flow_changed[1] });
   if (action === "bank_changed") return handleBankChanged(origin, token);
   return reply(origin, 400, { ok: false, error: "unknown_action" });
 });
