@@ -1630,6 +1630,7 @@ function closeDayModal(){
 function downloadDoc(id){
   var b=bookings.find(function(x){return String(x.id)===String(id);});
   if(!b){showToast('Client not found.');return;}
+  if(!b.signature_name||b.signature_name==='(admin added)'){showToast('This client has not signed these documents, so they cannot be downloaded.',5000);return;}
   var signDate=b.signed_date?new Date(b.signed_date).toLocaleDateString('en-AU'):'-';
   var signTime=b.signed_date?new Date(b.signed_date).toLocaleTimeString('en-AU'):'-';
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Signed Documents - '+esc(b.name)+'</title>';
@@ -1687,7 +1688,7 @@ function downloadDoc(id){
   html+='<h3>Payment and Additional Fees</h3><p>Payment is due upon completion of the service unless otherwise agreed. Additional charges may apply for stairs, restricted access or long carrying distances.</p>';
   html+='<div class="sig-box">';
   html+='<div style="font-weight:700;font-size:15px;margin-bottom:8px;color:#2a6b2a">DIGITAL SIGNATURE</div>';
-  html+='<div class="sig-name">'+esc(b.signature_name||'Not signed')+'</div>';
+  html+='<div class="sig-name">'+esc(b.signature_name)+'</div>';
   html+='<div style="font-size:13px;color:#555;margin-top:8px">Signed on: '+signDate+' at '+signTime+'</div>';
   html+='<div style="font-size:12px;color:#777;margin-top:6px">By signing, the client confirms they have read and agreed to all Terms &amp; Conditions and the Service Agreement above.</div>';
   html+='</div>';

@@ -51,6 +51,15 @@ module.exports = async ({ run, open }) => {
 
   // the download link stays valid after the click
   await run(`(() => { window.__rev = 0; URL.revokeObjectURL = () => { __rev++; }; HTMLAnchorElement.prototype.click = function () {};
-    bookings = [{ id: 'b1', name: 'A', date: '2026-10-01' }]; downloadDoc('b1'); })()`);
+    window.__blobs = 0; const real = URL.createObjectURL; URL.createObjectURL = (b) => { __blobs++; return real.call(URL, b); };
+    bookings = [{ id: 'b1', name: 'A', date: '2026-10-01', signature_name: 'A' }]; downloadDoc('b1'); })()`);
   assert.equal(await run(`__rev`), 0);
+
+  // no client signature: no "signed" document
+  assert.equal(await run(`__blobs`), 1);
+  for (const signature of [null, '', '(admin added)']) {
+    const t = await run(`(() => { __t = []; bookings = [{ id: 'b2', name: 'A', date: '2026-10-01', signature_name: ${JSON.stringify(signature)} }]; downloadDoc('b2'); return __t.at(-1); })()`);
+    assert.match(t, /has not signed/, String(signature));
+  }
+  assert.equal(await run(`__blobs`), 1);
 };
