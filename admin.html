@@ -2015,10 +2015,6 @@ async function submitAddPayment(){
 
   var amount = parsePaymentAmount(document.getElementById('pay_amount').value);
   if(!isFinite(amount) || amount <= 0){ showToast('Enter the amount like 1,500 or 1500.50, greater than 0. A comma only separates thousands.', 6000); return; }
-  if(lastInvoiceCalc && lastInvoiceCalc.totalAmount != null){
-    var outstanding = calculatePaymentTotals(lastLoadedPaymentsRows, lastInvoiceCalc.totalAmount).outstandingBalance;
-    if(Math.round(amount*100) > Math.round(outstanding*100)){ showToast('That is more than the outstanding balance of $'+outstanding.toFixed(2)+'.', 6000); return; }
-  }
 
   var method = document.getElementById('pay_method').value;
   var validMethods = ['bank_transfer','cash','card','other'];
@@ -2046,6 +2042,18 @@ async function submitAddPayment(){
   isAddingPayment = true;
   var btnConfirm = document.getElementById('btnConfirmPayment');
   if(btnConfirm) btnConfirm.disabled = true;
+
+  if(lastInvoiceCalc && lastInvoiceCalc.totalAmount != null){
+    var outstanding = calculatePaymentTotals(lastLoadedPaymentsRows, lastInvoiceCalc.totalAmount).outstandingBalance;
+    if(Math.round(amount*100) > Math.round(outstanding*100)){
+      var recordAnyway = await SubShared.dialog({title:'This payment is more than the balance. Record it anyway?',message:'Outstanding balance: $'+outstanding.toFixed(2)+'. This payment: $'+amount.toFixed(2)+'.',confirmText:'Record it'});
+      if(!recordAnyway){
+        isAddingPayment = false;
+        if(btnConfirm) btnConfirm.disabled = false;
+        return;
+      }
+    }
+  }
 
   try{
     var res = await db.from('payments').insert(payload).select().single();
