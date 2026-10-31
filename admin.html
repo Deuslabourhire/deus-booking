@@ -1671,6 +1671,12 @@ function downloadDoc(id){
 
 // ── INVOICE TAB ──────────────────────────────────────────────────────────────
 var invExtraCount = 0;
+// True after the form changes: totals and the preview only update on Generate, so they would be out of date.
+var invoiceFormDirty = false;
+var INVOICE_DIRTY_MSG = 'The form changed. Click Generate Invoice again first.';
+['input','change'].forEach(function(type){
+  $('tabInvoice').addEventListener(type, function(e){ if(/^inv(_|ex)/.test(e.target.id||'')) invoiceFormDirty = true; });
+});
 
 function toggleInvFixed(){
   var on = document.getElementById('inv_fixed').checked;
@@ -1700,7 +1706,7 @@ function addInvExtra(){
   var btn = document.createElement('button');
   btn.textContent = '✕';
   btn.style.cssText = 'background:#3a0f0f;color:#fca5a5;border:none;border-radius:7px;padding:8px;cursor:pointer;font-size:13px';
-  btn.addEventListener('click', function(){ div.remove(); });
+  btn.addEventListener('click', function(){ div.remove(); invoiceFormDirty = true; });
   div.appendChild(i1); div.appendChild(i2); div.appendChild(btn);
   document.getElementById('inv_extras').appendChild(div);
 }
@@ -1852,6 +1858,7 @@ function generateAdminInvoice(){
     description: desc,
     durationLabel: durStr
   };
+  invoiceFormDirty = false;
 }
 
 function resetAdminInvoice(){
@@ -1875,6 +1882,7 @@ function resetAdminInvoice(){
   currentInvoiceBookingId = null;
   currentInvoiceCustomerId = null;
   lastInvoiceCalc = null;
+  invoiceFormDirty = false;
   currentInvoiceId = null;
   currentInvoiceStatus = null;
   document.getElementById('inv_num').value = 'PENDING';
@@ -2262,6 +2270,7 @@ async function openInvoice(id){
     document.getElementById('inv_p_totals').innerHTML = totals;
 
     document.getElementById('inv_preview').style.display='block';
+    invoiceFormDirty = false;
 
     document.getElementById('inv_num').value = inv.invoice_number;
     var btnSave = document.getElementById('btnSaveInvoice');
@@ -2288,6 +2297,7 @@ async function openInvoice(id){
 async function saveAdminInvoice(){
   if(currentInvoiceId && currentInvoiceStatus !== 'draft'){ showToast('Invoice already saved.'); return; }
   if(!lastInvoiceCalc){ showToast('Generate the invoice first.'); return; }
+  if(invoiceFormDirty){ showToast(INVOICE_DIRTY_MSG, 5000); return; }
   var c = lastInvoiceCalc;
   var extrasTotalWithCallout = c.extrasTotal + (c.callout||0);
 
@@ -2409,6 +2419,7 @@ async function saveInvoiceItems(invoiceId){
 }
 
 function printAdminInvoice(){
+  if(invoiceFormDirty){ showToast(INVOICE_DIRTY_MSG, 5000); return; }
   var preview = document.getElementById('inv_preview');
   var previewClone = preview.cloneNode(true);
   var actionsClone = previewClone.querySelector('#inv_actions');
@@ -2431,6 +2442,7 @@ async function sendInvoiceEmail(){
   var client = document.getElementById('inv_client').value.trim();
   var num = document.getElementById('inv_num').value;
   if(!email){ showToast('Please enter client email first.'); return; }
+  if(invoiceFormDirty){ showToast(INVOICE_DIRTY_MSG, 5000); return; }
 
   var preview = document.getElementById('inv_preview');
   var previewClone = preview.cloneNode(true);
