@@ -3,6 +3,7 @@
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://deuslabourhire.github.io; connect-src https://amnacoyjgdfykdfepkze.supabase.co wss://amnacoyjgdfykdfepkze.supabase.co; base-uri 'none'; form-action 'none'">
 <title>Admin — Deus Labour Hire</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <style>
@@ -758,6 +759,8 @@ Payment is due upon completion of the service unless otherwise agreed. Additiona
 Company Representative: Deus Labour Hire Pty Ltd`;
 
 function $(id){return document.getElementById(id);}
+// Every value from the database or a form goes through this before entering innerHTML: bookings are public input.
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function showToast(msg,dur=3000){const el=$('toast');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',dur);}
 
 async function requireAdmin(){
@@ -872,11 +875,11 @@ function renderInvoicesList(){
       ? '<button onclick="markInvoiceAsSent(\''+inv.id+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:10px;padding:3px 6px;cursor:pointer;margin-left:4px">Mark as Sent</button>'
       : '';
     if(inv.status==='draft' || inv.status==='sent'){
-      actionCell += '<button onclick="cancelInvoice(\''+inv.id+'\',\''+inv.invoice_number+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#c99;font-size:10px;padding:3px 6px;cursor:pointer;margin-left:4px">Cancel Invoice</button>';
+      actionCell += '<button onclick="cancelInvoice(\''+inv.id+'\')" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#c99;font-size:10px;padding:3px 6px;cursor:pointer;margin-left:4px">Cancel Invoice</button>';
     }
     return '<div class="inv-row">'
-      +'<span data-label="Invoice">'+inv.invoice_number+'</span><span data-label="Customer">'+name+'</span><span data-label="Total">'+total+'</span>'
-      +'<span data-label="Status">'+inv.effective_status+'</span><span data-label="Issued">'+(inv.issued_date||'—')+'</span><span data-label="Due">'+(inv.due_date||'—')+'</span>'
+      +'<span data-label="Invoice">'+esc(inv.invoice_number)+'</span><span data-label="Customer">'+esc(name)+'</span><span data-label="Total">'+total+'</span>'
+      +'<span data-label="Status">'+esc(inv.effective_status)+'</span><span data-label="Issued">'+esc(inv.issued_date||'—')+'</span><span data-label="Due">'+esc(inv.due_date||'—')+'</span>'
       +'<span data-label="Paid">'+paidCell+'</span><span data-label="Outstanding">'+outstandingCell+'</span><span data-label="Actions">'+actionCell+'</span></div>';
   }).join('');
 }
@@ -903,7 +906,9 @@ async function markInvoiceAsSent(id){
   }
 }
 
-async function cancelInvoice(id, invoiceNumber){
+async function cancelInvoice(id){
+  var cancelled = invoicesListCache.find(function(inv){ return inv.id === id; });
+  var invoiceNumber = cancelled ? cancelled.invoice_number : '';
   if(!confirm('Cancel invoice '+invoiceNumber+'? This cannot be undone from this screen.')) return;
   try{
     const {error} = await db.from('invoices')
@@ -1084,11 +1089,11 @@ function renderQuotesList(){
     var sourceLabel = sourceRaw || 'Legacy/Unknown';
 
     return '<div class="quote-row">'
-      +'<span data-label="Name">'+name+'</span>'
-      +'<span data-label="Email">'+email+'</span>'
-      +'<span data-label="Status">'+statusLabel+'</span>'
-      +'<span data-label="Source">'+sourceLabel+'</span>'
-      +'<span data-label="Created">'+created+'</span>'
+      +'<span data-label="Name">'+esc(name)+'</span>'
+      +'<span data-label="Email">'+esc(email)+'</span>'
+      +'<span data-label="Status">'+esc(statusLabel)+'</span>'
+      +'<span data-label="Source">'+esc(sourceLabel)+'</span>'
+      +'<span data-label="Created">'+esc(created)+'</span>'
       +'<span data-label="Takeover">'+takeoverCell+(q.status === 'sent' ? takeoverControls : '')+'</span>'
       +'<span data-label="Actions">'+commercialControls+bookingControls+jobControls+'</span>'
       +'</div>';
@@ -1305,7 +1310,7 @@ function renderCalendar(){
     var cellCursor=events.length>0?'pointer':'default';
     html+='<div class="cal-cell'+(isToday?' today':'')+'" style="cursor:'+cellCursor+'" '+(cellClick?'onclick="'+cellClick+'"':'')+'>'+
           '<div class="cal-num">'+d+'</div>'+
-          events.map(function(e){return '<div class="cal-event" style="background:'+(e.status==='completed'?'var(--success-bg)':'var(--info-bg)')+';color:'+(e.status==='completed'?'var(--success)':'var(--info)')+'">'+fmtTime(e.start_time)+' '+(e.name||'').split(' ')[0]+'</div>';}).join('')+
+          events.map(function(e){return '<div class="cal-event" style="background:'+(e.status==='completed'?'var(--success-bg)':'var(--info-bg)')+';color:'+(e.status==='completed'?'var(--success)':'var(--info)')+'">'+esc(fmtTime(e.start_time)+' '+(e.name||'').split(' ')[0])+'</div>';}).join('')+
           '</div>';
   }
   $('calCells').innerHTML=html;
@@ -1315,7 +1320,7 @@ function renderCalendar(){
   jobsList.sort((a,b)=>+a[0]-+b[0]).forEach(([day,list])=>{list.forEach(b=>{
     const sc=b.status==='completed'?'var(--success)':b.status==='cancelled'?'var(--danger)':'var(--info)';
     const sb=b.status==='completed'?'var(--success-bg)':b.status==='cancelled'?'var(--danger-bg)':'var(--info-bg)';
-    jhtml+=`<div class="cal-job-row"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:13px;font-weight:700">${b.name}</div><div style="font-size:11px;color:var(--green-dark);font-weight:700;margin-top:2px">${fmtTime(b.start_time)} · ${MONTHS[m]} ${day}</div><div style="font-size:11px;color:var(--text-mid);margin-top:2px">From: ${b.pickup_address}</div><div style="font-size:11px;color:var(--text-mid)">To: ${b.dropoff_address}</div></div><span class="badge" style="background:${sb};color:${sc}">${b.status}</span></div></div>`;
+    jhtml+=`<div class="cal-job-row"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:13px;font-weight:700">${esc(b.name)}</div><div style="font-size:11px;color:var(--green-dark);font-weight:700;margin-top:2px">${esc(fmtTime(b.start_time))} · ${MONTHS[m]} ${day}</div><div style="font-size:11px;color:var(--text-mid);margin-top:2px">From: ${esc(b.pickup_address)}</div><div style="font-size:11px;color:var(--text-mid)">To: ${esc(b.dropoff_address)}</div></div><span class="badge" style="background:${sb};color:${sc}">${esc(b.status)}</span></div></div>`;
   });});
   $('calJobs').innerHTML=jhtml;
 }
@@ -1338,18 +1343,18 @@ function renderClients(){
     return `<div class="card">
       <div class="card-header" onclick="toggleCard('${bId}')">
         <div style="display:flex;align-items:center">
-          <div class="avatar">${initials}</div>
-          <div><div class="card-name">${b.name}</div><div class="card-meta">${b.date} · ${fmtTime(b.start_time)} · ${b.phone||b.email||''}</div></div>
+          <div class="avatar">${esc(initials)}</div>
+          <div><div class="card-name">${esc(b.name)}</div><div class="card-meta">${esc(b.date)} · ${esc(fmtTime(b.start_time))} · ${esc(b.phone||b.email||'')}</div></div>
         </div>
-        <div style="display:flex;align-items:center;gap:5px">${remBadge}<span class="badge" style="background:${sb};color:${sc}">${b.status}</span><span style="color:var(--text-light);font-size:12px;margin-left:4px" id="chev_${bId}">▼</span></div>
+        <div style="display:flex;align-items:center;gap:5px">${remBadge}<span class="badge" style="background:${sb};color:${sc}">${esc(b.status)}</span><span style="color:var(--text-light);font-size:12px;margin-left:4px" id="chev_${bId}">▼</span></div>
       </div>
       <div class="card-body" id="body_${bId}">
         <div class="info-box"><div class="info-title">Job Details</div>
-          ${[['📅 Date',b.date],['🕐 Start',fmtTime(b.start_time)],['📍 Pick-up',b.pickup_address],['🏁 Drop-off',b.dropoff_address],['📞 Phone',b.phone||'—'],['✉ Email',b.email||'—']].map(([k,v])=>`<div class="info-row"><span class="info-key">${k}</span><span class="info-val">${v||'—'}</span></div>`).join('')}
-          ${b.notes?`<div class="info-row"><span class="info-key">📝 Notes</span><span class="info-val">${b.notes}</span></div>`:''}
+          ${[['📅 Date',b.date],['🕐 Start',fmtTime(b.start_time)],['📍 Pick-up',b.pickup_address],['🏁 Drop-off',b.dropoff_address],['📞 Phone',b.phone||'—'],['✉ Email',b.email||'—']].map(([k,v])=>`<div class="info-row"><span class="info-key">${k}</span><span class="info-val">${esc(v||'—')}</span></div>`).join('')}
+          ${b.notes?`<div class="info-row"><span class="info-key">📝 Notes</span><span class="info-val">${esc(b.notes)}</span></div>`:''}
         </div>
         <div class="info-box"><div class="info-title">Documents</div>
-          ${b.signature_name?`<div style="font-size:13px;color:var(--success);font-style:italic;font-weight:700">✍ ${b.signature_name}</div><div style="font-size:11px;color:var(--text-mid);margin-top:3px">T&C + Service Agreement · ${(b.signed_date||'').split('T')[0]||'—'}</div>`:`<div style="font-size:12px;color:var(--danger);font-weight:600">⚠ Not yet signed</div>`}
+          ${b.signature_name?`<div style="font-size:13px;color:var(--success);font-style:italic;font-weight:700">✍ ${esc(b.signature_name)}</div><div style="font-size:11px;color:var(--text-mid);margin-top:3px">T&C + Service Agreement · ${esc((b.signed_date||'').split('T')[0]||'—')}</div>`:`<div style="font-size:12px;color:var(--danger);font-weight:600">⚠ Not yet signed</div>`}
         </div>
         <div class="info-box"><div class="info-title">1-Year Reminder</div>
           <div style="font-size:12px;font-weight:600;color:${isDue?'var(--danger)':isSoon?'var(--warn)':'var(--text-mid)'}">
@@ -1514,15 +1519,15 @@ function openDayModal(day){
     var bId=String(b.id);
     html+='<div style="background:#121720;border:1px solid #1c2130;border-radius:10px;padding:14px;margin-bottom:10px">';
     html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">';
-    html+='<div style="font-size:15px;font-weight:700">'+b.name+'</div>';
-    html+='<span style="font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;background:'+sb+';color:'+sc+'">'+b.status+'</span>';
+    html+='<div style="font-size:15px;font-weight:700">'+esc(b.name)+'</div>';
+    html+='<span style="font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;background:'+sb+';color:'+sc+'">'+esc(b.status)+'</span>';
     html+='</div>';
-    html+='<div style="font-size:12px;color:#6b7a6b;margin-bottom:4px">🕐 Start: <span style="color:#e8f0e8">'+fmtTime(b.start_time)+'</span></div>';
-    html+='<div style="font-size:12px;color:#6b7a6b;margin-bottom:4px">📍 Pick-up: <span style="color:#e8f0e8">'+b.pickup_address+'</span></div>';
-    html+='<div style="font-size:12px;color:#6b7a6b;margin-bottom:4px">🏁 Drop-off: <span style="color:#e8f0e8">'+b.dropoff_address+'</span></div>';
-    html+='<div style="font-size:12px;color:#6b7a6b;margin-bottom:10px">📞 Phone: <span style="color:#e8f0e8">'+b.phone+'</span></div>';
-    if(b.notes)html+='<div style="font-size:11px;color:#9aaa9a;margin-bottom:10px;background:#0a0c12;padding:8px;border-radius:6px">📝 '+b.notes+'</div>';
-    if(b.signature_name)html+='<div style="font-size:11px;color:#6ec86e;margin-bottom:10px">✍ Signed: '+b.signature_name+'</div>';
+    html+='<div style="font-size:12px;color:#6b7a6b;margin-bottom:4px">🕐 Start: <span style="color:#e8f0e8">'+esc(fmtTime(b.start_time))+'</span></div>';
+    html+='<div style="font-size:12px;color:#6b7a6b;margin-bottom:4px">📍 Pick-up: <span style="color:#e8f0e8">'+esc(b.pickup_address)+'</span></div>';
+    html+='<div style="font-size:12px;color:#6b7a6b;margin-bottom:4px">🏁 Drop-off: <span style="color:#e8f0e8">'+esc(b.dropoff_address)+'</span></div>';
+    html+='<div style="font-size:12px;color:#6b7a6b;margin-bottom:10px">📞 Phone: <span style="color:#e8f0e8">'+esc(b.phone)+'</span></div>';
+    if(b.notes)html+='<div style="font-size:11px;color:#9aaa9a;margin-bottom:10px;background:#0a0c12;padding:8px;border-radius:6px">📝 '+esc(b.notes)+'</div>';
+    if(b.signature_name)html+='<div style="font-size:11px;color:#6ec86e;margin-bottom:10px">✍ Signed: '+esc(b.signature_name)+'</div>';
     html+='<div style="display:flex;gap:7px;flex-wrap:wrap">';
     if(b.status!=='completed')html+='<button onclick="markDone(&quot;'+bId+'&quot;);closeDayModal()" style="padding:6px 12px;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit;background:#1a3a1a;color:#86efac">✓ Complete</button>';
     html+='<button onclick="openEditModal(&quot;'+bId+'&quot;);closeDayModal()" style="padding:6px 12px;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit;background:#1e2a3a;color:#93c5fd">✏ Edit</button>';
@@ -1544,7 +1549,7 @@ function downloadDoc(id){
   if(!b){alert('Client not found.');return;}
   var signDate=b.signed_date?new Date(b.signed_date).toLocaleDateString('en-AU'):'-';
   var signTime=b.signed_date?new Date(b.signed_date).toLocaleTimeString('en-AU'):'-';
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Signed Documents - '+b.name+'</title>';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Signed Documents - '+esc(b.name)+'</title>';
   html+='<style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;padding:20px;color:#111}';
   html+='.header{text-align:center;border-bottom:3px solid #3d8b3d;padding-bottom:20px;margin-bottom:30px}';
   html+='.logo{font-size:24px;font-weight:700;color:#3d8b3d}';
@@ -1562,14 +1567,14 @@ function downloadDoc(id){
   html+='<div style="color:#666;font-size:13px">deus.labour.hire@gmail.com | 0406 832 721</div></div>';
   html+='<h2>SIGNED SERVICE DOCUMENTS</h2>';
   html+='<div class="info-box">';
-  html+='<div class="info-row"><span><strong>Client Name</strong></span><span>'+b.name+'</span></div>';
-  html+='<div class="info-row"><span><strong>Phone</strong></span><span>'+(b.phone||'-')+'</span></div>';
-  html+='<div class="info-row"><span><strong>Email</strong></span><span>'+(b.email||'-')+'</span></div>';
-  html+='<div class="info-row"><span><strong>Move Date</strong></span><span>'+(b.date||'-')+'</span></div>';
-  html+='<div class="info-row"><span><strong>Start Time</strong></span><span>'+(b.start_time||'-')+'</span></div>';
-  html+='<div class="info-row"><span><strong>Pick-up</strong></span><span>'+(b.pickup_address||'-')+'</span></div>';
-  html+='<div class="info-row"><span><strong>Drop-off</strong></span><span>'+(b.dropoff_address||'-')+'</span></div>';
-  if(b.notes)html+='<div class="info-row"><span><strong>Notes</strong></span><span>'+b.notes+'</span></div>';
+  html+='<div class="info-row"><span><strong>Client Name</strong></span><span>'+esc(b.name)+'</span></div>';
+  html+='<div class="info-row"><span><strong>Phone</strong></span><span>'+esc(b.phone||'-')+'</span></div>';
+  html+='<div class="info-row"><span><strong>Email</strong></span><span>'+esc(b.email||'-')+'</span></div>';
+  html+='<div class="info-row"><span><strong>Move Date</strong></span><span>'+esc(b.date||'-')+'</span></div>';
+  html+='<div class="info-row"><span><strong>Start Time</strong></span><span>'+esc(b.start_time||'-')+'</span></div>';
+  html+='<div class="info-row"><span><strong>Pick-up</strong></span><span>'+esc(b.pickup_address||'-')+'</span></div>';
+  html+='<div class="info-row"><span><strong>Drop-off</strong></span><span>'+esc(b.dropoff_address||'-')+'</span></div>';
+  if(b.notes)html+='<div class="info-row"><span><strong>Notes</strong></span><span>'+esc(b.notes)+'</span></div>';
   html+='</div>';
   html+='<h2>TERMS AND CONDITIONS</h2>';
   html+='<h3>Acceptance of Terms</h3><p>By booking or accepting our services, the client confirms that they have read, understood, and agreed to these Terms and Conditions.</p>';
@@ -1599,7 +1604,7 @@ function downloadDoc(id){
   html+='<h3>Payment and Additional Fees</h3><p>Payment is due upon completion of the service unless otherwise agreed. Additional charges may apply for stairs, restricted access or long carrying distances.</p>';
   html+='<div class="sig-box">';
   html+='<div style="font-weight:700;font-size:15px;margin-bottom:8px;color:#2a6b2a">DIGITAL SIGNATURE</div>';
-  html+='<div class="sig-name">'+(b.signature_name||'Not signed')+'</div>';
+  html+='<div class="sig-name">'+esc(b.signature_name||'Not signed')+'</div>';
   html+='<div style="font-size:13px;color:#555;margin-top:8px">Signed on: '+signDate+' at '+signTime+'</div>';
   html+='<div style="font-size:12px;color:#777;margin-top:6px">By signing, the client confirms they have read and agreed to all Terms &amp; Conditions and the Service Agreement above.</div>';
   html+='</div>';
@@ -1714,7 +1719,7 @@ function generateAdminInvoice(){
     if(!fixedAmt){ showToast('Please enter fixed price amount.'); return; }
     var fixedDesc = document.getElementById('inv_fixed_desc').value.trim()||'Removal Service — Fixed Price';
     subtotal = fixedAmt + extTotal;
-    rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+fixedDesc+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Fixed</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+fixedAmt.toFixed(2)+'</td></tr>';
+    rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(fixedDesc)+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Fixed</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+fixedAmt.toFixed(2)+'</td></tr>';
     durStr = '—';
   } else {
     if(!start||!finish){ showToast('Please enter start and finish times.'); return; }
@@ -1727,11 +1732,11 @@ function generateAdminInvoice(){
     durStr = hrs>0?(mins>0?hrs+'h '+mins+'min':hrs+'h'):mins+'min';
     var labour=hours*rate;
     subtotal=labour+callout+extTotal;
-    rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+desc+'<br><small style="color:#888">'+fmtT(sh,sm)+' – '+fmtT(fh,fm)+'</small></td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+hours.toFixed(2)+'h</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+rate.toFixed(2)+'/hr</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+labour.toFixed(2)+'</td></tr>';
+    rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(desc)+'<br><small style="color:#888">'+fmtT(sh,sm)+' – '+fmtT(fh,fm)+'</small></td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+hours.toFixed(2)+'h</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+rate.toFixed(2)+'/hr</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+labour.toFixed(2)+'</td></tr>';
     if(callout>0) rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Call Out Fee</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+callout.toFixed(2)+'</td></tr>';
   }
 
-  extras.forEach(function(e){ rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+e.desc+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+e.amt.toFixed(2)+'</td></tr>'; });
+  extras.forEach(function(e){ rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(e.desc)+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+e.amt.toFixed(2)+'</td></tr>'; });
 
   var discountType = document.getElementById('inv_discount_type').value;
   var discountValue = parseFloat(document.getElementById('inv_discount_value').value)||0;
@@ -1756,16 +1761,16 @@ function generateAdminInvoice(){
   var dr=document.getElementById('inv_dropoff').value.trim();
   var ph=document.getElementById('inv_phone').value.trim();
   var em=document.getElementById('inv_email').value.trim();
-  if(pu) det+='From: '+pu+'<br>';
-  if(dr) det+='To: '+dr+'<br>';
-  if(ph) det+=ph+'<br>';
-  if(em) det+=em;
+  if(pu) det+='From: '+esc(pu)+'<br>';
+  if(dr) det+='To: '+esc(dr)+'<br>';
+  if(ph) det+=esc(ph)+'<br>';
+  if(em) det+=esc(em);
   document.getElementById('inv_p_detail').innerHTML=det;
   document.getElementById('inv_p_items').innerHTML=rows;
 
   var totals='';
   totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>Subtotal</span><span>$'+subtotal.toFixed(2)+'</span></div>';
-  if(discountAmt>0) totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>Discount'+(discountDesc?' ('+discountDesc+')':'')+'</span><span>-$'+discountAmt.toFixed(2)+'</span></div>';
+  if(discountAmt>0) totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>Discount'+(discountDesc?' ('+esc(discountDesc)+')':'')+'</span><span>-$'+discountAmt.toFixed(2)+'</span></div>';
   if(gst) totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>GST (10%)</span><span>$'+gstAmt.toFixed(2)+'</span></div>';
   totals+='<div style="display:flex;justify-content:space-between;padding:10px 0 4px;font-size:16px;font-weight:700;color:#1a1a1a;border-top:2px solid #1a1a1a;margin-top:4px"><span>TOTAL DUE</span><span>AUD $'+total.toFixed(2)+'</span></div>';
   if(gst) totals+='<div style="font-size:11px;color:#888;text-align:right;margin-top:3px">GST included: $'+gstAmt.toFixed(2)+'</div>';
@@ -1870,11 +1875,11 @@ function renderInvoicePaymentsBody(paymentsRows, totalAmount){
     rows.forEach(function(p, idx){
       // Step 10N: row opens a read-only detail view (showPaymentDetail) — index into the SAME rows array cached by loadInvoicePayments
       html += '<tr onclick="showPaymentDetail('+idx+')" style="cursor:pointer" title="View payment details">'
-        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(p.paid_at ? String(p.paid_at).slice(0,10) : '-')+'</td>'
+        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(p.paid_at ? String(p.paid_at).slice(0,10) : '-')+'</td>'
         +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+Number(p.amount||0).toFixed(2)+'</td>'
-        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(p.method||'-')+'</td>'
-        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(p.reference||'-')+'</td>'
-        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(p.status||'-')+'</td>'
+        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(p.method||'-')+'</td>'
+        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(p.reference||'-')+'</td>'
+        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(p.status||'-')+'</td>'
         +'</tr>';
     });
     html += '</tbody></table>';
@@ -1908,7 +1913,7 @@ async function loadInvoicePayments(invoiceId, totalAmount){
 
 // Step 10N: View Payment Details — read-only, uses the rows already fetched by loadInvoicePayments (no INSERT/UPDATE/DELETE, no extra query)
 function emptyDash(v){
-  return (v === null || v === undefined || String(v).trim() === '') ? '—' : String(v);
+  return (v === null || v === undefined || String(v).trim() === '') ? '—' : esc(v);
 }
 
 // Renders a timestamptz value in the viewer's local time, from the ISO string Supabase returns (already timezone-aware,
@@ -2165,7 +2170,7 @@ async function openInvoice(id){
 
     var rows = '';
     if(isFixed){
-      rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(inv.fixed_description||'Removal Service — Fixed Price')+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Fixed</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(inv.fixed_amount||0).toFixed(2)+'</td></tr>';
+      rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(inv.fixed_description||'Removal Service — Fixed Price')+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Fixed</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(inv.fixed_amount||0).toFixed(2)+'</td></tr>';
     } else {
       var timeLabel = '';
       if(ss.start_time && inv.finish_time){
@@ -2173,10 +2178,10 @@ async function openInvoice(id){
         var fh=parseInt(inv.finish_time.split(':')[0]),fm=parseInt(inv.finish_time.split(':')[1]);
         timeLabel = '<br><small style="color:#888">'+fmtT(sh,sm)+' – '+fmtT(fh,fm)+'</small>';
       }
-      rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+(inv.description||'Removal Service')+timeLabel+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+Number(inv.hours_worked||0).toFixed(2)+'h</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+Number(inv.hourly_rate||0).toFixed(2)+'/hr</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(inv.labour_amount||0).toFixed(2)+'</td></tr>';
+      rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(inv.description||'Removal Service')+timeLabel+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+Number(inv.hours_worked||0).toFixed(2)+'h</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+Number(inv.hourly_rate||0).toFixed(2)+'/hr</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(inv.labour_amount||0).toFixed(2)+'</td></tr>';
       if((ss.callout_fee||0)>0) rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Call Out Fee</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(ss.callout_fee).toFixed(2)+'</td></tr>';
     }
-    extras.forEach(function(e){ rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+e.desc+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+e.amt.toFixed(2)+'</td></tr>'; });
+    extras.forEach(function(e){ rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(e.desc)+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+e.amt.toFixed(2)+'</td></tr>'; });
 
     document.getElementById('inv_p_num').textContent = inv.invoice_number;
     document.getElementById('inv_p_client').textContent = cs.name || '';
@@ -2186,16 +2191,16 @@ async function openInvoice(id){
     document.getElementById('inv_p_ref').textContent = (cs.name||'').split(' ')[0].toUpperCase()+'_'+inv.invoice_number;
 
     var det='';
-    if(ss.pickup_address) det+='From: '+ss.pickup_address+'<br>';
-    if(ss.dropoff_address) det+='To: '+ss.dropoff_address+'<br>';
-    if(cs.phone) det+=cs.phone+'<br>';
-    if(cs.email) det+=cs.email;
+    if(ss.pickup_address) det+='From: '+esc(ss.pickup_address)+'<br>';
+    if(ss.dropoff_address) det+='To: '+esc(ss.dropoff_address)+'<br>';
+    if(cs.phone) det+=esc(cs.phone)+'<br>';
+    if(cs.email) det+=esc(cs.email);
     document.getElementById('inv_p_detail').innerHTML = det;
     document.getElementById('inv_p_items').innerHTML = rows;
 
     var totals='';
     totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>Subtotal</span><span>$'+Number(inv.subtotal||0).toFixed(2)+'</span></div>';
-    if((inv.discount_amount||0)>0) totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>Discount'+(inv.discount_description?' ('+inv.discount_description+')':'')+'</span><span>-$'+Number(inv.discount_amount).toFixed(2)+'</span></div>';
+    if((inv.discount_amount||0)>0) totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>Discount'+(inv.discount_description?' ('+esc(inv.discount_description)+')':'')+'</span><span>-$'+Number(inv.discount_amount).toFixed(2)+'</span></div>';
     if(inv.gst_included) totals+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:#666;border-bottom:1px solid #f0f0eb"><span>GST (10%)</span><span>$'+Number(inv.gst_amount||0).toFixed(2)+'</span></div>';
     totals+='<div style="display:flex;justify-content:space-between;padding:10px 0 4px;font-size:16px;font-weight:700;color:#1a1a1a;border-top:2px solid #1a1a1a;margin-top:4px"><span>TOTAL DUE</span><span>AUD $'+Number(inv.total_amount||0).toFixed(2)+'</span></div>';
     if(inv.gst_included) totals+='<div style="font-size:11px;color:#888;text-align:right;margin-top:3px">GST included: $'+Number(inv.gst_amount||0).toFixed(2)+'</div>';
@@ -2359,7 +2364,7 @@ function printAdminInvoice(){
   var num = document.getElementById('inv_num').value;
   var titleNum = (num && num !== 'PENDING') ? num : 'Draft';
   var w = window.open('','_blank');
-  w.document.write('<html><head><title>Invoice-'+titleNum+'</title><style>body{font-family:Arial,sans-serif;margin:20px}table{width:100%;border-collapse:collapse}</style></head><body>');
+  w.document.write('<html><head><title>Invoice-'+esc(titleNum)+'</title><style>body{font-family:Arial,sans-serif;margin:20px}table{width:100%;border-collapse:collapse}</style></head><body>');
   w.document.write(html);
   w.document.write('</body></html>');
   w.document.close();
@@ -2432,7 +2437,7 @@ function renderDraw(){
   }
   chips.innerHTML = drawParticipants.map(function(p,i){
     return '<div style="display:flex;align-items:center;gap:7px;background:#0e1218;border:1px solid #1c2130;border-radius:30px;padding:6px 12px;font-size:13px;font-weight:700;color:#e8f0e8">'+
-      p+'<button onclick="removeDrawParticipant('+i+')" style="background:none;border:none;color:#6b7a6b;cursor:pointer;font-size:14px;padding:0;line-height:1">✕</button></div>';
+      esc(p)+'<button onclick="removeDrawParticipant('+i+')" style="background:none;border:none;color:#6b7a6b;cursor:pointer;font-size:14px;padding:0;line-height:1">✕</button></div>';
   }).join('');
   renderDrawHistory();
 }
@@ -2447,8 +2452,8 @@ function renderDrawHistory(){
   list.innerHTML = [...drawHistory].reverse().map(function(h,i){
     return '<div style="background:#0e1218;border:1px solid #1c2130;border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px">'+
       '<span>'+medals[i]||'🎖️'+'</span>'+
-      '<span style="font-weight:700;color:#86efac">'+h.name+'</span>'+
-      '<span style="color:#6b7a6b;font-size:11px">'+h.date+'</span></div>';
+      '<span style="font-weight:700;color:#86efac">'+esc(h.name)+'</span>'+
+      '<span style="color:#6b7a6b;font-size:11px">'+esc(h.date)+'</span></div>';
   }).join('');
 }
 
