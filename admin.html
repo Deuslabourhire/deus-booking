@@ -773,11 +773,15 @@ function $(id){return document.getElementById(id);}
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function showToast(msg,dur=3000){const el=$('toast');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',dur);}
 
+// Same rule as resend-email: any one admin row is enough, so a user with several roles stays logged in.
+async function hasAdminRole(userId){
+  const {data,error}=await db.from('user_roles').select('role').eq('user_id',userId).eq('role','admin').limit(1);
+  return !error&&Array.isArray(data)&&data.length>0;
+}
 async function requireAdmin(){
   const {data:{session}}=await db.auth.getSession();
   if(!session||!session.user)return false;
-  const {data:role,error}=await db.from('user_roles').select('role').eq('user_id',session.user.id).single();
-  if(error||!role||role.role!=='admin'){await db.auth.signOut();return false;}
+  if(!(await hasAdminRole(session.user.id))){await db.auth.signOut();return false;}
   return true;
 }
 async function login(){
@@ -786,8 +790,7 @@ async function login(){
   if(!email||!password){$('loginErr').textContent='Please enter your email and password.';$('loginErr').style.display='block';return;}
   const {data,error}=await db.auth.signInWithPassword({email,password});
   if(error||!data.user){$('loginErr').textContent='Invalid email or password. Please try again.';$('loginErr').style.display='block';$('passInput').value='';return;}
-  const {data:role,error:roleError}=await db.from('user_roles').select('role').eq('user_id',data.user.id).single();
-  if(roleError||!role||role.role!=='admin'){await db.auth.signOut();$('loginErr').textContent='Access denied. This account is not an admin.';$('loginErr').style.display='block';$('passInput').value='';return;}
+  if(!(await hasAdminRole(data.user.id))){await db.auth.signOut();$('loginErr').textContent='Access denied. This account is not an admin.';$('loginErr').style.display='block';$('passInput').value='';return;}
   $('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();await loadInvoicesList();await loadQuotes();
 }
 async function logout(){await db.auth.signOut();$('loginScreen').style.display='flex';$('app').style.display='none';$('passInput').value='';$('emailInput').value='';$('loginErr').style.display='none';}
