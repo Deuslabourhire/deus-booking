@@ -36,7 +36,7 @@
     travel_invalid: 'Travel time: choose a value from the list (10-minute steps, up to 4 h).',
     invoice_closed: 'This record is Paid or Cancelled, so it can no longer be corrected.',
     day_not_submitted: 'This day is not part of a sent record.',
-    day_changed: 'This day was moved to or from an invoice by another action while you were editing. Nothing was saved. The list was refreshed: check the day and try again.',
+    day_changed: 'This day was changed by someone else. Nothing was saved. The list was refreshed: please check it and try again.',
     transition_not_allowed: 'That status change is not allowed for this record.',
     use_void_payment: 'This record is Paid. Undo the payment first (in the record), then you can cancel it.',
     use_record_payment: 'Use the payment bar to record a payment.',
