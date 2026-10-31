@@ -205,29 +205,6 @@ input[type=checkbox]{width:18px;height:18px;accent-color:#3d8b3d;cursor:pointer;
   <div class="btn-row" style="flex-wrap:wrap;gap:10px">
     <button class="btn-back" id="backBtn" style="flex:1;min-width:120px">← Edit</button>
     <button class="btn-print" onclick="window.print()" style="flex:2;min-width:160px">🖨️ Print / Save as PDF</button>
-    <button class="btn-email" id="emailBtn" style="flex:2;min-width:160px;padding:12px;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:#1a3a5a;color:#93c5fd">📧 Send by Email</button>
-  </div>
-  <!-- Email Modal -->
-  <div id="emailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:999;align-items:center;justify-content:center;padding:20px">
-    <div style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:420px">
-      <div style="font-size:16px;font-weight:700;margin-bottom:16px;color:#1a1a1a">📧 Send Invoice by Email</div>
-      <div style="margin-bottom:12px">
-        <label style="font-size:11px;color:#888;display:block;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Client Email *</label>
-        <input type="email" id="emailTo" style="width:100%;background:#f8f8f5;border:1.5px solid #e0e0d8;border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;outline:none" placeholder="client@email.com"/>
-      </div>
-      <div style="margin-bottom:12px">
-        <label style="font-size:11px;color:#888;display:block;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Subject</label>
-        <input type="text" id="emailSubject" style="width:100%;background:#f8f8f5;border:1.5px solid #e0e0d8;border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;outline:none"/>
-      </div>
-      <div style="margin-bottom:16px">
-        <label style="font-size:11px;color:#888;display:block;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Message</label>
-        <textarea id="emailBody" style="width:100%;background:#f8f8f5;border:1.5px solid #e0e0d8;border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;outline:none;min-height:100px;resize:vertical"></textarea>
-      </div>
-      <div style="display:flex;gap:10px">
-        <button onclick="document.getElementById('emailModal').style.display='none'" style="flex:1;padding:11px;border:1.5px solid #e0e0d8;border-radius:9px;cursor:pointer;font-family:inherit;background:#fff;color:#666;font-size:14px">Cancel</button>
-        <button id="sendEmailBtn" style="flex:2;padding:11px;border:none;border-radius:9px;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#1a3a5a,#2563eb);color:#fff;font-size:14px;font-weight:600">📧 Send Invoice</button>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -399,95 +376,6 @@ input[type=checkbox]{width:18px;height:18px;accent-color:#3d8b3d;cursor:pointer;
     document.getElementById('invoicePreview').style.display = 'block';
     window.scrollTo({top: 0, behavior: 'smooth'});
 
-    // Pre-fill email modal
-    var clientEmail = document.getElementById('clientEmail').value.trim();
-    var clientName = document.getElementById('clientName').value.trim();
-    var invNum = document.getElementById('invNum').value;
-    document.getElementById('emailTo').value = clientEmail;
-    document.getElementById('emailSubject').value = 'Invoice ' + invNum + ' — Deus Labour Hire';
-    document.getElementById('emailBody').value = 'Hi ' + clientName.split(' ')[0] + ',\n\nPlease find your invoice ' + invNum + ' attached.\n\nThank you for choosing Deus Labour Hire!\n\nJefferson\nDeus Labour Hire\n0406 832 721';
-  });
-
-  document.getElementById('emailBtn').addEventListener('click', function() {
-    document.getElementById('emailModal').style.display = 'flex';
-  });
-
-  document.getElementById('sendEmailBtn').addEventListener('click', async function() {
-    var to = document.getElementById('emailTo').value.trim();
-    var subject = document.getElementById('emailSubject').value.trim();
-    var body = document.getElementById('emailBody').value.trim();
-    if (!to) { alert('Please enter client email.'); return; }
-
-    var btn = document.getElementById('sendEmailBtn');
-    btn.textContent = 'Sending...';
-    btn.disabled = true;
-
-    // Build invoice HTML for email
-    var client = document.getElementById('previewClient').textContent;
-    var num = document.getElementById('previewNum').textContent;
-    var date = document.getElementById('previewDate').textContent;
-    var due = document.getElementById('previewDue').textContent;
-    var clientDetail = document.getElementById('previewClientDetail').innerHTML;
-    var items = document.getElementById('previewItems').innerHTML;
-    var totals = document.getElementById('previewTotals').innerHTML;
-    var dur = document.getElementById('previewDur').textContent;
-
-    var invoiceHtml = '<div style="font-family:Arial,sans-serif;max-width:650px;margin:0 auto;padding:20px">' +
-      '<div style="background:linear-gradient(135deg,#f0f7f0,#e6f3e6);padding:24px;border-bottom:3px solid #3d8b3d;border-radius:8px 8px 0 0">' +
-      '<h1 style="font-size:22px;color:#1a1a1a;margin:0">DEUS LABOUR HIRE</h1>' +
-      '<p style="color:#2a6b2a;font-size:11px;margin:4px 0 0;letter-spacing:.1em;text-transform:uppercase">Moving & Cleaning Services</p></div>' +
-      '<div style="background:#fff;padding:24px;border:1px solid #e0e0d8;border-top:none;border-radius:0 0 8px 8px">' +
-      '<h2 style="color:#1a1a1a;font-size:20px;margin-bottom:4px">TAX INVOICE</h2>' +
-      '<p style="color:#555;font-size:13px;margin-bottom:20px">' + num + '</p>' +
-      '<table style="width:100%;margin-bottom:20px"><tr>' +
-      '<td style="vertical-align:top"><strong style="font-size:10px;color:#3d8b3d;text-transform:uppercase;letter-spacing:.1em">From</strong><br>' +
-      '<strong>Deus Labour Hire Pty Ltd</strong><br>' +
-      '<span style="font-size:12px;color:#666">Unit 10/6 Grosvenor St, Croydon NSW<br>ABN 62 665 081 783<br>0406 832 721<br>deus.labour.hire@gmail.com</span></td>' +
-      '<td style="width:20px"></td>' +
-      '<td style="vertical-align:top"><strong style="font-size:10px;color:#3d8b3d;text-transform:uppercase;letter-spacing:.1em">Bill To</strong><br>' +
-      '<strong>' + client + '</strong><br>' +
-      '<span style="font-size:12px;color:#666">' + clientDetail + '</span></td></tr></table>' +
-      '<table style="width:100%;background:#f8f8f5;border-radius:8px;margin-bottom:20px"><tr>' +
-      '<td style="padding:12px;text-align:center"><div style="font-size:10px;color:#888;text-transform:uppercase">Date</div><strong>' + date + '</strong></td>' +
-      '<td style="padding:12px;text-align:center"><div style="font-size:10px;color:#888;text-transform:uppercase">Due Date</div><strong>' + due + '</strong></td>' +
-      '<td style="padding:12px;text-align:center"><div style="font-size:10px;color:#888;text-transform:uppercase">Duration</div><strong>' + dur + '</strong></td></tr></table>' +
-      '<table style="width:100%;border-collapse:collapse;margin-bottom:20px">' +
-      '<thead><tr style="background:#f8f8f5"><th style="padding:10px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">Description</th>' +
-      '<th style="padding:10px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">QTY</th>' +
-      '<th style="padding:10px;text-align:left;font-size:11px;color:#888;text-transform:uppercase">Rate</th>' +
-      '<th style="padding:10px;text-align:right;font-size:11px;color:#888;text-transform:uppercase">Amount</th></tr></thead>' +
-      '<tbody>' + items + '</tbody></table>' +
-      '<div style="margin-left:auto;width:260px">' + totals + '</div>' +
-      '<div style="background:#f0f7f0;border:1px solid #c6e6c6;border-radius:8px;padding:16px;margin-top:20px">' +
-      '<strong style="font-size:11px;color:#3d8b3d;text-transform:uppercase;letter-spacing:.08em">Payment Information</strong><br><br>' +
-      '<span style="font-size:12px">Account: <strong>Deus Labour Hire</strong> &nbsp;|&nbsp; BSB: <strong>062 188</strong> &nbsp;|&nbsp; Account No: <strong>1094 4013</strong></span></div>' +
-      '<p style="font-size:11px;color:#888;margin-top:16px;font-style:italic">Please note that the due date for this invoice is 7 business days from the date of the invoice. Thank you!</p>' +
-      '<hr style="border:none;border-top:1px solid #f0f0eb;margin:16px 0">' +
-      '<p style="font-size:12px;color:#444">' + body.replace(/\n/g,'<br>') + '</p>' +
-      '</div></div>';
-
-    try {
-      var res = await fetch('https://amnacoyjgdfykdfepkze.supabase.co/functions/v1/resend-email', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({to: to, subject: subject, invoiceHtml: invoiceHtml})
-      });
-      var data = await res.json();
-      if (data.id || res.ok) {
-        btn.textContent = '✅ Sent!';
-        setTimeout(function() {
-          document.getElementById('emailModal').style.display = 'none';
-          btn.textContent = '📧 Send Invoice';
-          btn.disabled = false;
-        }, 2000);
-      } else {
-        throw new Error(data.message || 'Failed');
-      }
-    } catch(e) {
-      alert('Error sending email: ' + e.message);
-      btn.textContent = '📧 Send Invoice';
-      btn.disabled = false;
-    }
   });
 })();
 </script>
