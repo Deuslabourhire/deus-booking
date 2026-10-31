@@ -42,7 +42,7 @@ module.exports = async ({ run, open, sleep }) => {
     const lines = (await __blob.text()).split('\\n');
     return { notice, n: lines.length - 1, pay: lines[2401].includes('PAY-1'), formula: lines[2500].includes("\\"'=SUM(1)\\""), tab: lines[2499].includes("\\"'\\tTab\\"") };
   })()`);
-  assert.deepEqual([rec.notice, rec.n, rec.pay, rec.formula], [true, 2500, true, true]);
+  assert.deepEqual([rec.notice, rec.n, rec.pay, rec.formula, rec.tab], [true, 2500, true, true, true]);
   // load failure: no partial report
   const failed = await run(`(async () => {
     const c = { select() { return c; }, order() { return c; }, eq() { return c; }, range() { return Promise.resolve({ data: null, error: { message: 'x' } }); } };

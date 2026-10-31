@@ -687,7 +687,7 @@
     function payNumber(id) { var p = payments.find(function (x) { return x.id === id; }); return p ? p.payment_number : ''; }
     var head = ['invoice_number', 'worker', 'abn', 'gst_registered', 'submitted_at', 'status', 'paid_at', 'payment_number', 'payment_method',
       'payment_reference', 'expense_category', 'labour_total', 'travel_total', 'subtotal', 'gst_amount', 'total'];
-    function q(v) { var s = String(v == null ? '' : v); if (/^[=+\-@]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; }
+    function q(v) { var s = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; }
     var lines = [head.join(',')].concat(rows.map(function (i) {
       var w = i.worker_snapshot || {};
       return [i.invoice_number, w.full_name, w.abn, i.gst_registered, i.submitted_at, i.status, i.paid_at, payNumber(i.payment_id), i.payment_method,
