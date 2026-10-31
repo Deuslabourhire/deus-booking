@@ -826,7 +826,12 @@
     out.appendChild(el('div', { style: 'background:#fff7e0;padding:8px;border-radius:6px;margin-top:6px;font-size:12px' }, [
       el('div', { text: 'Copy this link now and send it only to ' + s.display_name + '. It will not be shown again. Any older link stopped working.' }),
       inp,
-      el('button', { style: BTN_G, text: 'Copy', onclick: function () { inp.select(); navigator.clipboard && navigator.clipboard.writeText(url); toast('Copied.'); } })
+      el('button', { style: BTN_G, text: 'Copy', onclick: function () {
+        inp.select();
+        var manual = function () { toast('Could not copy automatically. The link is selected: copy it by hand.', true); };
+        if (!navigator.clipboard) return manual();
+        navigator.clipboard.writeText(url).then(function () { toast('Copied.'); }, manual);
+      } })
     ]));
     token = null;
     // refresh link status without wiping the one-time link box
