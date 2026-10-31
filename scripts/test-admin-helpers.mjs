@@ -10,6 +10,13 @@ assert.equal(esc("O'Brien & Sons"), "O&#39;Brien &amp; Sons");
 assert.equal(esc(null), "");
 assert.equal(esc(0), "0");
 
+// Payment amounts: a comma only separates thousands, and ambiguous values are refused.
+const parseAmount = new Function(html.match(/function parsePaymentAmount\(raw\)\{[\s\S]*?\r?\n\}/)[0] + "; return parsePaymentAmount;")();
+for (const [typed, value] of [["1,500", 1500], ["1,500.50", 1500.5], ["12,345,678.90", 12345678.9], ["1500", 1500],
+  ["1500.5", 1500.5], ["150.50", 150.5], ["0.50", 0.5], [" 1,500 ", 1500], ["0", 0]]) assert.equal(parseAmount(typed), value, typed);
+for (const typed of ["1,50", "150,50", "1,5000", "1,50,000", "1.500", "1.500,50", "1,500,50", "1,500.505", "0,500", ",500",
+  "1,", ".50", "5.", "", "   ", "abc", "$150", "-5", "1e3", "1 500", null]) assert.ok(Number.isNaN(parseAmount(typed)), String(typed));
+
 // Sydney dates. The results must not depend on this machine's time zone.
 const win = {};
 new Function("window", readFileSync(new URL("../sub-shared.js", import.meta.url), "utf8"))(win);

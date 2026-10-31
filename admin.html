@@ -2042,12 +2042,13 @@ function handlePaymentFieldEnter(ev){
   }
 }
 
-// Accepts "150", "150.50" or "150,50" — comma is normalized to a dot before Number()
+// Accepts "1500", "1500.50", "1,500" or "1,500.50": a comma only separates thousands, a dot only marks cents.
+// Anything that could be read two ways ("1,50", "1.500", "1.500,50") is refused instead of guessed.
 function parsePaymentAmount(raw){
   if(raw == null) return NaN;
-  var s = String(raw).trim().replace(',', '.');
-  if(s === '') return NaN;
-  return Number(s);
+  var s = String(raw).trim();
+  if(!/^(\d+|[1-9]\d{0,2}(,\d{3})+)(\.\d{1,2})?$/.test(s)) return NaN;
+  return Number(s.replace(/,/g, ''));
 }
 
 async function submitAddPayment(){
@@ -2070,7 +2071,7 @@ async function submitAddPayment(){
   }
 
   var amount = parsePaymentAmount(document.getElementById('pay_amount').value);
-  if(!isFinite(amount) || amount <= 0){ showToast('Enter a valid payment amount greater than 0.'); return; }
+  if(!isFinite(amount) || amount <= 0){ showToast('Enter the amount like 1,500 or 1500.50, greater than 0. A comma only separates thousands.', 6000); return; }
 
   var method = document.getElementById('pay_method').value;
   var validMethods = ['bank_transfer','cash','card','other'];
