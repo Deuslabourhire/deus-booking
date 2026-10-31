@@ -787,10 +787,14 @@ async function loadBookings(){
   try{const {data,error}=await db.from('bookings').select('*').order('date',{ascending:false});if(error)throw error;bookings=Array.isArray(data)?data:[];}catch(e){bookings=[];showToast('Could not connect to database.',4000);}renderAll();
 }
 
+// shortcut: Supabase returns at most 1000 rows per request, so bookings and quotes stop at the latest 1000; add paging before that.
 // Step 10O: invoice_id -> array of {amount,status} payment rows for the invoices currently in invoicesListCache.
 // null (not []) means the payments query failed — renderInvoicesList() must show a safe fallback, never a false $0.00.
 var invoicesPaymentsCache = {};
 var invoicesPaymentsCacheFailed = false;
+// shortcut: the payments query lists every loaded id in its URL, so very long lists show N/A; move this to a database view if that happens.
+var invoicesListLimit = 50;
+function loadMoreInvoices(){ invoicesListLimit += 50; return loadInvoicesList(); }
 
 async function loadInvoicesList(){
   var body = document.getElementById('invoicesListBody');
@@ -799,7 +803,7 @@ async function loadInvoicesList(){
     const {data, error} = await db.from('invoices_effective_status')
       .select('id, invoice_number, customer_snapshot, total_amount, status, effective_status, issued_date, due_date, created_at')
       .order('created_at', {ascending:false})
-      .limit(50);
+      .limit(invoicesListLimit);
     if(error) throw error;
     invoicesListCache = Array.isArray(data) ? data : [];
 
@@ -835,6 +839,9 @@ function renderInvoicesList(){
   var body = document.getElementById('invoicesListBody');
   if(!body) return;
   if(!invoicesListCache.length){ body.textContent = 'No invoices saved yet.'; return; }
+  var loadMore = invoicesListCache.length >= invoicesListLimit
+    ? '<div style="margin-top:10px">Search only covers the latest '+invoicesListLimit+' invoices. <button onclick="loadMoreInvoices()" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:11px;padding:4px 8px;cursor:pointer">Load 50 more</button></div>'
+    : '';
 
   // Step 10S: case-insensitive substring search over invoice_number, customer name and effective_status.
   // Filters only the already-loaded cache — no new query, loadInvoicesList() and the underlying data are untouched.
@@ -849,7 +856,7 @@ function renderInvoicesList(){
     return num.indexOf(q) !== -1 || custName.indexOf(q) !== -1 || status.indexOf(q) !== -1 || hasOutstanding;
   });
 
-  if(!filteredInvoices.length){ body.textContent = 'No invoices match your search.'; return; }
+  if(!filteredInvoices.length){ body.innerHTML = 'No invoices match your search.' + loadMore; return; }
 
   body.innerHTML = filteredInvoices.map(function(inv){
     var name = (inv.customer_snapshot && inv.customer_snapshot.name) || '—';
@@ -881,7 +888,7 @@ function renderInvoicesList(){
       +'<span data-label="Invoice">'+esc(inv.invoice_number)+'</span><span data-label="Customer">'+esc(name)+'</span><span data-label="Total">'+total+'</span>'
       +'<span data-label="Status">'+esc(inv.effective_status)+'</span><span data-label="Issued">'+esc(inv.issued_date||'—')+'</span><span data-label="Due">'+esc(inv.due_date||'—')+'</span>'
       +'<span data-label="Paid">'+paidCell+'</span><span data-label="Outstanding">'+outstandingCell+'</span><span data-label="Actions">'+actionCell+'</span></div>';
-  }).join('');
+  }).join('') + loadMore;
 }
 
 async function markInvoiceAsSent(id){
