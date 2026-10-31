@@ -121,9 +121,9 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
 <script>
 (function () {
   'use strict';
-  // ---- Configuration (TEST project). Swap only after production approval. ----
+  // ---- Configuration: production project. ----
   var SUPABASE_URL = 'https://amnacoyjgdfykdfepkze.supabase.co';
-  var PUBLIC_KEY = 'sb_publishable_LbydnfpU5gwpG9zekS53rw_Uoj5EoAg';   // public (publishable/anon) key of the test project
+  var PUBLIC_KEY = 'sb_publishable_LbydnfpU5gwpG9zekS53rw_Uoj5EoAg';   // public (publishable) key: safe in a page, access is limited by the database
   var SUBMIT_URL = SUPABASE_URL + '/functions/v1/sub-invoice-submit';
 
   var ERRORS = {
