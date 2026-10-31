@@ -1752,11 +1752,12 @@ function generateAdminInvoice(){
   function fmtT(h,m){ return (h>12?h-12:(h||12))+':'+(m<10?'0'+m:m)+' '+(h>=12?'PM':'AM'); }
   function fmtD(str){ if(!str)return '-'; var d=new Date(str+'T00:00:00'); return d.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}); }
 
-  var extras=[];
+  var extras=[], extraWithoutDesc=false;
   document.querySelectorAll('#inv_extras > div').forEach(function(el){
     var d=el.querySelector('[id$="d"]'), a=el.querySelector('[id$="a"]');
-    if(d&&a){ var dv=d.value.trim(),av=parseFloat(a.value)||0; if(dv&&av>0) extras.push({desc:dv,amt:av}); }
+    if(d&&a){ var dv=d.value.trim(),av=parseFloat(a.value)||0; if(av>0&&!dv) extraWithoutDesc=true; if(dv&&av>0) extras.push({desc:dv,amt:av}); }
   });
+  if(extraWithoutDesc){ showToast('An additional charge has an amount but no description. Add one or remove the item.', 6000); return; }
   var extTotal = extras.reduce(function(s,e){return s+e.amt;},0);
 
   var subtotal, rows='', durStr='-';

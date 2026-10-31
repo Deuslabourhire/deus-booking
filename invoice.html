@@ -321,15 +321,17 @@ input[type=checkbox]{width:18px;height:18px;accent-color:#3d8b3d;cursor:pointer;
       return d.toLocaleDateString('en-AU', {day: '2-digit', month: 'short', year: 'numeric'});
     }
 
-    var extras = [];
+    var extras = [], extraWithoutDesc = false;
     document.querySelectorAll('.extra-item').forEach(function(el) {
       var dEl = el.querySelector('[id$="d"]');
       var aEl = el.querySelector('[id$="a"]');
       if (dEl && aEl) {
         var dv = dEl.value.trim(), av = parseFloat(aEl.value) || 0;
+        if (av > 0 && !dv) extraWithoutDesc = true;
         if (dv && av > 0) extras.push({desc: dv, amt: av});
       }
     });
+    if (extraWithoutDesc) { alert('An additional charge has an amount but no description. Add one or remove the item.'); return; }
     var extTotal = extras.reduce(function(s, e) { return s + e.amt; }, 0);
 
     var subtotal, rows = '', durStr = '-';
