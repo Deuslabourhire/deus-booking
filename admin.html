@@ -2512,8 +2512,13 @@ async function sendInvoiceEmail(){
 }
 
 // ── MONTHLY DRAW ──────────────────────────────────────────────────────────────
-var drawParticipants = JSON.parse(localStorage.getItem('deus_draw_p') || '[]');
-var drawHistory = JSON.parse(localStorage.getItem('deus_draw_h') || '[]');
+// A damaged value must not stop the page: this runs before the login is restored.
+function readDrawList(key){
+  try{ var v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; }
+  catch(e){ return []; }
+}
+var drawParticipants = readDrawList('deus_draw_p');
+var drawHistory = readDrawList('deus_draw_h');
 var drawDrawing = false;
 var drawCurrentWinner = '';
 
