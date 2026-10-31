@@ -1375,7 +1375,8 @@ function renderClients(){
 }
 
 function toggleCard(id){const body=$('body_'+id),chev=$('chev_'+id);if(!body||!chev)return;const open=body.classList.toggle('open');chev.textContent=open?'▲':'▼';}
-async function markDone(id){bookings=bookings.map(b=>String(b.id)===String(id)?{...b,status:'completed'}:b);await saveToSupabase({status:'completed'},id);renderAll();showToast('Job marked as completed ✓');}
+const SAVE_FAILED_MSG='Could not save. Nothing was changed. Check your connection or log in again, then try again.';
+async function markDone(id){const saved=await saveToSupabase({status:'completed'},id);if(!saved){showToast(SAVE_FAILED_MSG,6000);return;}bookings=bookings.map(b=>String(b.id)===String(id)?{...b,...saved}:b);renderAll();showToast('Job marked as completed ✓');}
 var remindersSending = {}; // a double click must not e-mail the client twice
 async function sendReminder(id){
   var b = bookings.find(function(x){ return String(x.id)===String(id); });
@@ -1465,11 +1466,12 @@ async function saveJob(){
   const data={name,phone,email,date,start_time:time,pickup_address:pickup,dropoff_address:dropoff,notes:$('mNotes').value.trim(),status:$('mStatus').value};
   const editId=$('editId').value;
   try{
-    if(editId){bookings=bookings.map(b=>String(b.id)===String(editId)?{...b,...data}:b);await saveToSupabase(data,editId);showToast('Booking updated ✓');}
+    if(editId){const saved=await saveToSupabase(data,editId);if(!saved){showToast(SAVE_FAILED_MSG,6000);return;}bookings=bookings.map(b=>String(b.id)===String(editId)?{...b,...saved}:b);showToast('Booking updated ✓');}
     else{
       var newB={...data,signature_name:'(admin added)',signed_date:new Date().toISOString().split('T')[0],reminder_sent:false,created_at:new Date().toISOString()};
-      if(SUPABASE_URL){const saved=await saveToSupabase(newB,null);if(saved&&saved.id)newB=saved;}
-      bookings=[newB,...bookings];
+      const saved=await saveToSupabase(newB,null);
+      if(!saved){showToast(SAVE_FAILED_MSG,6000);return;}
+      bookings=[saved,...bookings];
       showToast('New job added ✓');
     }
   }catch(e){showToast('Error saving. Please try again.',4000);return;}
