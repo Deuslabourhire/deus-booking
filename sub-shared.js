@@ -45,6 +45,7 @@
       '' +
       '#subInvoiceView .siv-bar{max-width:760px;margin:0 auto 10px;display:flex;gap:8px;justify-content:flex-end}' +
       '#subInvoiceView .siv-bar button{padding:10px 14px;border-radius:8px;border:none;font-size:14px;cursor:pointer}' +
+      '@media screen and (max-width:640px){#subInvoiceView .siv-sheet{padding:14px}#subInvoiceView table{display:block;overflow-x:auto}}' +
       '@media print{body>*:not(#subInvoiceView){display:none!important}' +
       '#subInvoiceView{position:static;background:#fff;padding:0;overflow:visible}' +
       '#subInvoiceView .siv-bar{display:none}#subInvoiceView .siv-sheet{max-width:none;padding:0;border-radius:0}}';

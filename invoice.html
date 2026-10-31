@@ -71,7 +71,15 @@ input[type=checkbox]{width:18px;height:18px;accent-color:#3d8b3d;cursor:pointer;
   .app-header,.form-wrap,.btn-row{display:none!important}
   #invoicePreview{display:block!important;margin:0;border-radius:0;box-shadow:none;max-width:100%}
 }
-@media screen and (max-width:640px){.field input,.field select,.field textarea{font-size:16px}}
+@media screen and (max-width:640px){
+  .field input,.field select,.field textarea{font-size:16px}
+  .row{grid-template-columns:1fr}
+  .inv-header{padding:16px;flex-wrap:wrap;gap:10px}
+  .inv-body{padding:16px}
+  .inv-totals{width:100%;margin-left:0}
+  .inv-table th,.inv-table td{padding:8px 6px}
+  .inv-footer,.btn-row{padding-left:16px;padding-right:16px;flex-wrap:wrap}
+}
 </style>
 </head>
 <body>

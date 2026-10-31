@@ -146,6 +146,7 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
   .cal-event{font-size:10px}
   /* The payment and invoice bars are tall on a phone: fixed in place, they would cover the list. */
   #tabSubs [style*="sticky"]{position:static!important}
+  #inv_preview td,#inv_preview th{padding:6px!important}
 }
 </style>
 </head>
@@ -452,7 +453,7 @@ These Terms and Conditions are governed by the laws of Australia.</div>
           </tr></thead>
           <tbody id="inv_p_items"></tbody>
         </table>
-        <div style="margin-left:auto;width:240px;margin-bottom:16px" id="inv_p_totals"></div>
+        <div style="margin-left:auto;width:240px;max-width:100%;margin-bottom:16px" id="inv_p_totals"></div>
         <div style="background:#f0f7f0;border:1px solid #c6e6c6;border-radius:8px;padding:14px;margin-bottom:14px">
           <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Payment Information</div>
           <div style="font-size:12px;color:#444">Account: <strong>Deus Labour Hire</strong> &nbsp;|&nbsp; BSB: <strong>062 188</strong> &nbsp;|&nbsp; Account No: <strong>1094 4013</strong><br>Reference: <strong id="inv_p_ref"></strong></div>
