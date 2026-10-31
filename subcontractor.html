@@ -41,6 +41,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
 .badge.pending{background:#fff7e0;color:#9a6a00}.badge.approved{background:#e8f0ff;color:#2952a3}
 .badge.paid{background:#e9f7e9;color:#2a7a2a}.badge.cancelled{background:#f3f3f3;color:#888}
 #app{display:none}
+@media (max-width:640px){.row{grid-template-columns:1fr}.field input,.field select,.field textarea{font-size:16px}.day-actions button{min-height:44px;font-size:13px}}
 </style>
 </head>
 <body>
@@ -120,9 +121,9 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
 <script>
 (function () {
   'use strict';
-  // ---- Configuration (TEST project). Swap only after production approval. ----
+  // ---- Configuration: production project. ----
   var SUPABASE_URL = 'https://amnacoyjgdfykdfepkze.supabase.co';
-  var PUBLIC_KEY = 'sb_publishable_LbydnfpU5gwpG9zekS53rw_Uoj5EoAg';   // public (publishable/anon) key of the test project
+  var PUBLIC_KEY = 'sb_publishable_LbydnfpU5gwpG9zekS53rw_Uoj5EoAg';   // public (publishable) key: safe in a page, access is limited by the database
   var SUBMIT_URL = SUPABASE_URL + '/functions/v1/sub-invoice-submit';
 
   var ERRORS = {
@@ -359,8 +360,15 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
       state.gst = $('pGst').checked;
       // Bank details replaced: the office alert is already recorded by the database; this asks for the e-mail alert.
       if (r && r.bank_alert) {
-        try { await fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token, action: 'bank_changed' }) }); } catch (e) { /* alert stays queued */ }
-        showMsg('Your details were saved. Because your bank details changed, the office was notified and a warning was sent to your previous e-mail address.', true);
+        var mailed = false;
+        try {
+          var res = await fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token, action: 'bank_changed' }) });
+          var out = await res.json();
+          var notDone = /^(failed|not_configured)/;
+          mailed = res.ok && out.ok && out.alerts > 0 && out.email.every(function (m) { return !notDone.test(m.admin || '') && !notDone.test(m.worker || ''); });
+        } catch (e) { /* the alert stays queued */ }
+        showMsg(mailed ? 'Your details were saved. Because your bank details changed, the office was notified and a warning was sent to your previous e-mail address.'
+          : 'Your details were saved and the office can see the change. The warning e-mail could not be sent yet.', true);
         return;
       }
       showMsg('Your details were saved.', true);

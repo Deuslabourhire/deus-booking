@@ -378,6 +378,7 @@
     box.appendChild(head); box.appendChild(payBar); box.appendChild(list);
     renderPayBar();
     var rows = cache.invoices.filter(function (i) { return filter.value === 'all' || i.status === filter.value; });
+    if (cache.invoices.length >= 200) list.appendChild(el('div', { style: 'color:#666;font-size:12px;margin-bottom:6px', text: 'Showing the latest 200 records. The CSV includes all of them.' }));
     if (!rows.length) list.appendChild(el('div', { style: 'color:#999;font-size:13px', text: 'No records.' }));
     rows.forEach(function (inv) { list.appendChild(invoiceCard(inv)); });
   }
@@ -664,15 +665,32 @@
     return box;
   }
 
-  function exportCsv(filter) {
-    var rows = cache.invoices.filter(function (i) { return filter === 'all' || i.status === filter; });
+  // The screen only loads recent records; a report must cover all of them.
+  async function fetchAll(build) {
+    var rows = [], size = 1000;
+    for (var from = 0; ; from += size) {
+      var r = await build().range(from, from + size - 1);
+      if (r.error) throw r.error;
+      rows = rows.concat(r.data);
+      if (r.data.length < size) return rows;
+    }
+  }
+  async function exportCsv(filter) {
+    var rows, payments;
+    try {
+      rows = await fetchAll(function () {
+        var q = db.from('sub_invoices').select('*').order('submitted_at', { ascending: false }).order('id');
+        return filter === 'all' ? q : q.eq('status', filter);
+      });
+      payments = await fetchAll(function () { return db.from('sub_payments').select('id,payment_number').order('id'); });
+    } catch (e) { return toast('Could not load all the records, so no CSV was created. Try again.', true); }
+    function payNumber(id) { var p = payments.find(function (x) { return x.id === id; }); return p ? p.payment_number : ''; }
     var head = ['invoice_number', 'worker', 'abn', 'gst_registered', 'submitted_at', 'status', 'paid_at', 'payment_number', 'payment_method',
       'payment_reference', 'expense_category', 'labour_total', 'travel_total', 'subtotal', 'gst_amount', 'total'];
-    function q(v) { var s = String(v == null ? '' : v); if (/^[=+\-@]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; }
+    function q(v) { var s = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; }
     var lines = [head.join(',')].concat(rows.map(function (i) {
       var w = i.worker_snapshot || {};
-      var p = i.payment_id ? payById(i.payment_id) : null;
-      return [i.invoice_number, w.full_name, w.abn, i.gst_registered, i.submitted_at, i.status, i.paid_at, p ? p.payment_number : '', i.payment_method,
+      return [i.invoice_number, w.full_name, w.abn, i.gst_registered, i.submitted_at, i.status, i.paid_at, payNumber(i.payment_id), i.payment_method,
         i.payment_reference, i.expense_category, i.labour_total, i.travel_total, i.subtotal, i.gst_amount, i.total].map(q).join(',');
     }));
     var a = el('a', { href: URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' })), download: 'subcontractor-records-' + filter + '.csv' });
@@ -808,7 +826,12 @@
     out.appendChild(el('div', { style: 'background:#fff7e0;padding:8px;border-radius:6px;margin-top:6px;font-size:12px' }, [
       el('div', { text: 'Copy this link now and send it only to ' + s.display_name + '. It will not be shown again. Any older link stopped working.' }),
       inp,
-      el('button', { style: BTN_G, text: 'Copy', onclick: function () { inp.select(); navigator.clipboard && navigator.clipboard.writeText(url); toast('Copied.'); } })
+      el('button', { style: BTN_G, text: 'Copy', onclick: function () {
+        inp.select();
+        var manual = function () { toast('Could not copy automatically. The link is selected: copy it by hand.', true); };
+        if (!navigator.clipboard) return manual();
+        navigator.clipboard.writeText(url).then(function () { toast('Copied.'); }, manual);
+      } })
     ]));
     token = null;
     // refresh link status without wiping the one-time link box

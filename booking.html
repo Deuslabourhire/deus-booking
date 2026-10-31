@@ -126,7 +126,8 @@ textarea{resize:vertical;min-height:78px}
 .contact-btn.email{background:var(--bg);border:1.5px solid var(--border);color:var(--text)}
 .confirm-box{background:var(--bg);border:1.5px solid var(--border);border-radius:11px;padding:16px;margin-top:18px;text-align:left}
 
-.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:var(--black);color:#fff;border-radius:10px;padding:10px 20px;z-index:2000;font-size:13px;font-weight:600;box-shadow:var(--shadow-card);display:none;white-space:nowrap;border:1px solid rgba(232,160,32,0.4)}
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:var(--black);color:#fff;border-radius:10px;padding:10px 20px;z-index:2000;font-size:13px;font-weight:600;box-shadow:var(--shadow-card);display:none;width:max-content;max-width:calc(100% - 32px);text-align:center;border:1px solid rgba(232,160,32,0.4)}
+@media (max-width:640px){input,textarea,select{font-size:16px}.field-row{grid-template-columns:1fr}.doc-box{max-height:50vh}}
 </style>
 </head>
 <body>
@@ -237,68 +238,7 @@ textarea{resize:vertical;min-height:78px}
 
       <div class="doc-block">
         <div class="doc-header"><span class="doc-title">1. Terms &amp; Conditions</span><span class="doc-badge">Removal Services</span></div>
-        <div class="doc-box">DEUS LABOUR HIRE
-Moving &amp; Cleaning Services
-Email: deus.labour.hire@gmail.com
-
-TERMS AND CONDITIONS &#8211; REMOVAL SERVICES
-
-Acceptance of Terms
-By booking or accepting our services, the client confirms that they have read, understood, and agreed to these Terms and Conditions.
-
-Duty of Care
-Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client&#39;s belongings. However, removal services involve inherent risks and minor damage may occasionally occur despite reasonable care.
-
-Condition of Goods
-The client confirms that all items provided for transport are in a condition suitable for removal unless otherwise disclosed prior to the move.
-
-Client Packing Responsibility
-Items packed by the client are transported at the client&#39;s risk unless damage is directly caused by proven negligence during handling by our staff.
-
-Fragile and High-Risk Items
-Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics require special care and must be disclosed before the move.
-
-Television and Electronic Equipment
-Modern televisions are extremely fragile and may suffer internal panel damage even when handled with reasonable care. Televisions should ideally be transported in original packaging.
-
-Disclosure of High-Value Items
-Items valued above $800 must be disclosed prior to the move.
-
-Safe Transport and Additional Trips
-If fragile items cannot be safely transported due to limited truck space, Deus Labour Hire may transport them in a separate load.
-
-Refusal to Move Unsafe Items
-Deus Labour Hire reserves the right to refuse items considered unsafe for transport.
-
-Pre-Existing Damage
-Deus Labour Hire is not responsible for items that were already damaged before the move.
-
-Liability for Loss or Damage
-If damage occurs due to negligence during the service, liability will be assessed based on the fair market value of the item at the time of the move considering age, condition and depreciation. Nothing in these Terms and Conditions excludes, restricts or modifies any rights that the client may have under the Australian Consumer Law.
-
-Transit Insurance
-Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited subject to the policy terms and conditions.
-
-Insurance Claims
-If a claim is submitted to the insurer the final decision regarding compensation will be determined by the insurance company.
-
-Claims Procedure
-Any claim must be reported within 24 hours after completion of the move and include photographs and a description of the damage.
-
-Resolution of Claims
-Resolution may include repair, replacement with the same model, similar second-hand replacement or payment of the fair market value.
-
-Access and Safety
-The client must ensure safe access to the property. Additional charges may apply for stairs or restricted access.
-
-Heavy Items
-Items over 100kg must be disclosed before the move.
-
-Payment Terms
-Payment is due upon completion of the service unless otherwise agreed.
-
-Governing Law
-These Terms and Conditions are governed by the laws of Australia.</div>
+        <div class="doc-box" id="docTC"></div>
         <button type="button" class="agree-btn" id="arTC" onclick="toggleAgree('agreeTC','arTC')">
           <div class="agree-check-box" id="chkTC">☐</div>
           <div>
@@ -313,28 +253,7 @@ These Terms and Conditions are governed by the laws of Australia.</div>
 
       <div class="doc-block">
         <div class="doc-header"><span class="doc-title">2. Service Agreement</span><span class="doc-badge">Removal Services</span></div>
-        <div class="doc-box">DEUS LABOUR HIRE
-Moving &amp; Cleaning Services
-Email: deus.labour.hire@gmail.com
-
-SERVICE AGREEMENT &#8211; REMOVAL SERVICES
-
-Acceptance and Scope
-By booking or accepting our services, the client confirms they have read, understood, and agreed to these Terms and Conditions. Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client&#39;s belongings. Removal services involve inherent risks and minor damage may occasionally occur despite reasonable care. These Terms are governed by the laws of Australia.
-
-Client Responsibilities
-Items packed by the client are transported at the client&#39;s risk unless damage is directly caused by proven negligence. The client confirms all goods are suitable for removal unless disclosed prior to the move. The client must ensure safe access to the property. Items over 100kg must be disclosed before the move. Items valued above $800 must be disclosed before the move.
-
-Fragile and Special Items
-Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics must be disclosed before the move. Modern televisions are extremely fragile and may suffer internal panel damage even when handled with reasonable care and should ideally be transported in original packaging. If fragile items cannot be safely transported due to limited truck space, Deus Labour Hire may transport them in a separate load. Deus Labour Hire reserves the right to refuse items considered unsafe for transport.
-
-Liability and Insurance
-Deus Labour Hire is not responsible for items that were already damaged before the move. If damage occurs due to negligence, liability will be assessed based on the fair market value of the item considering age, condition and depreciation. Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited subject to policy terms. Any claim must be reported within 24 hours and must include photos and description of the damage. Nothing in these terms excludes the client&#39;s rights under Australian Consumer Law.
-
-Payment and Additional Fees
-Payment is due upon completion of the service unless otherwise agreed. Additional charges may apply for stairs, restricted access or long carrying distances.
-
-Company Representative: Deus Labour Hire Pty Ltd</div>
+        <div class="doc-box" id="docSA"></div>
         <button type="button" class="agree-btn" id="arSA" onclick="toggleAgree('agreeAG','arSA')">
           <div class="agree-check-box" id="chkSA">☐</div>
           <div>
@@ -384,7 +303,7 @@ Company Representative: Deus Labour Hire Pty Ltd</div>
         <p>Thank you! Your move has been booked with <strong>Deus Labour Hire</strong>.</p>
         <p>Jefferson and the team will be in touch shortly to confirm all details.</p>
         <div class="success-contact">
-          <a class="contact-btn wa" href="https://wa.me/61406832721">WhatsApp Us: 0406 832 721</a>
+          <a class="contact-btn wa" href="https://wa.me/61430008700">WhatsApp Us: 0430 008 700</a>
           <a class="contact-btn email" href="mailto:deus.labour.hire@gmail.com">deus.labour.hire@gmail.com</a>
         </div>
         <div class="confirm-box" id="confirmDetails"></div>
@@ -394,12 +313,16 @@ Company Representative: Deus Labour Hire Pty Ltd</div>
   </div>
 </div>
 
+<script src="./terms.js"></script>
 <script>
 const EDGE_FUNCTION_URL='https://amnacoyjgdfykdfepkze.supabase.co/functions/v1/create-booking';
 
 let formData={};
 const quoteIdFromUrl = new URLSearchParams(window.location.search).get('quote_id') || null;
 const TOTAL_CHECKS=14;
+if(window.DEUS_TERMS){document.getElementById('docTC').textContent=DEUS_TERMS.tc;document.getElementById('docSA').textContent=DEUS_TERMS.sa;}
+function sydneyToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Sydney'}).format(new Date());}
+document.getElementById('date').min=sydneyToday();
 
 function $(id){return document.getElementById(id);}
 function showToast(msg,dur=3500){const el=$('toast');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',dur);}
@@ -426,7 +349,9 @@ function goStep2(){
   if(!name){setFieldError('name',true);ok=false;}else setFieldError('name',false);
   if(!validatePhone(phone)){setFieldError('phone',true);ok=false;}else setFieldError('phone',false);
   if(!validateEmail(email)){setFieldError('email',true);ok=false;}else setFieldError('email',false);
-  if(!date){setFieldError('date',true);ok=false;}else setFieldError('date',false);
+  const dateError=!date?'Select a date.':date<sydneyToday()?'The move date cannot be in the past. Please choose today or a later date.':'';
+  $('f-date').querySelector('.field-error').textContent=dateError||'Select a date.';
+  setFieldError('date',!!dateError);if(dateError)ok=false;
   if(!time){setFieldError('time',true);ok=false;}else setFieldError('time',false);
   if(!pickup){setFieldError('pickup',true);ok=false;}else setFieldError('pickup',false);
   if(!dropoff){setFieldError('dropoff',true);ok=false;}else setFieldError('dropoff',false);
@@ -446,6 +371,7 @@ function onCheck(el){
 }
 
 function goStep3(){
+  if(!window.DEUS_TERMS){showToast('Could not load the documents. Please reload the page.',5000);return;}
   if(document.querySelectorAll('.cl:checked').length!==TOTAL_CHECKS){showToast('Please confirm all checklist items.');return;}
   goStep(3);
 }
@@ -512,7 +438,7 @@ function downloadSignedDoc(){
   html+='</style></head><body>';
   html+='<div class="header"><div class="logo">DEUS LABOUR HIRE</div>';
   html+='<div style="color:#666;margin-top:4px;font-size:14px">Moving &amp; Cleaning Services</div>';
-  html+='<div style="color:#666;font-size:13px">deus.labour.hire@gmail.com | 0406 832 721</div></div>';
+  html+='<div style="color:#666;font-size:13px">deus.labour.hire@gmail.com | 0430 008 700</div></div>';
   html+='<h2>SIGNED SERVICE DOCUMENTS</h2>';
   html+='<div class="info-box">';
   html+='<div class="info-row"><span><strong>Client Name</strong></span><span>'+b.name+'</span></div>';
@@ -524,39 +450,15 @@ function downloadSignedDoc(){
   html+='<div class="info-row"><span><strong>Drop-off Address</strong></span><span>'+b.dropoffAddress+'</span></div>';
   if(b.notes)html+='<div class="info-row"><span><strong>Notes</strong></span><span>'+b.notes+'</span></div>';
   html+='</div>';
-  html+='<h2>TERMS AND CONDITIONS</h2>';
-  html+='<h3>Acceptance of Terms</h3><p>By booking or accepting our services, the client confirms that they have read, understood, and agreed to these Terms and Conditions.</p>';
-  html+='<h3>Duty of Care</h3><p>Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client&#39;s belongings. However, removal services involve inherent risks and minor damage may occasionally occur despite reasonable care.</p>';
-  html+='<h3>Condition of Goods</h3><p>The client confirms that all items provided for transport are in a condition suitable for removal unless otherwise disclosed prior to the move.</p>';
-  html+='<h3>Client Packing Responsibility</h3><p>Items packed by the client are transported at the client&#39;s risk unless damage is directly caused by proven negligence during handling by our staff.</p>';
-  html+='<h3>Fragile and High-Risk Items</h3><p>Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics require special care and must be disclosed before the move.</p>';
-  html+='<h3>Television and Electronic Equipment</h3><p>Modern televisions are extremely fragile and may suffer internal panel damage even when handled with reasonable care. Televisions should ideally be transported in original packaging.</p>';
-  html+='<h3>Disclosure of High-Value Items</h3><p>Items valued above $800 must be disclosed prior to the move.</p>';
-  html+='<h3>Safe Transport and Additional Trips</h3><p>If fragile items cannot be safely transported due to limited truck space, Deus Labour Hire may transport them in a separate load.</p>';
-  html+='<h3>Refusal to Move Unsafe Items</h3><p>Deus Labour Hire reserves the right to refuse items considered unsafe for transport.</p>';
-  html+='<h3>Pre-Existing Damage</h3><p>Deus Labour Hire is not responsible for items that were already damaged before the move.</p>';
-  html+='<h3>Liability for Loss or Damage</h3><p>If damage occurs due to negligence, liability will be assessed based on the fair market value considering age, condition and depreciation. Nothing in these Terms excludes the client&#39;s rights under the Australian Consumer Law.</p>';
-  html+='<h3>Transit Insurance</h3><p>Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited subject to the policy terms and conditions.</p>';
-  html+='<h3>Insurance Claims</h3><p>If a claim is submitted to the insurer the final decision regarding compensation will be determined by the insurance company.</p>';
-  html+='<h3>Claims Procedure</h3><p>Any claim must be reported within 24 hours after completion of the move and include photographs and a description of the damage.</p>';
-  html+='<h3>Resolution of Claims</h3><p>Resolution may include repair, replacement with the same model, similar second-hand replacement or payment of the fair market value.</p>';
-  html+='<h3>Access and Safety</h3><p>The client must ensure safe access to the property. Additional charges may apply for stairs or restricted access.</p>';
-  html+='<h3>Heavy Items</h3><p>Items over 100kg must be disclosed before the move.</p>';
-  html+='<h3>Payment Terms</h3><p>Payment is due upon completion of the service unless otherwise agreed.</p>';
-  html+='<h3>Governing Law</h3><p>These Terms and Conditions are governed by the laws of Australia.</p>';
-  html+='<h2>SERVICE AGREEMENT</h2>';
-  html+='<h3>Acceptance and Scope</h3><p>By booking or accepting our services, the client confirms they have read, understood, and agreed to these Terms and Conditions. Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client&#39;s belongings. These Terms are governed by the laws of Australia.</p>';
-  html+='<h3>Client Responsibilities</h3><p>Items packed by the client are transported at the client&#39;s risk unless damage is directly caused by proven negligence. The client confirms all goods are suitable for removal unless disclosed. The client must ensure safe access. Items over 100kg and items valued above $800 must be disclosed before the move.</p>';
-  html+='<h3>Fragile and Special Items</h3><p>Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics must be disclosed before the move. Modern televisions are extremely fragile. Deus Labour Hire reserves the right to refuse items considered unsafe for transport.</p>';
-  html+='<h3>Liability and Insurance</h3><p>Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited. Any claim must be reported within 24 hours with photos and description. Nothing in these terms excludes the client&#39;s rights under Australian Consumer Law.</p>';
-  html+='<h3>Payment and Additional Fees</h3><p>Payment is due upon completion of the service unless otherwise agreed. Additional charges may apply for stairs, restricted access or long carrying distances.</p>';
+  html+='<h2>TERMS AND CONDITIONS</h2>'+DEUS_TERMS.toHtml(DEUS_TERMS.tc);
+  html+='<h2>SERVICE AGREEMENT</h2>'+DEUS_TERMS.toHtml(DEUS_TERMS.sa);
   html+='<div class="sig-box">';
   html+='<div style="font-weight:700;font-size:15px;margin-bottom:8px;color:#2a6b2a">DIGITAL SIGNATURE</div>';
   html+='<div class="sig-name">'+b.signatureName+'</div>';
   html+='<div style="font-size:13px;color:#555;margin-top:8px">Signed on: '+signDate+' at '+signTime+'</div>';
   html+='<div style="font-size:12px;color:#777;margin-top:6px">By signing, the client confirms they have read and agreed to all Terms &amp; Conditions and the Service Agreement above.</div>';
   html+='</div>';
-  html+='<div class="footer"><strong>Deus Labour Hire Pty Ltd</strong><br>deus.labour.hire@gmail.com | 0406 832 721<br>Document generated: '+new Date().toLocaleDateString('en-AU')+'</div>';
+  html+='<div class="footer"><strong>Deus Labour Hire Pty Ltd</strong><br>deus.labour.hire@gmail.com | 0430 008 700<br>Document generated: '+new Date().toLocaleDateString('en-AU')+'</div>';
   html+='</body></html>';
   var blob=new Blob([html],{type:'text/html'});
   var url=URL.createObjectURL(blob);
@@ -564,7 +466,8 @@ function downloadSignedDoc(){
   a.href=url;
   a.download='SignedDocuments_'+b.name.replace(/ /g,'_')+'_'+b.date+'.html';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Revoking at once can cancel the download on iPhones.
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
 }
 </script>
 </body>

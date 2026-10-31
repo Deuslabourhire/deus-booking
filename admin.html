@@ -13,6 +13,7 @@
   --dark:#1c1c1c;
   --green:#22b022;
   --green-dark:#1a8a1a;
+  --green-light:#e8f7e8;
   --orange-light:#fdf3e0;
   --bg:#f5f5f5;
   --white:#ffffff;
@@ -125,7 +126,7 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
 .modal-btns .btn-save{flex:2;padding:12px;background:var(--black);color:#fff;font-weight:700;border-radius:9px;border:none;cursor:pointer;font-family:inherit}
 .modal-btns .btn-save:hover{background:var(--dark)}
 
-.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:var(--black);color:#fff;border-radius:10px;padding:10px 20px;z-index:2000;font-size:13px;font-weight:600;box-shadow:var(--shadow-card);display:none;white-space:nowrap;border:1px solid rgba(232,160,32,0.4)}
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:var(--black);color:#fff;border-radius:10px;padding:10px 20px;z-index:2000;font-size:13px;font-weight:600;box-shadow:var(--shadow-card);display:none;width:max-content;max-width:calc(100% - 32px);text-align:center;border:1px solid rgba(232,160,32,0.4)}
 
 .inv-row{display:grid;grid-template-columns:1.2fr 1.4fr .8fr .9fr .8fr .8fr .8fr .8fr .9fr;gap:6px;padding:5px 0;border-bottom:1px solid #1c2130}
 @media (max-width:640px){
@@ -138,6 +139,15 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
   .quote-row{display:block;padding:10px 0}
   .quote-row span{display:block;padding:2px 0;word-break:break-word}
   .quote-row span::before{content:attr(data-label) ": ";font-weight:700;color:#6b7a6b}
+}
+@media (max-width:640px){
+  /* Below 16px, iPhones zoom the page on focus. Small rows of buttons need a finger-sized target. */
+  input,select,textarea{font-size:16px!important}
+  .inv-row button,.quote-row button,#tabSubs button,#dayModalContent button,.action-btn,.tab{min-height:44px}
+  .cal-event{font-size:10px}
+  /* The payment and invoice bars are tall on a phone: fixed in place, they would cover the list. */
+  #tabSubs [style*="sticky"]{position:static!important}
+  #inv_preview td,#inv_preview th{padding:6px!important}
 }
 </style>
 </head>
@@ -415,7 +425,7 @@ These Terms and Conditions are governed by the laws of Australia.</div>
           </div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:20px;font-weight:700;color:#1a1a1a">TAX INVOICE</div>
+          <div style="font-size:20px;font-weight:700;color:#1a1a1a" id="inv_p_title">TAX INVOICE</div>
           <div style="font-size:12px;color:#555;margin-top:3px" id="inv_p_num"></div>
         </div>
       </div>
@@ -423,7 +433,7 @@ These Terms and Conditions are governed by the laws of Australia.</div>
         <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0eb">
           <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">From</div>
           <div style="font-size:14px;font-weight:700">Deus Labour Hire Pty Ltd</div>
-          <div style="font-size:11px;color:#666;line-height:1.7">Unit 10/6 Grosvenor St, Croydon NSW | ABN 62 665 081 783<br>0406 832 721 | deus.labour.hire@gmail.com</div>
+          <div style="font-size:11px;color:#666;line-height:1.7">Unit 10/6 Grosvenor St, Croydon NSW | ABN 62 665 081 783<br>0430 008 700 | deus.labour.hire@gmail.com</div>
         </div>
         <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0eb">
           <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Bill To</div>
@@ -444,12 +454,12 @@ These Terms and Conditions are governed by the laws of Australia.</div>
           </tr></thead>
           <tbody id="inv_p_items"></tbody>
         </table>
-        <div style="margin-left:auto;width:240px;margin-bottom:16px" id="inv_p_totals"></div>
+        <div style="margin-left:auto;width:240px;max-width:100%;margin-bottom:16px" id="inv_p_totals"></div>
         <div style="background:#f0f7f0;border:1px solid #c6e6c6;border-radius:8px;padding:14px;margin-bottom:14px">
           <div style="font-size:10px;color:#3d8b3d;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Payment Information</div>
           <div style="font-size:12px;color:#444">Account: <strong>Deus Labour Hire</strong> &nbsp;|&nbsp; BSB: <strong>062 188</strong> &nbsp;|&nbsp; Account No: <strong>1094 4013</strong><br>Reference: <strong id="inv_p_ref"></strong></div>
         </div>
-        <div style="font-size:11px;color:#888;font-style:italic;border-top:1px solid #f0f0eb;padding-top:12px">Please note that the due date for this invoice is 7 business days from the date of the invoice. Thank you!</div>
+        <div style="font-size:11px;color:#888;font-style:italic;border-top:1px solid #f0f0eb;padding-top:12px">Please note that the due date for this invoice is 7 days from the date of the invoice. Thank you!</div>
       </div>
       <div id="inv_actions" style="display:flex;gap:10px;padding:14px 24px;background:#f8f8f5;border-top:1px solid #f0f0eb">
         <button onclick="document.getElementById(&#39;inv_preview&#39;).style.display=&#39;none&#39;" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:8px;cursor:pointer;font-family:inherit;background:#fff;color:#666;font-size:13px">← Edit</button>
@@ -659,6 +669,7 @@ These Terms and Conditions are governed by the laws of Australia.</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="./sub-shared.js"></script>
+<script src="./terms.js"></script>
 <script src="./subcontractor-admin.js"></script>
 <script>
 const SUPABASE_URL='https://amnacoyjgdfykdfepkze.supabase.co';
@@ -673,101 +684,22 @@ let currentInvoiceId = null;
 let currentInvoiceStatus = null;
 let invoicesListCache = [];
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
-const TERMS_TEXT=`DEUS LABOUR HIRE
-Moving & Cleaning Services
-Email: deus.labour.hire@gmail.com
-
-TERMS AND CONDITIONS - REMOVAL SERVICES
-
-Acceptance of Terms
-By booking or accepting our services, the client confirms that they have read, understood, and agreed to these Terms and Conditions.
-
-Duty of Care
-Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client's belongings. However, removal services involve inherent risks and minor damage may occasionally occur despite reasonable care.
-
-Condition of Goods
-The client confirms that all items provided for transport are in a condition suitable for removal unless otherwise disclosed prior to the move.
-
-Client Packing Responsibility
-Items packed by the client are transported at the client's risk unless damage is directly caused by proven negligence during handling by our staff.
-
-Fragile and High-Risk Items
-Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics require special care and must be disclosed before the move.
-
-Television and Electronic Equipment
-Modern televisions are extremely fragile and may suffer internal panel damage even when handled with reasonable care. Televisions should ideally be transported in original packaging.
-
-Disclosure of High-Value Items
-Items valued above $800 must be disclosed prior to the move.
-
-Safe Transport and Additional Trips
-If fragile items cannot be safely transported due to limited truck space, Deus Labour Hire may transport them in a separate load.
-
-Refusal to Move Unsafe Items
-Deus Labour Hire reserves the right to refuse items considered unsafe for transport.
-
-Pre-Existing Damage
-Deus Labour Hire is not responsible for items that were already damaged before the move.
-
-Liability for Loss or Damage
-If damage occurs due to negligence during the service, liability will be assessed based on the fair market value of the item at the time of the move considering age, condition and depreciation. Nothing in these Terms and Conditions excludes, restricts or modifies any rights that the client may have under the Australian Consumer Law.
-
-Transit Insurance
-Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited subject to the policy terms and conditions.
-
-Insurance Claims
-If a claim is submitted to the insurer the final decision regarding compensation will be determined by the insurance company.
-
-Claims Procedure
-Any claim must be reported within 24 hours after completion of the move and include photographs and a description of the damage.
-
-Resolution of Claims
-Resolution may include repair, replacement with the same model, similar second-hand replacement or payment of the fair market value.
-
-Access and Safety
-The client must ensure safe access to the property. Additional charges may apply for stairs or restricted access.
-
-Heavy Items
-Items over 100kg must be disclosed before the move.
-
-Payment Terms
-Payment is due upon completion of the service unless otherwise agreed.
-
-Governing Law
-These Terms and Conditions are governed by the laws of Australia.`;
-const SA_TEXT=`DEUS LABOUR HIRE
-Moving & Cleaning Services
-Email: deus.labour.hire@gmail.com
-
-SERVICE AGREEMENT - REMOVAL SERVICES
-
-Acceptance and Scope
-By booking or accepting our services, the client confirms they have read, understood, and agreed to these Terms and Conditions. Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client's belongings. Removal services involve inherent risks and minor damage may occasionally occur despite reasonable care. These Terms are governed by the laws of Australia.
-
-Client Responsibilities
-Items packed by the client are transported at the client's risk unless damage is directly caused by proven negligence. The client confirms all goods are suitable for removal unless disclosed prior to the move. The client must ensure safe access to the property. Items over 100kg must be disclosed before the move. Items valued above $800 must be disclosed before the move.
-
-Fragile and Special Items
-Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics must be disclosed before the move. Modern televisions are extremely fragile and may suffer internal panel damage even when handled with reasonable care and should ideally be transported in original packaging. If fragile items cannot be safely transported due to limited truck space, Deus Labour Hire may transport them in a separate load. Deus Labour Hire reserves the right to refuse items considered unsafe for transport.
-
-Liability and Insurance
-Deus Labour Hire is not responsible for items that were already damaged before the move. If damage occurs due to negligence, liability will be assessed based on the fair market value of the item considering age, condition and depreciation. Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited subject to policy terms. Any claim must be reported within 24 hours and must include photos and description of the damage. Nothing in these terms excludes the client's rights under Australian Consumer Law.
-
-Payment and Additional Fees
-Payment is due upon completion of the service unless otherwise agreed. Additional charges may apply for stairs, restricted access or long carrying distances.
-
-Company Representative: Deus Labour Hire Pty Ltd`;
+const TERMS_TEXT=DEUS_TERMS.tc,SA_TEXT=DEUS_TERMS.sa;
 
 function $(id){return document.getElementById(id);}
 // Every value from the database or a form goes through this before entering innerHTML: bookings are public input.
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function showToast(msg,dur=3000){const el=$('toast');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',dur);}
 
+// Same rule as resend-email: any one admin row is enough, so a user with several roles stays logged in.
+async function hasAdminRole(userId){
+  const {data,error}=await db.from('user_roles').select('role').eq('user_id',userId).eq('role','admin').limit(1);
+  return !error&&Array.isArray(data)&&data.length>0;
+}
 async function requireAdmin(){
   const {data:{session}}=await db.auth.getSession();
   if(!session||!session.user)return false;
-  const {data:role,error}=await db.from('user_roles').select('role').eq('user_id',session.user.id).single();
-  if(error||!role||role.role!=='admin'){await db.auth.signOut();return false;}
+  if(!(await hasAdminRole(session.user.id))){await db.auth.signOut();return false;}
   return true;
 }
 async function login(){
@@ -776,8 +708,7 @@ async function login(){
   if(!email||!password){$('loginErr').textContent='Please enter your email and password.';$('loginErr').style.display='block';return;}
   const {data,error}=await db.auth.signInWithPassword({email,password});
   if(error||!data.user){$('loginErr').textContent='Invalid email or password. Please try again.';$('loginErr').style.display='block';$('passInput').value='';return;}
-  const {data:role,error:roleError}=await db.from('user_roles').select('role').eq('user_id',data.user.id).single();
-  if(roleError||!role||role.role!=='admin'){await db.auth.signOut();$('loginErr').textContent='Access denied. This account is not an admin.';$('loginErr').style.display='block';$('passInput').value='';return;}
+  if(!(await hasAdminRole(data.user.id))){await db.auth.signOut();$('loginErr').textContent='Access denied. This account is not an admin.';$('loginErr').style.display='block';$('passInput').value='';return;}
   $('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();await loadInvoicesList();await loadQuotes();
 }
 async function logout(){await db.auth.signOut();$('loginScreen').style.display='flex';$('app').style.display='none';$('passInput').value='';$('emailInput').value='';$('loginErr').style.display='none';}
@@ -787,10 +718,14 @@ async function loadBookings(){
   try{const {data,error}=await db.from('bookings').select('*').order('date',{ascending:false});if(error)throw error;bookings=Array.isArray(data)?data:[];}catch(e){bookings=[];showToast('Could not connect to database.',4000);}renderAll();
 }
 
+// shortcut: Supabase returns at most 1000 rows per request, so bookings and quotes stop at the latest 1000; add paging before that.
 // Step 10O: invoice_id -> array of {amount,status} payment rows for the invoices currently in invoicesListCache.
 // null (not []) means the payments query failed — renderInvoicesList() must show a safe fallback, never a false $0.00.
 var invoicesPaymentsCache = {};
 var invoicesPaymentsCacheFailed = false;
+// shortcut: the payments query lists every loaded id in its URL, so very long lists show N/A; move this to a database view if that happens.
+var invoicesListLimit = 50;
+function loadMoreInvoices(){ invoicesListLimit += 50; return loadInvoicesList(); }
 
 async function loadInvoicesList(){
   var body = document.getElementById('invoicesListBody');
@@ -799,7 +734,7 @@ async function loadInvoicesList(){
     const {data, error} = await db.from('invoices_effective_status')
       .select('id, invoice_number, customer_snapshot, total_amount, status, effective_status, issued_date, due_date, created_at')
       .order('created_at', {ascending:false})
-      .limit(50);
+      .limit(invoicesListLimit);
     if(error) throw error;
     invoicesListCache = Array.isArray(data) ? data : [];
 
@@ -835,6 +770,9 @@ function renderInvoicesList(){
   var body = document.getElementById('invoicesListBody');
   if(!body) return;
   if(!invoicesListCache.length){ body.textContent = 'No invoices saved yet.'; return; }
+  var loadMore = invoicesListCache.length >= invoicesListLimit
+    ? '<div style="margin-top:10px">Search only covers the latest '+invoicesListLimit+' invoices. <button onclick="loadMoreInvoices()" style="background:none;border:1px solid #2a3a2a;border-radius:6px;color:#9bb89b;font-size:11px;padding:4px 8px;cursor:pointer">Load 50 more</button></div>'
+    : '';
 
   // Step 10S: case-insensitive substring search over invoice_number, customer name and effective_status.
   // Filters only the already-loaded cache — no new query, loadInvoicesList() and the underlying data are untouched.
@@ -849,7 +787,7 @@ function renderInvoicesList(){
     return num.indexOf(q) !== -1 || custName.indexOf(q) !== -1 || status.indexOf(q) !== -1 || hasOutstanding;
   });
 
-  if(!filteredInvoices.length){ body.textContent = 'No invoices match your search.'; return; }
+  if(!filteredInvoices.length){ body.innerHTML = 'No invoices match your search.' + loadMore; return; }
 
   body.innerHTML = filteredInvoices.map(function(inv){
     var name = (inv.customer_snapshot && inv.customer_snapshot.name) || '—';
@@ -881,17 +819,20 @@ function renderInvoicesList(){
       +'<span data-label="Invoice">'+esc(inv.invoice_number)+'</span><span data-label="Customer">'+esc(name)+'</span><span data-label="Total">'+total+'</span>'
       +'<span data-label="Status">'+esc(inv.effective_status)+'</span><span data-label="Issued">'+esc(inv.issued_date||'—')+'</span><span data-label="Due">'+esc(inv.due_date||'—')+'</span>'
       +'<span data-label="Paid">'+paidCell+'</span><span data-label="Outstanding">'+outstandingCell+'</span><span data-label="Actions">'+actionCell+'</span></div>';
-  }).join('');
+  }).join('') + loadMore;
 }
 
 async function markInvoiceAsSent(id){
-  if(!confirm('Mark this invoice as Sent?')) return;
+  if(!(await SubShared.dialog({title:'Mark this invoice as Sent?',confirmText:'Mark as Sent'}))) return;
   try{
-    const {error} = await db.from('invoices')
+    // .select(): a filter that matches nothing is not an error, so success has to be checked.
+    const {data, error} = await db.from('invoices')
       .update({ status: 'sent', sent_date: SubShared.sydneyDate() })
       .eq('id', id)
-      .eq('status', 'draft');
+      .eq('status', 'draft')
+      .select('id');
     if(error) throw error;
+    if(!data || !data.length){ showToast('This invoice is no longer a draft. The list was refreshed.', 5000); await loadInvoicesList(); return; }
     showToast('Invoice marked as Sent ✓');
     await loadInvoicesList();
     if(id === currentInvoiceId){
@@ -909,13 +850,15 @@ async function markInvoiceAsSent(id){
 async function cancelInvoice(id){
   var cancelled = invoicesListCache.find(function(inv){ return inv.id === id; });
   var invoiceNumber = cancelled ? cancelled.invoice_number : '';
-  if(!confirm('Cancel invoice '+invoiceNumber+'? This cannot be undone from this screen.')) return;
+  if(!(await SubShared.dialog({title:'Cancel invoice '+invoiceNumber+'?',message:'This cannot be undone from this screen.',confirmText:'Cancel invoice',danger:true}))) return;
   try{
-    const {error} = await db.from('invoices')
+    const {data, error} = await db.from('invoices')
       .update({ status: 'cancelled' })
       .eq('id', id)
-      .in('status', ['draft','sent']);
+      .in('status', ['draft','sent'])
+      .select('id');
     if(error) throw error;
+    if(!data || !data.length){ showToast('This invoice can no longer be cancelled: its status changed. The list was refreshed.', 5000); await loadInvoicesList(); return; }
     showToast('Invoice '+invoiceNumber+' cancelled ✓');
     if(id === currentInvoiceId){
       resetAdminInvoice();
@@ -1164,8 +1107,9 @@ async function resumeAutomation(id){
 // re-derives to "Automation Active" as soon as loadQuotes() reloads below.
 async function acceptQuote(id){
   try{
-    const {error} = await db.from('quotes').update({ status: 'accepted', human_takeover_until: null }).eq('id', id).eq('status', 'sent');
+    const {data, error} = await db.from('quotes').update({ status: 'accepted', human_takeover_until: null }).eq('id', id).eq('status', 'sent').select('id');
     if(error) throw error;
+    if(!data || !data.length){ showToast('This quote already changed. The list was refreshed.', 5000); await loadQuotes(); return; }
     showToast('Quote marked as accepted ✓');
     await loadQuotes();
   }catch(e){
@@ -1175,8 +1119,9 @@ async function acceptQuote(id){
 
 async function declineQuote(id){
   try{
-    const {error} = await db.from('quotes').update({ status: 'declined', human_takeover_until: null }).eq('id', id).eq('status', 'sent');
+    const {data, error} = await db.from('quotes').update({ status: 'declined', human_takeover_until: null }).eq('id', id).eq('status', 'sent').select('id');
     if(error) throw error;
+    if(!data || !data.length){ showToast('This quote already changed. The list was refreshed.', 5000); await loadQuotes(); return; }
     showToast('Quote marked as declined ✓');
     await loadQuotes();
   }catch(e){
@@ -1387,7 +1332,7 @@ async function sendReminder(id){
     +'<p>Hi '+esc((b.name||'').split(' ')[0] || 'there')+',</p>'
     +'<p>It\'s been about a year since we helped with your move. Thank you again for choosing Deus Labour Hire!</p>'
     +'<p>If you have another move coming up, we\'d love to help again. As a returning customer, you\'ll get 10% off your next move. Just mention this email when you book. This offer is valid for 2 weeks.</p>'
-    +'<p>Best regards,<br>Jefferson Deus<br>Deus Labour Hire<br>0406 832 721<br>deus.labour.hire@gmail.com</p>';
+    +'<p>Best regards,<br>Jefferson Deus<br>Deus Labour Hire<br>0430 008 700<br>deus.labour.hire@gmail.com</p>';
 
   remindersSending[id] = true;
   showToast('Sending email...');
@@ -1426,7 +1371,7 @@ async function sendReminder(id){
   }
 }
 async function deleteJob(id){
-  if(!confirm('Delete this booking? This cannot be undone.'))return;
+  if(!(await SubShared.dialog({title:'Delete this booking?',message:'This cannot be undone.',confirmText:'Delete booking',danger:true})))return;
   try{
     // Guard: a non-draft invoice linked to this booking is immutable at the DB level
     // (invoices_enforce_invoice_immutability trigger) — deleting the booking would
@@ -1480,6 +1425,15 @@ async function saveJob(){
 
 function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Calendar','Clients','Docs','Calc','Invoice','Draw','Quotes','Subs'].forEach(t=>$('tab'+t).style.display='none');$('tab'+name).style.display='block';if(name==='Invoice'){currentInvoiceBookingId=null;currentInvoiceCustomerId=null;}if(name==='Subs'&&window.SubAdmin){SubAdmin.init(db,$('tabSubs'));}}
 function switchDoc(name){$('docContent').textContent=name==='tc'?TERMS_TEXT:SA_TEXT;$('docTabTC').className='doc-tab-btn'+(name==='tc'?' active':'');$('docTabSA').className='doc-tab-btn'+(name==='sa'?' active':'');}
+function fmtT(h,m){ return (h>12?h-12:(h||12))+':'+(m<10?'0'+m:m)+' '+(h>=12?'PM':'AM'); }
+function fmtD(str){ if(!str)return '-'; var d=new Date(str+'T00:00:00'); return d.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}); }
+// One line of the invoice table. The arguments are HTML: callers escape what comes from the form or the database.
+function invRow(desc,qty,rate,amount){
+  var td='<td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">';
+  return '<tr>'+td+desc+'</td>'+td+qty+'</td>'+td+rate+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">'+amount+'</td></tr>';
+}
+// Every invoice line is rounded to cents and the total is the sum of the lines.
+function roundMoney(n){ return Math.round((Number(n)+Number.EPSILON)*100)/100; }
 function fmtTime(t){if(!t)return '';const[h,m]=t.split(':'),hr=parseInt(h);return `${hr>12?hr-12:hr||12}:${m} ${hr>=12?'PM':'AM'}`;}
 $('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
 $('docContent').textContent=TERMS_TEXT;
@@ -1494,22 +1448,22 @@ function updateCalcGST(){
 function calcJob(){
   var start=document.getElementById('cStart').value;
   var finish=document.getElementById('cFinish').value;
-  var rate=parseFloat(document.getElementById('cRate').value)||150;
-  var callout=parseFloat(document.getElementById('cCallout').value)||0;
-  var extras=parseFloat(document.getElementById('cExtras').value)||0;
+  var rate=parseFloat(document.getElementById('cRate').value);
+  var callout=roundMoney(parseFloat(document.getElementById('cCallout').value)||0);
+  var extras=roundMoney(parseFloat(document.getElementById('cExtras').value)||0);
   var clientName=document.getElementById('cClientName').value.trim();
   var gst=document.getElementById('cGST').checked;
-  if(!start||!finish){alert('Please enter both start and finish times.');return;}
+  if(!start||!finish){showToast('Please enter both start and finish times.');return;}
+  if(!(rate>0)){showToast('Enter an hourly rate greater than 0.',5000);return;}
   var sp=start.split(':'),fp=finish.split(':');
   var sh=parseInt(sp[0]),sm=parseInt(sp[1]),fh=parseInt(fp[0]),fm=parseInt(fp[1]);
   var sM=sh*60+sm,fM=fh*60+fm;
   if(fM<sM)fM+=1440;
   var totalMins=fM-sM,hours=totalMins/60;
-  var labour=hours*rate,subtotal=labour+callout+extras;
-  var gstAmt=gst?subtotal*0.1:0,total=subtotal+gstAmt;
+  var labour=roundMoney(hours*rate),subtotal=roundMoney(labour+callout+extras);
+  var gstAmt=gst?roundMoney(subtotal*0.1):0,total=roundMoney(subtotal+gstAmt);
   var hrs=Math.floor(totalMins/60),mins=totalMins%60;
   var durStr=hrs>0?(mins>0?hrs+'h '+mins+'min':hrs+'h'):mins+'min';
-  function fmtT(h,m){return (h>12?h-12:(h||12))+':'+('0'+m).slice(-2)+' '+(h>=12?'PM':'AM');}
   document.getElementById('calcDuration').textContent='Duration: '+durStr;
   var rows='';
   rows+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #2a3a2a"><span style="font-size:12px;color:#9aaa9a">Hours</span><span style="font-size:13px;font-weight:600;color:#e8f0e8">'+hours.toFixed(2)+'h</span></div>';
@@ -1595,7 +1549,8 @@ function closeDayModal(){
 
 function downloadDoc(id){
   var b=bookings.find(function(x){return String(x.id)===String(id);});
-  if(!b){alert('Client not found.');return;}
+  if(!b){showToast('Client not found.');return;}
+  if(!b.signature_name||b.signature_name==='(admin added)'){showToast('This client has not signed these documents, so they cannot be downloaded.',5000);return;}
   var signDate=b.signed_date?new Date(b.signed_date).toLocaleDateString('en-AU'):'-';
   var signTime=b.signed_date?new Date(b.signed_date).toLocaleTimeString('en-AU'):'-';
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Signed Documents - '+esc(b.name)+'</title>';
@@ -1613,7 +1568,7 @@ function downloadDoc(id){
   html+='</style></head><body>';
   html+='<div class="header"><div class="logo">DEUS LABOUR HIRE</div>';
   html+='<div style="color:#666;margin-top:4px;font-size:14px">Moving &amp; Cleaning Services</div>';
-  html+='<div style="color:#666;font-size:13px">deus.labour.hire@gmail.com | 0406 832 721</div></div>';
+  html+='<div style="color:#666;font-size:13px">deus.labour.hire@gmail.com | 0430 008 700</div></div>';
   html+='<h2>SIGNED SERVICE DOCUMENTS</h2>';
   html+='<div class="info-box">';
   html+='<div class="info-row"><span><strong>Client Name</strong></span><span>'+esc(b.name)+'</span></div>';
@@ -1625,39 +1580,15 @@ function downloadDoc(id){
   html+='<div class="info-row"><span><strong>Drop-off</strong></span><span>'+esc(b.dropoff_address||'-')+'</span></div>';
   if(b.notes)html+='<div class="info-row"><span><strong>Notes</strong></span><span>'+esc(b.notes)+'</span></div>';
   html+='</div>';
-  html+='<h2>TERMS AND CONDITIONS</h2>';
-  html+='<h3>Acceptance of Terms</h3><p>By booking or accepting our services, the client confirms that they have read, understood, and agreed to these Terms and Conditions.</p>';
-  html+='<h3>Duty of Care</h3><p>Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client&#39;s belongings. However, removal services involve inherent risks and minor damage may occasionally occur despite reasonable care.</p>';
-  html+='<h3>Condition of Goods</h3><p>The client confirms that all items provided for transport are in a condition suitable for removal unless otherwise disclosed prior to the move.</p>';
-  html+='<h3>Client Packing Responsibility</h3><p>Items packed by the client are transported at the client&#39;s risk unless damage is directly caused by proven negligence during handling by our staff.</p>';
-  html+='<h3>Fragile and High-Risk Items</h3><p>Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics require special care and must be disclosed before the move.</p>';
-  html+='<h3>Television and Electronic Equipment</h3><p>Modern televisions are extremely fragile and may suffer internal panel damage even when handled with reasonable care. Televisions should ideally be transported in original packaging.</p>';
-  html+='<h3>Disclosure of High-Value Items</h3><p>Items valued above $800 must be disclosed prior to the move.</p>';
-  html+='<h3>Safe Transport and Additional Trips</h3><p>If fragile items cannot be safely transported due to limited truck space, Deus Labour Hire may transport them in a separate load.</p>';
-  html+='<h3>Refusal to Move Unsafe Items</h3><p>Deus Labour Hire reserves the right to refuse items considered unsafe for transport.</p>';
-  html+='<h3>Pre-Existing Damage</h3><p>Deus Labour Hire is not responsible for items that were already damaged before the move.</p>';
-  html+='<h3>Liability for Loss or Damage</h3><p>If damage occurs due to negligence during the service, liability will be assessed based on the fair market value of the item at the time of the move considering age, condition and depreciation. Nothing in these Terms and Conditions excludes, restricts or modifies any rights that the client may have under the Australian Consumer Law.</p>';
-  html+='<h3>Transit Insurance</h3><p>Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited subject to the policy terms and conditions.</p>';
-  html+='<h3>Insurance Claims</h3><p>If a claim is submitted to the insurer the final decision regarding compensation will be determined by the insurance company.</p>';
-  html+='<h3>Claims Procedure</h3><p>Any claim must be reported within 24 hours after completion of the move and include photographs and a description of the damage.</p>';
-  html+='<h3>Resolution of Claims</h3><p>Resolution may include repair, replacement with the same model, similar second-hand replacement or payment of the fair market value.</p>';
-  html+='<h3>Access and Safety</h3><p>The client must ensure safe access to the property. Additional charges may apply for stairs or restricted access.</p>';
-  html+='<h3>Heavy Items</h3><p>Items over 100kg must be disclosed before the move.</p>';
-  html+='<h3>Payment Terms</h3><p>Payment is due upon completion of the service unless otherwise agreed.</p>';
-  html+='<h3>Governing Law</h3><p>These Terms and Conditions are governed by the laws of Australia.</p>';
-  html+='<h2>SERVICE AGREEMENT</h2>';
-  html+='<h3>Acceptance and Scope</h3><p>By booking or accepting our services, the client confirms they have read, understood, and agreed to these Terms and Conditions. Deus Labour Hire Pty Ltd will take reasonable care when handling and transporting the client&#39;s belongings. These Terms are governed by the laws of Australia.</p>';
-  html+='<h3>Client Responsibilities</h3><p>Items packed by the client are transported at the client&#39;s risk unless damage is directly caused by proven negligence. The client must ensure safe access to the property. Items over 100kg must be disclosed. Items valued above $800 must be disclosed.</p>';
-  html+='<h3>Fragile and Special Items</h3><p>Fragile items including televisions, glass items, artwork, mirrors, marble, antiques and electronics must be disclosed before the move. Deus Labour Hire reserves the right to refuse items considered unsafe for transport.</p>';
-  html+='<h3>Liability and Insurance</h3><p>Deus Labour Hire holds Public Liability Insurance through AIG Australia Limited. Any claim must be reported within 24 hours. Nothing in these terms excludes the client&#39;s rights under Australian Consumer Law.</p>';
-  html+='<h3>Payment and Additional Fees</h3><p>Payment is due upon completion of the service unless otherwise agreed. Additional charges may apply for stairs, restricted access or long carrying distances.</p>';
+  html+='<h2>TERMS AND CONDITIONS</h2>'+DEUS_TERMS.toHtml(DEUS_TERMS.tc);
+  html+='<h2>SERVICE AGREEMENT</h2>'+DEUS_TERMS.toHtml(DEUS_TERMS.sa);
   html+='<div class="sig-box">';
   html+='<div style="font-weight:700;font-size:15px;margin-bottom:8px;color:#2a6b2a">DIGITAL SIGNATURE</div>';
-  html+='<div class="sig-name">'+esc(b.signature_name||'Not signed')+'</div>';
+  html+='<div class="sig-name">'+esc(b.signature_name)+'</div>';
   html+='<div style="font-size:13px;color:#555;margin-top:8px">Signed on: '+signDate+' at '+signTime+'</div>';
   html+='<div style="font-size:12px;color:#777;margin-top:6px">By signing, the client confirms they have read and agreed to all Terms &amp; Conditions and the Service Agreement above.</div>';
   html+='</div>';
-  html+='<div class="footer"><strong>Deus Labour Hire Pty Ltd</strong><br>deus.labour.hire@gmail.com | 0406 832 721<br>Document generated: '+new Date().toLocaleDateString('en-AU')+'</div>';
+  html+='<div class="footer"><strong>Deus Labour Hire Pty Ltd</strong><br>deus.labour.hire@gmail.com | 0430 008 700<br>Document generated: '+new Date().toLocaleDateString('en-AU')+'</div>';
   html+='</body></html>';
   var blob=new Blob([html],{type:'text/html'});
   var url=URL.createObjectURL(blob);
@@ -1665,16 +1596,23 @@ function downloadDoc(id){
   a.href=url;
   a.download='SignedDocuments_'+b.name.replace(/ /g,'_')+'_'+b.date+'.html';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Revoking at once can cancel the download on iPhones.
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
 }
 
 // ── INVOICE TAB ──────────────────────────────────────────────────────────────
 var invExtraCount = 0;
+// True after the form changes: totals and the preview only update on Generate, so they would be out of date.
+var invoiceFormDirty = false;
+var invoicePreviewUnsaved = false; // the preview was generated but not saved: it has no real number yet
+var INVOICE_DIRTY_MSG = 'The form changed. Click Generate Invoice again first.';
+['input','change'].forEach(function(type){
+  $('tabInvoice').addEventListener(type, function(e){ if(/^inv(_|ex)/.test(e.target.id||'')) invoiceFormDirty = true; });
+});
 
 function toggleInvFixed(){
   var on = document.getElementById('inv_fixed').checked;
   document.getElementById('inv_fixed_fields').style.display = on ? 'block' : 'none';
-  var jobRows = document.querySelectorAll('#tabInvoice .row');
 }
 
 function updateInvGST(){
@@ -1699,7 +1637,7 @@ function addInvExtra(){
   var btn = document.createElement('button');
   btn.textContent = '✕';
   btn.style.cssText = 'background:#3a0f0f;color:#fca5a5;border:none;border-radius:7px;padding:8px;cursor:pointer;font-size:13px';
-  btn.addEventListener('click', function(){ div.remove(); });
+  btn.addEventListener('click', function(){ div.remove(); invoiceFormDirty = true; });
   div.appendChild(i1); div.appendChild(i2); div.appendChild(btn);
   document.getElementById('inv_extras').appendChild(div);
 }
@@ -1745,31 +1683,31 @@ function generateAdminInvoice(){
   if(!clientName){ showToast('Please enter client name.'); return; }
 
   var gst = document.getElementById('inv_gst').checked;
-  var rate = parseFloat(document.getElementById('inv_rate').value)||150;
-  var callout = parseFloat(document.getElementById('inv_callout').value)||0;
+  var rate = parseFloat(document.getElementById('inv_rate').value);
+  var callout = roundMoney(parseFloat(document.getElementById('inv_callout').value)||0);
   var desc = document.getElementById('inv_desc').value.trim()||'Removal Service';
 
-  function fmtT(h,m){ return (h>12?h-12:(h||12))+':'+(m<10?'0'+m:m)+' '+(h>=12?'PM':'AM'); }
-  function fmtD(str){ if(!str)return '-'; var d=new Date(str+'T00:00:00'); return d.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}); }
 
-  var extras=[];
+  var extras=[], extraWithoutDesc=false;
   document.querySelectorAll('#inv_extras > div').forEach(function(el){
     var d=el.querySelector('[id$="d"]'), a=el.querySelector('[id$="a"]');
-    if(d&&a){ var dv=d.value.trim(),av=parseFloat(a.value)||0; if(dv&&av>0) extras.push({desc:dv,amt:av}); }
+    if(d&&a){ var dv=d.value.trim(),av=parseFloat(a.value)||0; if(av>0&&!dv) extraWithoutDesc=true; if(dv&&av>0) extras.push({desc:dv,amt:roundMoney(av)}); }
   });
-  var extTotal = extras.reduce(function(s,e){return s+e.amt;},0);
+  if(extraWithoutDesc){ showToast('An additional charge has an amount but no description. Add one or remove the item.', 6000); return; }
+  var extTotal = roundMoney(extras.reduce(function(s,e){return s+e.amt;},0));
 
   var subtotal, rows='', durStr='-';
 
   if(isFixed){
-    var fixedAmt = parseFloat(document.getElementById('inv_fixed_amt').value)||0;
+    var fixedAmt = roundMoney(parseFloat(document.getElementById('inv_fixed_amt').value)||0);
     if(!fixedAmt){ showToast('Please enter fixed price amount.'); return; }
     var fixedDesc = document.getElementById('inv_fixed_desc').value.trim()||'Removal Service — Fixed Price';
-    subtotal = fixedAmt + extTotal;
-    rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(fixedDesc)+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Fixed</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+fixedAmt.toFixed(2)+'</td></tr>';
+    subtotal = roundMoney(fixedAmt + extTotal);
+    rows += invRow(esc(fixedDesc),'1','Fixed','$'+fixedAmt.toFixed(2));
     durStr = '—';
   } else {
     if(!start||!finish){ showToast('Please enter start and finish times.'); return; }
+    if(!(rate>0)){ showToast('Enter an hourly rate greater than 0.', 5000); return; }
     var sh=parseInt(start.split(':')[0]),sm=parseInt(start.split(':')[1]);
     var fh=parseInt(finish.split(':')[0]),fm=parseInt(finish.split(':')[1]);
     var sM=sh*60+sm,fM=fh*60+fm;
@@ -1777,26 +1715,27 @@ function generateAdminInvoice(){
     var totalMins=fM-sM, hours=totalMins/60;
     var hrs=Math.floor(hours),mins=totalMins%60;
     durStr = hrs>0?(mins>0?hrs+'h '+mins+'min':hrs+'h'):mins+'min';
-    var labour=hours*rate;
-    subtotal=labour+callout+extTotal;
-    rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(desc)+'<br><small style="color:#888">'+fmtT(sh,sm)+' – '+fmtT(fh,fm)+'</small></td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+hours.toFixed(2)+'h</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+rate.toFixed(2)+'/hr</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+labour.toFixed(2)+'</td></tr>';
-    if(callout>0) rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Call Out Fee</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+callout.toFixed(2)+'</td></tr>';
+    var labour=roundMoney(hours*rate);
+    subtotal=roundMoney(labour+callout+extTotal);
+    rows+=invRow(esc(desc)+'<br><small style="color:#888">'+fmtT(sh,sm)+' – '+fmtT(fh,fm)+'</small>',hours.toFixed(2)+'h','$'+rate.toFixed(2)+'/hr','$'+labour.toFixed(2));
+    if(callout>0) rows+=invRow('Call Out Fee','1','—','$'+callout.toFixed(2));
   }
 
-  extras.forEach(function(e){ rows+='<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(e.desc)+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+e.amt.toFixed(2)+'</td></tr>'; });
+  extras.forEach(function(e){ rows+=invRow(esc(e.desc),'1','—','$'+e.amt.toFixed(2)); });
 
   var discountType = document.getElementById('inv_discount_type').value;
   var discountValue = parseFloat(document.getElementById('inv_discount_value').value)||0;
   var discountDesc = document.getElementById('inv_discount_desc').value.trim();
   var discountAmt = discountType==='percent' ? subtotal*(discountValue/100) : discountValue;
-  discountAmt = Math.max(0, Math.min(discountAmt, subtotal));
-  var taxableSubtotal = subtotal - discountAmt;
+  discountAmt = roundMoney(Math.max(0, Math.min(discountAmt, subtotal)));
+  var taxableSubtotal = roundMoney(subtotal - discountAmt);
 
-  var gstAmt=gst?taxableSubtotal*0.1:0, total=taxableSubtotal+gstAmt;
+  var gstAmt=gst?roundMoney(taxableSubtotal*0.1):0, total=roundMoney(taxableSubtotal+gstAmt);
 
   // Fill preview
   var num=document.getElementById('inv_num').value;
   document.getElementById('inv_p_num').textContent=num;
+  document.getElementById('inv_p_title').textContent=gst?'TAX INVOICE':'INVOICE';
   document.getElementById('inv_p_client').textContent=clientName;
   document.getElementById('inv_p_date').textContent=fmtD(document.getElementById('inv_date').value);
   document.getElementById('inv_p_due').textContent=fmtD(document.getElementById('inv_due').value);
@@ -1849,6 +1788,8 @@ function generateAdminInvoice(){
     description: desc,
     durationLabel: durStr
   };
+  invoiceFormDirty = false;
+  invoicePreviewUnsaved = true;
 }
 
 function resetAdminInvoice(){
@@ -1872,6 +1813,8 @@ function resetAdminInvoice(){
   currentInvoiceBookingId = null;
   currentInvoiceCustomerId = null;
   lastInvoiceCalc = null;
+  invoiceFormDirty = false;
+  invoicePreviewUnsaved = false;
   currentInvoiceId = null;
   currentInvoiceStatus = null;
   document.getElementById('inv_num').value = 'PENDING';
@@ -2100,6 +2043,18 @@ async function submitAddPayment(){
   var btnConfirm = document.getElementById('btnConfirmPayment');
   if(btnConfirm) btnConfirm.disabled = true;
 
+  if(lastInvoiceCalc && lastInvoiceCalc.totalAmount != null){
+    var outstanding = calculatePaymentTotals(lastLoadedPaymentsRows, lastInvoiceCalc.totalAmount).outstandingBalance;
+    if(Math.round(amount*100) > Math.round(outstanding*100)){
+      var recordAnyway = await SubShared.dialog({title:'This payment is more than the balance. Record it anyway?',message:'Outstanding balance: $'+outstanding.toFixed(2)+'. This payment: $'+amount.toFixed(2)+'.',confirmText:'Record it'});
+      if(!recordAnyway){
+        isAddingPayment = false;
+        if(btnConfirm) btnConfirm.disabled = false;
+        return;
+      }
+    }
+  }
+
   try{
     var res = await db.from('payments').insert(payload).select().single();
     if(res.error) throw res.error;
@@ -2213,12 +2168,10 @@ async function openInvoice(id){
     };
 
     // Render the preview from the saved data (mirrors generateAdminInvoice()'s preview markup, fed from DB values instead of live form fields)
-    function fmtT(h,m){ return (h>12?h-12:(h||12))+':'+(m<10?'0'+m:m)+' '+(h>=12?'PM':'AM'); }
-    function fmtD(str){ if(!str)return '-'; var d=new Date(str+'T00:00:00'); return d.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}); }
 
     var rows = '';
     if(isFixed){
-      rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(inv.fixed_description||'Removal Service — Fixed Price')+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Fixed</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(inv.fixed_amount||0).toFixed(2)+'</td></tr>';
+      rows += invRow(esc(inv.fixed_description||'Removal Service — Fixed Price'),'1','Fixed','$'+Number(inv.fixed_amount||0).toFixed(2));
     } else {
       var timeLabel = '';
       if(ss.start_time && inv.finish_time){
@@ -2226,12 +2179,13 @@ async function openInvoice(id){
         var fh=parseInt(inv.finish_time.split(':')[0]),fm=parseInt(inv.finish_time.split(':')[1]);
         timeLabel = '<br><small style="color:#888">'+fmtT(sh,sm)+' – '+fmtT(fh,fm)+'</small>';
       }
-      rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(inv.description||'Removal Service')+timeLabel+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+Number(inv.hours_worked||0).toFixed(2)+'h</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+Number(inv.hourly_rate||0).toFixed(2)+'/hr</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(inv.labour_amount||0).toFixed(2)+'</td></tr>';
-      if((ss.callout_fee||0)>0) rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">Call Out Fee</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+Number(ss.callout_fee).toFixed(2)+'</td></tr>';
+      rows += invRow(esc(inv.description||'Removal Service')+timeLabel,Number(inv.hours_worked||0).toFixed(2)+'h','$'+Number(inv.hourly_rate||0).toFixed(2)+'/hr','$'+Number(inv.labour_amount||0).toFixed(2));
+      if((ss.callout_fee||0)>0) rows += invRow('Call Out Fee','1','—','$'+Number(ss.callout_fee).toFixed(2));
     }
-    extras.forEach(function(e){ rows += '<tr><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(e.desc)+'</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">1</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">—</td><td style="padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f0eb;text-align:right;font-weight:600">$'+e.amt.toFixed(2)+'</td></tr>'; });
+    extras.forEach(function(e){ rows += invRow(esc(e.desc),'1','—','$'+e.amt.toFixed(2)); });
 
     document.getElementById('inv_p_num').textContent = inv.invoice_number;
+    document.getElementById('inv_p_title').textContent = inv.gst_included ? 'TAX INVOICE' : 'INVOICE';
     document.getElementById('inv_p_client').textContent = cs.name || '';
     document.getElementById('inv_p_date').textContent = fmtD(inv.issued_date);
     document.getElementById('inv_p_due').textContent = fmtD(inv.due_date);
@@ -2255,6 +2209,8 @@ async function openInvoice(id){
     document.getElementById('inv_p_totals').innerHTML = totals;
 
     document.getElementById('inv_preview').style.display='block';
+    invoiceFormDirty = false;
+    invoicePreviewUnsaved = false;
 
     document.getElementById('inv_num').value = inv.invoice_number;
     var btnSave = document.getElementById('btnSaveInvoice');
@@ -2281,6 +2237,7 @@ async function openInvoice(id){
 async function saveAdminInvoice(){
   if(currentInvoiceId && currentInvoiceStatus !== 'draft'){ showToast('Invoice already saved.'); return; }
   if(!lastInvoiceCalc){ showToast('Generate the invoice first.'); return; }
+  if(invoiceFormDirty){ showToast(INVOICE_DIRTY_MSG, 5000); return; }
   var c = lastInvoiceCalc;
   var extrasTotalWithCallout = c.extrasTotal + (c.callout||0);
 
@@ -2332,6 +2289,7 @@ async function saveAdminInvoice(){
         .eq('status', 'draft')
         .select().single();
       if(error || !data){ showToast('Could not update — invoice may no longer be a draft.'); return; }
+      invoicePreviewUnsaved = false;
       showToast('Invoice '+data.invoice_number+' updated ✓');
       document.getElementById('inv_num').value = data.invoice_number;
       document.getElementById('inv_p_num').textContent = data.invoice_number;
@@ -2348,6 +2306,7 @@ async function saveAdminInvoice(){
     const {data,error} = await db.from('invoices').insert(payload).select().single();
     if(error) throw error;
     currentInvoiceId = data.id;
+    invoicePreviewUnsaved = false;
     showToast('Invoice '+data.invoice_number+' saved as draft ✓');
     document.getElementById('inv_num').value = data.invoice_number;
     document.getElementById('inv_p_num').textContent = data.invoice_number;
@@ -2402,6 +2361,7 @@ async function saveInvoiceItems(invoiceId){
 }
 
 function printAdminInvoice(){
+  if(invoiceFormDirty){ showToast(INVOICE_DIRTY_MSG, 5000); return; }
   var preview = document.getElementById('inv_preview');
   var previewClone = preview.cloneNode(true);
   var actionsClone = previewClone.querySelector('#inv_actions');
@@ -2424,6 +2384,8 @@ async function sendInvoiceEmail(){
   var client = document.getElementById('inv_client').value.trim();
   var num = document.getElementById('inv_num').value;
   if(!email){ showToast('Please enter client email first.'); return; }
+  if(invoiceFormDirty){ showToast(INVOICE_DIRTY_MSG, 5000); return; }
+  if(!currentInvoiceId || invoicePreviewUnsaved){ showToast('Save the invoice first, so it has its real number.', 5000); return; }
 
   var preview = document.getElementById('inv_preview');
   var previewClone = preview.cloneNode(true);
@@ -2461,8 +2423,13 @@ async function sendInvoiceEmail(){
 }
 
 // ── MONTHLY DRAW ──────────────────────────────────────────────────────────────
-var drawParticipants = JSON.parse(localStorage.getItem('deus_draw_p') || '[]');
-var drawHistory = JSON.parse(localStorage.getItem('deus_draw_h') || '[]');
+// A damaged value must not stop the page: this runs before the login is restored.
+function readDrawList(key){
+  try{ var v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; }
+  catch(e){ return []; }
+}
+var drawParticipants = readDrawList('deus_draw_p');
+var drawHistory = readDrawList('deus_draw_h');
 var drawDrawing = false;
 var drawCurrentWinner = '';
 
@@ -2499,7 +2466,7 @@ function renderDrawHistory(){
   var medals = ['🥇','🥈','🥉'];
   list.innerHTML = [...drawHistory].reverse().map(function(h,i){
     return '<div style="background:#0e1218;border:1px solid #1c2130;border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px">'+
-      '<span>'+medals[i]||'🎖️'+'</span>'+
+      '<span>'+(medals[i]||'🎖️')+'</span>'+
       '<span style="font-weight:700;color:#86efac">'+esc(h.name)+'</span>'+
       '<span style="color:#6b7a6b;font-size:11px">'+esc(h.date)+'</span></div>';
   }).join('');
@@ -2546,16 +2513,16 @@ function removeDrawParticipant(i){
   saveDrawData(); renderDraw();
 }
 
-function clearDrawAll(){
-  if(!drawParticipants.length||!confirm('Clear all participants?')) return;
+async function clearDrawAll(){
+  if(!drawParticipants.length||!(await SubShared.dialog({title:'Clear all participants?',confirmText:'Clear',danger:true}))) return;
   drawParticipants=[];
   saveDrawData(); renderDraw();
   document.getElementById('drawWinner').style.display='none';
   document.getElementById('drawDrum').style.display='none';
 }
 
-function clearDrawHistory(){
-  if(!confirm('Delete all draw history?')) return;
+async function clearDrawHistory(){
+  if(!(await SubShared.dialog({title:'Delete all draw history?',confirmText:'Delete history',danger:true}))) return;
   drawHistory=[];
   saveDrawData(); renderDrawHistory();
 }

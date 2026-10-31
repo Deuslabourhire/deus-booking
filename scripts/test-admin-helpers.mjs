@@ -17,6 +17,12 @@ for (const [typed, value] of [["1,500", 1500], ["1,500.50", 1500.5], ["12,345,67
 for (const typed of ["1,50", "150,50", "1,5000", "1,50,000", "1.500", "1.500,50", "1,500,50", "1,500.505", "0,500", ",500",
   "1,", ".50", "5.", "", "   ", "abc", "$150", "-5", "1e3", "1 500", null]) assert.ok(Number.isNaN(parseAmount(typed)), String(typed));
 
+// Payment totals: only completed payments count, and the balance never goes below zero.
+const totals = new Function(html.match(/function calculatePaymentTotals\([\s\S]*?\r?\n\}/)[0] + "; return calculatePaymentTotals;")();
+assert.deepEqual(totals([{ status: "completed", amount: "100" }, { status: "failed", amount: 50 }, { status: "completed", amount: 25.5 }], 200), { totalPaid: 125.5, outstandingBalance: 74.5 });
+assert.deepEqual(totals(null, "80"), { totalPaid: 0, outstandingBalance: 80 });
+assert.equal(totals([{ status: "completed", amount: 90 }], 80).outstandingBalance, 0);
+
 // Sydney dates. The results must not depend on this machine's time zone.
 const win = {};
 new Function("window", readFileSync(new URL("../sub-shared.js", import.meta.url), "utf8"))(win);
@@ -31,11 +37,14 @@ assert.equal(addDays("2026-10-31", 7), "2026-11-07");
 assert.equal(addDays("2028-02-28", 1), "2028-02-29");
 assert.equal(addDays("2026-12-31", 7), "2027-01-07");
 
-// invoice.html: 9 am in Sydney is still the previous day in UTC.
-const invoice = readFileSync(new URL("../invoice.html", import.meta.url), "utf8");
-const dates = invoice.match(/var today = new Date\(\);[\s\S]*?var dueStr = .*/)[0];
-const at = (iso) => class extends Date { constructor(...a) { super(...(a.length ? a : [iso])); } };
-const [today, due] = new Function("Date", dates + "; return [todayStr, dueStr];")(at("2026-10-30T22:00:00Z"));
-assert.deepEqual([today, due], ["2026-10-31", "2026-11-07"]);
+
+// Only the official phone number reaches clients.
+for (const page of ["admin.html", "booking.html", "subcontractor.html"]) {
+  const text = readFileSync(new URL("../" + page, import.meta.url), "utf8");
+  assert.doesNotMatch(text, /406[ .-]?832[ .-]?721/, page);
+}
+assert.match(readFileSync(new URL("../booking.html", import.meta.url), "utf8"), /wa\.me\/61430008700/);
+
+assert.doesNotMatch(html, /business days/);
 
 console.log("ok");

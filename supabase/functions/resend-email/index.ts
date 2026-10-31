@@ -15,7 +15,7 @@
 // (../_shared/sanitize-email-html.ts) and only the cleaned result is e-mailed.
 // Nothing about the recipient, subject, body or token is logged.
 
-import { BodyError, isPlainEmail, readJsonLimited } from "../_shared/request.ts";
+import { allowedOrigins, BodyError, corsHeaders, isPlainEmail, readJsonLimited, reply } from "../_shared/request.ts";
 import { deliver } from "../_shared/email-transport.ts";
 import { sanitizeEmailHtml } from "../_shared/sanitize-email-html.ts";
 
@@ -27,29 +27,6 @@ const CONTROL_RE = /[\u0000-\u001f\u007f]/;
 const BEARER_RE = /^Bearer\s+([A-Za-z0-9._-]+)$/;
 const ALLOWED_KEYS = new Set(["to", "subject", "invoiceHtml", "clientName"]);
 const enc = new TextEncoder();
-
-function allowedOrigins(): string[] {
-  return (Deno.env.get("ALLOWED_ORIGINS") ?? "https://deuslabourhire.github.io")
-    .split(",").map((s) => s.trim()).filter((s) => s.startsWith("https://"));
-}
-
-function corsHeaders(origin: string | null): Record<string, string> {
-  const h: Record<string, string> = {
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    // supabase-js in the browser also sends apikey and x-client-info.
-    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
-    "Vary": "Origin",
-  };
-  if (origin && allowedOrigins().includes(origin)) h["Access-Control-Allow-Origin"] = origin;
-  return h;
-}
-
-function reply(origin: string | null, status: number, body: Record<string, unknown>): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders(origin), "Content-Type": "application/json", "Cache-Control": "no-store" },
-  });
-}
 
 // `message` is what admin.html shows in its toast.
 const MESSAGES: Record<string, string> = {
