@@ -565,7 +565,8 @@ function downloadSignedDoc(){
   a.href=url;
   a.download='SignedDocuments_'+b.name.replace(/ /g,'_')+'_'+b.date+'.html';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Revoking at once can cancel the download on iPhones.
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
 }
 </script>
 </body>
