@@ -51,4 +51,6 @@ for (const page of ["admin.html", "booking.html", "invoice.html", "subcontractor
 }
 assert.match(readFileSync(new URL("../booking.html", import.meta.url), "utf8"), /wa\.me\/61430008700/);
 
+assert.doesNotMatch(html, /business days/);
+
 console.log("ok");
