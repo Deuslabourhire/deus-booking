@@ -888,7 +888,7 @@ async function markInvoiceAsSent(id){
   if(!confirm('Mark this invoice as Sent?')) return;
   try{
     const {error} = await db.from('invoices')
-      .update({ status: 'sent', sent_date: new Date().toISOString().split('T')[0] })
+      .update({ status: 'sent', sent_date: SubShared.sydneyDate() })
       .eq('id', id)
       .eq('status', 'draft');
     if(error) throw error;
@@ -999,7 +999,7 @@ function renderQuotesList(){
   body.innerHTML = quotesListCache.map(function(q){
     var name = q.contact_name || '—';
     var email = q.contact_email || '—';
-    var created = q.created_at ? q.created_at.split('T')[0] : '—';
+    var created = SubShared.sydneyDate(q.created_at) || '—';
     var qid = String(q.id);
 
     // Three distinct states. An expired timestamp is NOT the same as "never taken over" —
@@ -1354,7 +1354,7 @@ function renderClients(){
           ${b.notes?`<div class="info-row"><span class="info-key">📝 Notes</span><span class="info-val">${esc(b.notes)}</span></div>`:''}
         </div>
         <div class="info-box"><div class="info-title">Documents</div>
-          ${b.signature_name?`<div style="font-size:13px;color:var(--success);font-style:italic;font-weight:700">✍ ${esc(b.signature_name)}</div><div style="font-size:11px;color:var(--text-mid);margin-top:3px">T&C + Service Agreement · ${esc((b.signed_date||'').split('T')[0]||'—')}</div>`:`<div style="font-size:12px;color:var(--danger);font-weight:600">⚠ Not yet signed</div>`}
+          ${b.signature_name?`<div style="font-size:13px;color:var(--success);font-style:italic;font-weight:700">✍ ${esc(b.signature_name)}</div><div style="font-size:11px;color:var(--text-mid);margin-top:3px">T&C + Service Agreement · ${esc(SubShared.sydneyDate(b.signed_date)||'—')}</div>`:`<div style="font-size:12px;color:var(--danger);font-weight:600">⚠ Not yet signed</div>`}
         </div>
         <div class="info-box"><div class="info-title">1-Year Reminder</div>
           <div style="font-size:12px;font-weight:600;color:${isDue?'var(--danger)':isSoon?'var(--warn)':'var(--text-mid)'}">
@@ -1468,7 +1468,7 @@ async function saveJob(){
   try{
     if(editId){const saved=await saveToSupabase(data,editId);if(!saved){showToast(SAVE_FAILED_MSG,6000);return;}bookings=bookings.map(b=>String(b.id)===String(editId)?{...b,...saved}:b);showToast('Booking updated ✓');}
     else{
-      var newB={...data,signature_name:'(admin added)',signed_date:new Date().toISOString().split('T')[0],reminder_sent:false,created_at:new Date().toISOString()};
+      var newB={...data,signature_name:'(admin added)',signed_date:SubShared.sydneyDate(),reminder_sent:false,created_at:new Date().toISOString()};
       const saved=await saveToSupabase(newB,null);
       if(!saved){showToast(SAVE_FAILED_MSG,6000);return;}
       bookings=[saved,...bookings];
@@ -1727,9 +1727,7 @@ function createInvoice(id){
   if(b.date) document.getElementById('inv_date').value = b.date;
   // Set due date (7 days later)
   if(b.date){
-    var d = new Date(b.date+'T00:00:00');
-    d.setDate(d.getDate()+7);
-    document.getElementById('inv_due').value = d.toISOString().split('T')[0];
+    document.getElementById('inv_due').value = SubShared.addDays(b.date, 7);
   }
   // Reset preview
   document.getElementById('inv_preview').style.display = 'none';
@@ -1924,7 +1922,7 @@ function renderInvoicePaymentsBody(paymentsRows, totalAmount){
     rows.forEach(function(p, idx){
       // Step 10N: row opens a read-only detail view (showPaymentDetail) — index into the SAME rows array cached by loadInvoicePayments
       html += '<tr onclick="showPaymentDetail('+idx+')" style="cursor:pointer" title="View payment details">'
-        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(p.paid_at ? String(p.paid_at).slice(0,10) : '-')+'</td>'
+        +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(SubShared.sydneyDate(p.paid_at)||'-')+'</td>'
         +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">$'+Number(p.amount||0).toFixed(2)+'</td>'
         +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(p.method||'-')+'</td>'
         +'<td style="padding:8px 12px;font-size:12px;border-bottom:1px solid #f0f0eb">'+esc(p.reference||'-')+'</td>'

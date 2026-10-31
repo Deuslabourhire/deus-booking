@@ -234,9 +234,9 @@ input[type=checkbox]{width:18px;height:18px;accent-color:#3d8b3d;cursor:pointer;
 <script>
 (function() {
   var today = new Date();
-  var todayStr = today.toISOString().split('T')[0];
-  var due = new Date(today);
-  due.setDate(due.getDate() + 7);
+  var todayStr = new Intl.DateTimeFormat('en-CA', {timeZone: 'Australia/Sydney'}).format(today);
+  var due = new Date(todayStr + 'T00:00:00Z');
+  due.setUTCDate(due.getUTCDate() + 7);
   var dueStr = due.toISOString().split('T')[0];
 
   document.getElementById('invDate').value = todayStr;
