@@ -902,7 +902,7 @@ function renderInvoicesList(){
 }
 
 async function markInvoiceAsSent(id){
-  if(!confirm('Mark this invoice as Sent?')) return;
+  if(!(await SubShared.dialog({title:'Mark this invoice as Sent?',confirmText:'Mark as Sent'}))) return;
   try{
     // .select(): a filter that matches nothing is not an error, so success has to be checked.
     const {data, error} = await db.from('invoices')
@@ -929,7 +929,7 @@ async function markInvoiceAsSent(id){
 async function cancelInvoice(id){
   var cancelled = invoicesListCache.find(function(inv){ return inv.id === id; });
   var invoiceNumber = cancelled ? cancelled.invoice_number : '';
-  if(!confirm('Cancel invoice '+invoiceNumber+'? This cannot be undone from this screen.')) return;
+  if(!(await SubShared.dialog({title:'Cancel invoice '+invoiceNumber+'?',message:'This cannot be undone from this screen.',confirmText:'Cancel invoice',danger:true}))) return;
   try{
     const {data, error} = await db.from('invoices')
       .update({ status: 'cancelled' })
@@ -1450,7 +1450,7 @@ async function sendReminder(id){
   }
 }
 async function deleteJob(id){
-  if(!confirm('Delete this booking? This cannot be undone.'))return;
+  if(!(await SubShared.dialog({title:'Delete this booking?',message:'This cannot be undone.',confirmText:'Delete booking',danger:true})))return;
   try{
     // Guard: a non-draft invoice linked to this booking is immutable at the DB level
     // (invoices_enforce_invoice_immutability trigger) — deleting the booking would
@@ -1530,7 +1530,7 @@ function calcJob(){
   var extras=parseFloat(document.getElementById('cExtras').value)||0;
   var clientName=document.getElementById('cClientName').value.trim();
   var gst=document.getElementById('cGST').checked;
-  if(!start||!finish){alert('Please enter both start and finish times.');return;}
+  if(!start||!finish){showToast('Please enter both start and finish times.');return;}
   if(!(rate>0)){showToast('Enter an hourly rate greater than 0.',5000);return;}
   var sp=start.split(':'),fp=finish.split(':');
   var sh=parseInt(sp[0]),sm=parseInt(sp[1]),fh=parseInt(fp[0]),fm=parseInt(fp[1]);
@@ -1626,7 +1626,7 @@ function closeDayModal(){
 
 function downloadDoc(id){
   var b=bookings.find(function(x){return String(x.id)===String(id);});
-  if(!b){alert('Client not found.');return;}
+  if(!b){showToast('Client not found.');return;}
   var signDate=b.signed_date?new Date(b.signed_date).toLocaleDateString('en-AU'):'-';
   var signTime=b.signed_date?new Date(b.signed_date).toLocaleTimeString('en-AU'):'-';
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Signed Documents - '+esc(b.name)+'</title>';
@@ -2597,16 +2597,16 @@ function removeDrawParticipant(i){
   saveDrawData(); renderDraw();
 }
 
-function clearDrawAll(){
-  if(!drawParticipants.length||!confirm('Clear all participants?')) return;
+async function clearDrawAll(){
+  if(!drawParticipants.length||!(await SubShared.dialog({title:'Clear all participants?',confirmText:'Clear',danger:true}))) return;
   drawParticipants=[];
   saveDrawData(); renderDraw();
   document.getElementById('drawWinner').style.display='none';
   document.getElementById('drawDrum').style.display='none';
 }
 
-function clearDrawHistory(){
-  if(!confirm('Delete all draw history?')) return;
+async function clearDrawHistory(){
+  if(!(await SubShared.dialog({title:'Delete all draw history?',confirmText:'Delete history',danger:true}))) return;
   drawHistory=[];
   saveDrawData(); renderDrawHistory();
 }

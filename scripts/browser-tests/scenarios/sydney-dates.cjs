@@ -9,7 +9,7 @@ module.exports = async ({ run, open, sleep }) => {
     window.showToast = () => {};
     const eq = { eq() { return this; }, select() { return this; }, single() { return Promise.resolve({ data: null, error: null }); }, then(f) { return Promise.resolve({ error: null }).then(f); } };
     db.from = () => ({ update(row) { out.sent = row.sent_date; return eq; } });
-    window.confirm = () => true; window.loadInvoicesList = async () => {};
+    SubShared.dialog = async () => ({ value: true }); window.loadInvoicesList = async () => {};
     await markInvoiceAsSent('i1');
     window.saveToSupabase = async (d) => { out.signed = d.signed_date; return { id: 'n', ...d }; };
     bookings = []; openAddModal();
