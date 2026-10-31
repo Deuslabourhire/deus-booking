@@ -1494,12 +1494,13 @@ function updateCalcGST(){
 function calcJob(){
   var start=document.getElementById('cStart').value;
   var finish=document.getElementById('cFinish').value;
-  var rate=parseFloat(document.getElementById('cRate').value)||150;
+  var rate=parseFloat(document.getElementById('cRate').value);
   var callout=parseFloat(document.getElementById('cCallout').value)||0;
   var extras=parseFloat(document.getElementById('cExtras').value)||0;
   var clientName=document.getElementById('cClientName').value.trim();
   var gst=document.getElementById('cGST').checked;
   if(!start||!finish){alert('Please enter both start and finish times.');return;}
+  if(!(rate>0)){showToast('Enter an hourly rate greater than 0.',5000);return;}
   var sp=start.split(':'),fp=finish.split(':');
   var sh=parseInt(sp[0]),sm=parseInt(sp[1]),fh=parseInt(fp[0]),fm=parseInt(fp[1]);
   var sM=sh*60+sm,fM=fh*60+fm;
@@ -1745,7 +1746,7 @@ function generateAdminInvoice(){
   if(!clientName){ showToast('Please enter client name.'); return; }
 
   var gst = document.getElementById('inv_gst').checked;
-  var rate = parseFloat(document.getElementById('inv_rate').value)||150;
+  var rate = parseFloat(document.getElementById('inv_rate').value);
   var callout = parseFloat(document.getElementById('inv_callout').value)||0;
   var desc = document.getElementById('inv_desc').value.trim()||'Removal Service';
 
@@ -1771,6 +1772,7 @@ function generateAdminInvoice(){
     durStr = '—';
   } else {
     if(!start||!finish){ showToast('Please enter start and finish times.'); return; }
+    if(!(rate>0)){ showToast('Enter an hourly rate greater than 0.', 5000); return; }
     var sh=parseInt(start.split(':')[0]),sm=parseInt(start.split(':')[1]);
     var fh=parseInt(finish.split(':')[0]),fm=parseInt(finish.split(':')[1]);
     var sM=sh*60+sm,fM=fh*60+fm;

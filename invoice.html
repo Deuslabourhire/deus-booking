@@ -345,7 +345,8 @@ input[type=checkbox]{width:18px;height:18px;accent-color:#3d8b3d;cursor:pointer;
       durStr = '—';
     } else {
       if (!start || !finish) { alert('Please enter start and finish times.'); return; }
-      var rate = parseFloat(document.getElementById('rate').value) || 150;
+      var rate = parseFloat(document.getElementById('rate').value);
+      if (!(rate > 0)) { alert('Enter an hourly rate greater than 0.'); return; }
       var callout = parseFloat(document.getElementById('callout').value) || 0;
       var desc = document.getElementById('jobDesc').value.trim() || 'Removal Service';
       var sh = parseInt(start.split(':')[0]), sm = parseInt(start.split(':')[1]);
