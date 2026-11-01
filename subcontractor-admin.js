@@ -95,6 +95,7 @@
   function invById(id) { return cache.invoices.find(function (x) { return x.id === id; }); }
   function payById(id) { return cache.payments.find(function (x) { return x.id === id; }); }
   function payable(inv) { return inv.status === 'pending' || inv.status === 'approved'; }
+  function bankAlertOpen(subId) { return cache.alerts.some(function (a) { return a.kind === 'bank_changed_by_worker' && a.subcontractor_id === subId; }); }
   function subName(id) { var s = cache.subs.find(function (x) { return x.id === id; }); return s ? (s.full_name || s.display_name) : '?'; }
   function dayById(id) { return cache.waiting.find(function (x) { return x.id === id; }); }
 
@@ -146,7 +147,7 @@
       } }));
     }
     payBar.appendChild(el('button', { style: BTN, text: 'Clear selection', onclick: function () { selected = []; refresh(); } }));
-    if (cache.alerts.some(function (a) { return a.subcontractor_id === subId; })) {
+    if (bankAlertOpen(subId)) {
       payBar.appendChild(el('div', { style: 'background:#fff0f0;border:1px solid #fca5a5;border-radius:6px;padding:6px;margin:4px 0',
         text: '⚠ Payment blocked: this subcontractor has an unacknowledged bank-change alert (see above).' }));
     }
@@ -209,7 +210,7 @@
       } }));
     }
     dayBar.appendChild(el('button', { style: BTN, text: 'Clear selection', onclick: function () { daySel = []; refresh(); } }));
-    if (cache.alerts.some(function (a) { return a.subcontractor_id === subId; })) {
+    if (bankAlertOpen(subId)) {
       dayBar.appendChild(el('div', { style: 'background:#fff0f0;border:1px solid #fca5a5;border-radius:6px;padding:6px;margin:4px 0',
         text: '⚠ This subcontractor has an unacknowledged bank-change alert (see above). Acknowledge it before creating the invoice.' }));
     }
@@ -383,20 +384,23 @@
     rows.forEach(function (inv) { list.appendChild(invoiceCard(inv)); });
   }
 
-  // Open alerts (e.g. bank details changed by a worker through the link). Values are masked.
+  // Open alerts (bank details or contact e-mail changed by a worker through the link). Values are masked.
+  // Only a bank alert blocks invoices and payments.
   function alertsBox() {
     var box = el('div');
     cache.alerts.forEach(function (a) {
       var d = a.details || {}, o = d.old || {}, n = d.new || {};
+      var emailChange = a.kind === 'email_changed_by_worker';
       box.appendChild(el('div', { style: 'background:#fff0f0;border:1px solid #fca5a5;border-radius:8px;padding:8px;margin-bottom:8px;font-size:12px' }, [
-        el('b', { text: '⚠ Bank details changed by ' + subName(a.subcontractor_id) }),
-        el('div', { text: SubShared.sydneyDateTime(a.created_at) + ' · before: ' + [o.account_name, 'BSB ' + o.bsb, 'Acc ' + o.account_number].join(' ') +
-          ' · after: ' + [n.account_name, 'BSB ' + n.bsb, 'Acc ' + n.account_number].join(' ') + ' · admin e-mail: ' + (a.email_status || 'not sent yet') + ' · warning to worker (previous e-mail): ' + (a.worker_email_status || 'not sent yet') +
+        el('b', { text: '⚠ ' + (emailChange ? 'Contact e-mail' : 'Bank details') + ' changed by ' + subName(a.subcontractor_id) }),
+        el('div', { text: SubShared.sydneyDateTime(a.created_at) + ' · before: ' + (emailChange ? d.old_email : [o.account_name, 'BSB ' + o.bsb, 'Acc ' + o.account_number].join(' ')) +
+          ' · after: ' + (emailChange ? d.new_email : [n.account_name, 'BSB ' + n.bsb, 'Acc ' + n.account_number].join(' ')) + ' · admin e-mail: ' + (a.email_status || 'not sent yet') + ' · warning to worker (previous e-mail): ' + (a.worker_email_status || 'not sent yet') +
           ' · delivery: ' + a.delivery_state + ' (attempts ' + a.attempts + ')' +
           (a.gave_up_reason === 'retry_window_closed' ? ' · automatic e-mail retries stopped after 23 h (to avoid duplicates): contact the subcontractor directly' :
            a.gave_up_reason === 'max_attempts' ? ' · e-mail retries stopped after the maximum attempts: contact the subcontractor directly' : '') +
           (d.email_changed_in_same_save ? ' · ⚠ e-mail was changed in the same update' : '') }),
-        el('div', { text: 'Payments to this subcontractor are BLOCKED until this alert is acknowledged. If the change was not expected, revoke the link and confirm with the subcontractor first.' }),
+        el('div', { text: emailChange ? 'This does not block payments. If the change was not expected, revoke the link and confirm with the subcontractor.'
+          : 'Payments to this subcontractor are BLOCKED until this alert is acknowledged. If the change was not expected, revoke the link and confirm with the subcontractor first.' }),
         el('button', { style: BTN, text: 'Acknowledge', onclick: async function () {
           var r = await db.rpc('sub_admin_ack_notification', { p_id: a.id }); if (r.error) return fail(r.error);
           toast('Alert acknowledged (recorded in history).'); await refresh();
@@ -626,7 +630,7 @@
     if (inv.status === 'pending') {
       box.appendChild(el('button', { style: BTN_G, text: 'Approve', onclick: function () { set('approved'); } }));
     }
-    var blocked = cache.alerts.some(function (a) { return a.subcontractor_id === inv.subcontractor_id; });
+    var blocked = bankAlertOpen(inv.subcontractor_id);
     if (blocked && (inv.status === 'pending' || inv.status === 'approved')) {
       box.appendChild(el('div', { style: 'background:#fff0f0;border:1px solid #fca5a5;border-radius:6px;padding:6px;font-size:12px;margin:4px 0',
         text: '⚠ Payment blocked: this subcontractor has an unacknowledged bank-change alert (see the top of Records).' }));

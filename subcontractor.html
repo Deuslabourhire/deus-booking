@@ -358,8 +358,8 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
         p_bank_bsb: $('pBsb').value, p_bank_account_number: $('pAcc').value
       });
       state.gst = $('pGst').checked;
-      // Bank details replaced: the office alert is already recorded by the database; this asks for the e-mail alert.
-      if (r && r.bank_alert) {
+      // Bank details or contact e-mail replaced: the office alert is already recorded by the database; this asks for the e-mail alert.
+      if (r && (r.bank_alert || r.email_alert)) {
         var mailed = false, noPrevious = false;
         try {
           var res = await fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token, action: 'bank_changed' }) });
@@ -369,7 +369,7 @@ body{background:#f0f0eb;font-family:'DM Sans',Arial,sans-serif;color:#1a1a1a;min
           mailed = res.ok && out.ok && out.alerts > 0 && out.email.every(function (m) { return !notDone.test(m.admin || '') && !notDone.test(m.worker || ''); });
         } catch (e) { /* the alert stays queued */ }
         showMsg(noPrevious ? 'Your details were saved and the office can see the change. There was no previous e-mail on file to send a warning to.'
-          : mailed ? 'Your details were saved. Because your bank details changed, the office was notified and a warning was sent to your previous e-mail address.'
+          : mailed ? 'Your details were saved. Because your ' + (r.bank_alert ? 'bank details' : 'e-mail') + ' changed, the office was notified and a warning was sent to your previous e-mail address.'
           : 'Your details were saved and the office can see the change. The warning e-mail could not be sent yet.', true);
         return;
       }

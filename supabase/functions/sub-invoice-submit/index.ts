@@ -19,6 +19,8 @@
 //          warning to the worker at the address on file BEFORE the change, both
 //          with MASKED values only -> rpc sub_record_alert_channel (per channel,
 //          tied to the claim token) -> rpc sub_finish_alert_claim.
+//          The worker changing the contact e-mail queues an alert the same way: same claim,
+//          same two channels, its own e-mails (kind email_changed_by_worker).
 //   {action: "retry_due"} + header x-retry-secret: <ALERT_RETRY_SECRET>
 //       -> rpc sub_claim_due_bank_alerts: retries alerts left pending (failed send)
 //          or whose claim expired (interrupted attempt). Meant for a scheduled job
@@ -91,10 +93,10 @@ type Submitted = {
 };
 type Masked = { account_name: string | null; bsb: string | null; account_number: string | null };
 type BankAlert = {
-  id: number; claim_token: string; attempt: number; need_admin: boolean; need_worker: boolean;
+  id: number; kind?: string; claim_token: string; attempt: number; need_admin: boolean; need_worker: boolean;
   created_at: string; worker: string | null; display_name: string;
   worker_notify_email: string | null;   // address on file BEFORE the change (chosen by the database)
-  details: { old: Masked; new: Masked; email_changed_in_same_save?: boolean };
+  details: { old: Masked; new: Masked; email_changed_in_same_save?: boolean; old_email?: string; new_email?: string };
 };
 
 function esc(v: unknown): string {
@@ -235,6 +237,27 @@ ${emailNote}
 so the link can be revoked and no payment is made to the new account.</p></div>`;
 }
 
+// Admin alert: contact e-mail changed through the personal link. Masked values only.
+function emailAlertHtml(a: BankAlert): string {
+  return `<div style="font-family:Arial,sans-serif;max-width:640px">
+<h2>Contact e-mail changed by a subcontractor</h2>
+<p><b>${esc(a.worker ?? a.display_name)}</b> changed their contact e-mail through the personal link on ${esc(a.created_at)}.</p>
+<p>Before: ${esc(a.details.old_email)}<br>After: ${esc(a.details.new_email)}</p>
+<p>From now on, warnings and copies go to the new address. If this was not expected, revoke the link and confirm the details with the subcontractor.
+Open Admin → Subcontractors to review and acknowledge this alert.</p></div>`;
+}
+
+// Worker warning: sent to the address on file BEFORE the change. Masked values only.
+function workerEmailWarningHtml(a: BankAlert, companyName: string): string {
+  return `<div style="font-family:Arial,sans-serif;max-width:640px">
+<h2>Your contact e-mail was changed</h2>
+<p>Hi ${esc(a.worker ?? a.display_name)}, the contact e-mail on your subcontractor profile with ${esc(companyName)}
+was changed through your personal link on ${esc(a.created_at)}.</p>
+<p>Before: ${esc(a.details.old_email)}<br>After: ${esc(a.details.new_email)}</p>
+<p>If you made this change, no action is needed. <b>If you did not, contact the office immediately</b>
+so the link can be revoked. Later messages go to the new address, so this may be the only warning you receive here.</p></div>`;
+}
+
 // Status strings stored by the database: sent / dry_run / not_configured / failed_<code>.
 async function sendEmail(to: string, subject: string, html: string, idempotencyKey?: string): Promise<string> {
   const out = await deliver({ to, subject: cleanSubject(subject), html, idempotencyKey });
@@ -256,9 +279,10 @@ async function deliverAlerts(alerts: BankAlert[]): Promise<Record<string, unknow
   const out: Record<string, unknown>[] = [];
   for (const a of alerts) {
     const result: Record<string, unknown> = { id: a.id, attempt: a.attempt };
+    const emailChange = a.kind === "email_changed_by_worker";
     if (a.need_admin) {
       const admin = isPlainEmail(adminEmail)
-        ? await sendEmail(adminEmail, `Bank details changed — ${String(a.worker ?? a.display_name)}`, bankAlertHtml(a), `sub-alert-${a.id}-admin`)
+        ? await sendEmail(adminEmail, `${emailChange ? "Contact e-mail" : "Bank details"} changed — ${String(a.worker ?? a.display_name)}`, emailChange ? emailAlertHtml(a) : bankAlertHtml(a), `sub-alert-${a.id}-admin`)
         : "not_configured";
       result.admin = admin;
       try { await rpc("sub_record_alert_channel", { p_id: a.id, p_claim_token: a.claim_token, p_channel: "admin", p_status: admin }); } catch { /* claim expires -> retried */ }
@@ -266,7 +290,7 @@ async function deliverAlerts(alerts: BankAlert[]): Promise<Record<string, unknow
     if (a.need_worker) {
       // Only the address chosen by the database (pre-change) is used; nothing from the request body.
       const worker = isPlainEmail(a.worker_notify_email)
-        ? await sendEmail(a.worker_notify_email, "Your bank details were changed", workerBankWarningHtml(a, companyName), `sub-alert-${a.id}-worker`)
+        ? await sendEmail(a.worker_notify_email, emailChange ? "Your contact e-mail was changed" : "Your bank details were changed", emailChange ? workerEmailWarningHtml(a, companyName) : workerBankWarningHtml(a, companyName), `sub-alert-${a.id}-worker`)
         : "no_previous_email";
       result.worker = worker;
       try { await rpc("sub_record_alert_channel", { p_id: a.id, p_claim_token: a.claim_token, p_channel: "worker", p_status: worker }); } catch { /* claim expires -> retried */ }
