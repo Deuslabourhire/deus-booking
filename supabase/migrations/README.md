@@ -40,7 +40,6 @@ Some files still carry other comments from before they were applied:
 - `20261027222146_…adjust_lock_order.sql` says "REVIEW DRAFT ONLY … No database changes have been
   applied". It is applied in production.
 - Some files refer to earlier files by their old local versions (20261016130000 … 20261017150000).
-  So does `supabase/scheduled/sub_alert_retry_cron.sql`.
 
 ## Corrected header comments
 

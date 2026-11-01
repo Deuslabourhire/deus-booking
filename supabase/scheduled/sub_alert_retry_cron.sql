@@ -1,19 +1,20 @@
 -- =====================================================================
--- Scheduled retry of bank-change alert e-mails — PREPARED, NOT APPLIED.
--- Target: deus-authtest first. Run only after explicit approval, and only
--- after:
---   1. migration 20261016130000_subcontractor_invoices.sql is applied;
---   2. Edge Function sub-invoice-submit is deployed with verify_jwt = false
---      (supabase/config.toml) and the secret ALERT_RETRY_SECRET is set;
---   3. pg_net and pg_cron are enabled, `net` is NOT in the Data API "Exposed
---      schemas", and sub_alert_retry_net_audit.sql (read-only) has been run and
---      its output reviewed (who can read the pg_net request queue).
+-- Scheduled retry of subcontractor alert e-mails: notes only, nothing to run here.
+-- The jobs are in migration *_alert_retry_schedule.sql; rollback in
+-- supabase/rollbacks/alert_retry_schedule.sql. Test on deus-authtest first, in this order:
+--   1. create the secret in both places (below) and the URL in Vault;
+--   2. apply *_alert_retry_extensions.sql;
+--   3. check `net` is NOT in the Data API "Exposed schemas", then run
+--      sub_alert_retry_net_audit.sql (read-only) and review its output (who can
+--      read the pg_net request queue);
+--   4. apply *_alert_retry_schedule.sql (it refuses to run if Vault is not ready);
+--   5. after a run, scripts/test-alert-retry-no-leak.sql: the secret must not appear.
 --
 -- What it does
 --   Every 15 minutes pg_cron calls the Edge Function with
 --   {"action":"retry_due"} and the header x-retry-secret. The function then
 --   calls sub_claim_due_bank_alerts(20), which only returns alerts that are
---   pending (failed send) or whose 10-minute claim lease expired
+--   pending (never sent, or a failed send) or whose 10-minute claim lease expired
 --   (interrupted attempt), and only within 23 h of their first attempt
 --   (sub_alert_retry_window), i.e. inside the provider's 24 h idempotency
 --   window. With 15-minute runs and at most 5 attempts, retries normally
@@ -43,16 +44,18 @@
 --       re-send after an expired lease is de-duplicated by the provider (24 h).
 --
 -- Secret handling (never in this file, the repository, logs or chat)
---   1. Generate on your own computer, e.g. Windows PowerShell 5.1:
---        $b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)
---      (64 characters; the function refuses secrets shorter than 32). Copy it
---      straight into the two places below; do not save it in a file.
---   2. Edge Function secret (Dashboard → Edge Functions → Secrets, or
---        supabase secrets set ALERT_RETRY_SECRET=... --project-ref <ref>).
---   3. The SAME value in Supabase Vault (SQL editor, run once by hand —
---      do not save the statement with the real value anywhere):
---        select vault.create_secret('<generated value>', 'sub_alert_retry_secret',
---                                   'x-retry-secret header for sub-invoice-submit retry_due');
+--   1. Generate on your own computer, in a separate Windows PowerShell window (not through an
+--      AI assistant's terminal). It prints nothing and leaves the value in the clipboard:
+--        $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+--        (($b | ForEach-Object { $_.ToString('x2') }) -join '') | Set-Clipboard; Remove-Variable b
+--      (64 characters; the function refuses secrets shorter than 32). Use a different value for
+--      each project. Paste it into the two places below, then clear it with
+--      Set-Clipboard -Value ' ' and from the Windows clipboard history (Win+V) if that is on.
+--      Do not save it in a file.
+--   2. Edge Function secret: Dashboard → Edge Functions → Secrets, ALERT_RETRY_SECRET.
+--   3. The SAME value in the Dashboard's Vault screen, named sub_alert_retry_secret. Do not
+--      use vault.create_secret in the SQL editor for it: that writes the value in a statement.
+--   4. The URL is not secret, so SQL is fine:
 --        select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/sub-invoice-submit',
 --                                   'sub_alert_retry_url', 'retry_due endpoint');
 --
@@ -104,28 +107,8 @@
 --     with a single-use token minted per run and expiring in minutes, so a
 --     value read from the queue is useless after the request is processed.
 --
--- Rotation: generate a new value, update the Edge Function secret, then
---   select vault.update_secret((select id from vault.secrets where name = 'sub_alert_retry_secret'), '<new value>');
+-- Rotation: generate a new value and update it in both Dashboard screens
 -- (a run in between gets 403 and the next run retries; nothing is lost).
 --
--- Turning it off: select cron.unschedule('sub-alert-retry');
---   or remove ALERT_RETRY_SECRET from the function (retry_due then returns 403).
+-- History: the job cron-history-cleanup deletes cron.job_run_details rows older than 30 days.
 -- =====================================================================
-
--- Re-runnable: remove a previous version of the job first.
-select cron.unschedule(jobid) from cron.job where jobname = 'sub-alert-retry';
-
-select cron.schedule(
-  'sub-alert-retry',
-  '*/15 * * * *',
-  $job$
-  select net.http_post(
-    url     := (select decrypted_secret from vault.decrypted_secrets where name = 'sub_alert_retry_url'),
-    headers := jsonb_build_object(
-                 'Content-Type', 'application/json',
-                 'x-retry-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'sub_alert_retry_secret')),
-    body    := '{"action":"retry_due"}'::jsonb,
-    timeout_milliseconds := 30000
-  );
-  $job$
-);
