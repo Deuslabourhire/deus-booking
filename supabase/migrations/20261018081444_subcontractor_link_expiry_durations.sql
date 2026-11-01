@@ -1,7 +1,7 @@
 -- =====================================================================
 -- Subcontractor links expire after 7 days without activity; durations in
--- 10-minute steps — TEST FIRST.
--- Target: deus-authtest (aaafpfkwpdpfamfuimki). NOT for production yet.
+-- 10-minute steps.
+-- Applied on production as version 20261018081444.
 -- Requires 20261016130000_subcontractor_invoices.sql and 20261017120000_subcontractor_payments.sql.
 --
 -- Link expiry

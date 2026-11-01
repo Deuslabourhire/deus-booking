@@ -1,7 +1,7 @@
 -- =====================================================================
--- E-mail resend for subcontractor records and payments. Applied on deus-authtest (as 3 parts) on 17/10/2026; NOT on production.
+-- E-mail resend for subcontractor records and payments. Applied on deus-authtest (as 3 parts) on 17/10/2026; applied on production as version 20261018081533.
 -- Version 20261017150000: after 20261017140000 (admin corrections), same day.
--- Target when approved: deus-authtest (aaafpfkwpdpfamfuimki) first. Requires the four
+-- Requires the four
 -- earlier subcontractor migrations. Existing rows are not changed; delivery state for old
 -- records is derived on first use from the columns they already have.
 --

@@ -1,6 +1,6 @@
 -- =====================================================================
--- Subcontractor payments (one payment for several records) — TEST FIRST.
--- Target: deus-authtest (aaafpfkwpdpfamfuimki). NOT for production yet.
+-- Subcontractor payments (one payment for several records).
+-- Applied on production as version 20261018081342.
 -- Requires 20261016130000_subcontractor_invoices.sql.
 --
 -- Model

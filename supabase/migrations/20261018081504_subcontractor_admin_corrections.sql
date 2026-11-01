@@ -1,6 +1,6 @@
 -- =====================================================================
--- Admin corrections of sent records and readable history — TEST FIRST.
--- Target: deus-authtest (aaafpfkwpdpfamfuimki). NOT for production yet.
+-- Admin corrections of sent records and readable history.
+-- Applied on production as version 20261018081504.
 -- Requires the three earlier subcontractor migrations. No table or data change:
 -- one function is replaced and one read-only function is added.
 --

@@ -1,5 +1,5 @@
 -- =====================================================================
--- Subcontractor invoices grouped by the Admin. TEST FIRST (deus-authtest); NOT on production.
+-- Subcontractor invoices grouped by the Admin. Applied on production as version 20261020102601.
 -- Version 20261020120000: after 20261017150000 (e-mail resend). Requires the five earlier
 -- subcontractor migrations.
 --
