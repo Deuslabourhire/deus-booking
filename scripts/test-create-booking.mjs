@@ -110,4 +110,18 @@ await refused({ date: "2030-01-01" }, PAST);
 assert.equal((await post({ ...good(), date: "2030-01-02" })).status, 201);
 globalThis.Date = RealDate;
 
+// Size limits: the limit itself is accepted, one more is refused.
+const emailOf = (n) => "a".repeat(n - 5) + "@x.au";
+reset();
+await refused({ phone: "1".repeat(31) }, "The phone number must be 30 characters or fewer.");
+await refused({ email: emailOf(255) }, "The email address must be 254 characters or fewer.");
+await refused({ pickupAddress: "p".repeat(301) }, "The pickup address must be 300 characters or fewer.");
+await refused({ dropoffAddress: "d".repeat(301) }, "The drop-off address must be 300 characters or fewer.");
+await refused({ signatureName: "s".repeat(201) }, "The signature must be 200 characters or fewer.");
+assert.equal(tables.bookings.length, 0);
+out = await post({ ...good(), phone: "1".repeat(30), email: emailOf(254), pickupAddress: "p".repeat(300), dropoffAddress: "d".repeat(300), signatureName: "s".repeat(200) });
+assert.equal(out.status, 201);
+// Spaces around a value do not count.
+assert.equal((await post({ ...good(), pickupAddress: "  " + "q".repeat(300) + "  " })).status, 201);
+
 console.log("ok");

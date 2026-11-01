@@ -76,10 +76,14 @@ Deno.serve(async (req) => {
   const phone = getString(body.phone);
   if (!phone || !isValidPhone(phone))
     return jsonResponse({ success: false, error: "Please enter a valid phone number." }, 400);
+  if (phone.length > 30)
+    return jsonResponse({ success: false, error: "The phone number must be 30 characters or fewer." }, 400);
 
   const email = getString(body.email);
   if (!email || !isValidEmail(email))
     return jsonResponse({ success: false, error: "Please enter a valid email address." }, 400);
+  if (email.length > 254)
+    return jsonResponse({ success: false, error: "The email address must be 254 characters or fewer." }, 400);
 
   const date = getString(body.date);
   if (!date || !isValidCalendarDate(date))
@@ -94,14 +98,20 @@ Deno.serve(async (req) => {
   const pickupAddress = getString(body.pickupAddress);
   if (!pickupAddress)
     return jsonResponse({ success: false, error: "Please enter the pickup address." }, 400);
+  if (pickupAddress.length > 300)
+    return jsonResponse({ success: false, error: "The pickup address must be 300 characters or fewer." }, 400);
 
   const dropoffAddress = getString(body.dropoffAddress);
   if (!dropoffAddress)
     return jsonResponse({ success: false, error: "Please enter the drop-off address." }, 400);
+  if (dropoffAddress.length > 300)
+    return jsonResponse({ success: false, error: "The drop-off address must be 300 characters or fewer." }, 400);
 
   const signatureName = getString(body.signatureName);
   if (!signatureName)
     return jsonResponse({ success: false, error: "Please sign with your full name." }, 400);
+  if (signatureName.length > 200)
+    return jsonResponse({ success: false, error: "The signature must be 200 characters or fewer." }, 400);
 
   const signedDate = getString(body.signedDate);
   if (!signedDate || isNaN(Date.parse(signedDate)))
