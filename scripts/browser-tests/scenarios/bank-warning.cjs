@@ -22,4 +22,10 @@ module.exports = async ({ run, open, sleep }) => {
   assert.equal(await save(`__set(true, { ok: true, alerts: 0, email: [] })`), FAILED);
   assert.equal(await save(`__set(false, { ok: false, error: 'alert_failed' })`), FAILED);
   assert.equal(await save(`window.__fail = 'network'`), FAILED);
+
+  // No previous e-mail: nothing was sent to the worker, whatever happened to the office copy.
+  const NO_PREVIOUS = 'Your details were saved and the office can see the change. There was no previous e-mail on file to send a warning to.';
+  assert.equal(await save(`__set(true, { ok: true, alerts: 1, email: [{ admin: 'sent', worker: 'no_previous_email' }] })`), NO_PREVIOUS);
+  assert.equal(await save(`__set(true, { ok: true, alerts: 1, email: [{ admin: 'failed_500', worker: 'no_previous_email' }] })`), NO_PREVIOUS);
+  assert.match(await save(`__set(true, { ok: true, alerts: 1, email: [{ admin: 'sent', worker: 'sent' }] })`), SENT);
 };
