@@ -15,6 +15,7 @@ stored there.
 | 20261020102601 | subcontractor_admin_grouped_invoices |
 | 20261020124229 | subcontractor_admin_job_rate_correction |
 | 20261027222146 | subcontractor_adjust_lock_order |
+| 20261101054154 | followups_fix_search_path (audit item P1, not part of the subcontractor module) |
 
 ## Rules
 
@@ -45,7 +46,7 @@ match what production ran:
 ```sql
 select version, name, md5(statements[1]) as md5, length(statements[1]) as chars
 from supabase_migrations.schema_migrations
-where name like 'subcontractor%'
+where name like 'subcontractor%' or name = 'followups_fix_search_path'
 order by version;
 ```
 
