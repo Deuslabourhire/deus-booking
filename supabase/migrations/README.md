@@ -16,6 +16,7 @@ stored there, except for the corrected header comments listed below.
 | 20261020124229 | subcontractor_admin_job_rate_correction |
 | 20261027222146 | subcontractor_adjust_lock_order |
 | 20261101054154 | followups_fix_search_path (audit item P1, not part of the subcontractor module) |
+| 20261101105932 | subcontractor_email_change_alert (rollback: `supabase/rollbacks/`) |
 
 ## Rules
 
