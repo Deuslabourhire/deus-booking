@@ -124,4 +124,36 @@ assert.equal(out.status, 201);
 // Spaces around a value do not count.
 assert.equal((await post({ ...good(), pickupAddress: "  " + "q".repeat(300) + "  " })).status, 201);
 
+// Repeats within 10 minutes answer with the existing booking and create nothing.
+reset();
+const first = await post(good());
+assert.deepEqual([first.status, first.body.id], [201, "bookings-1"]);
+const customers = tables.customers.length;
+out = await post(good());
+assert.deepEqual([out.status, out.body], [200, { success: true, id: "bookings-1" }]);
+out = await post({ ...good(), email: " ANA@X.AU " });
+assert.deepEqual([out.status, out.body.id], [200, "bookings-1"]);
+assert.deepEqual([tables.bookings.length, tables.customers.length], [1, customers]);
+
+// Any difference in email, date, time or pickup is a new booking.
+for (const change of [{ email: "bea@x.au" }, { date: sydneyDay(8) }, { startTime: "10:00" }, { pickupAddress: "9 Other St" }]) {
+  assert.equal((await post({ ...good(), ...change })).status, 201, JSON.stringify(change));
+}
+assert.equal(tables.bookings.length, 5);
+
+// Older than 10 minutes is a new booking; just inside is still a repeat.
+reset();
+await post(good());
+tables.bookings[0].created_at = new Date(Date.now() - 9 * 60 * 1000).toISOString();
+assert.equal((await post(good())).status, 200);
+tables.bookings[0].created_at = new Date(Date.now() - 11 * 60 * 1000).toISOString();
+assert.equal((await post(good())).status, 201);
+assert.equal(tables.bookings.length, 2);
+
+// If the check fails, the booking is still created.
+reset();
+failRead = true;
+assert.equal((await post(good())).status, 201);
+assert.equal(tables.bookings.length, 1);
+
 console.log("ok");

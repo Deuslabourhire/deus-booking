@@ -16,6 +16,8 @@ function getString(value: unknown): string | null {
   return typeof value === "string" ? value.trim() : null;
 }
 
+const REPEAT_WINDOW_MS = 10 * 60 * 1000;
+
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -132,6 +134,21 @@ Deno.serve(async (req) => {
 
   const emailNorm = normalizeEmail(email);
   const phoneNorm = normalizePhone(phone);
+
+  // ── Repeat of a recent booking: answer with the existing id, create nothing ──
+  // shortcut: check then insert, so two requests at the very same moment can both insert; add a unique rule in the database if that happens.
+  const { data: recent, error: recentError } = await supabase
+    .from("bookings")
+    .select("id, email")
+    .eq("date", date)
+    .eq("start_time", startTime)
+    .eq("pickup_address", pickupAddress)
+    .gte("created_at", new Date(Date.now() - REPEAT_WINDOW_MS).toISOString())
+    .order("created_at", { ascending: true });
+  // A failed check must not lose the booking: continue and create it.
+  if (recentError) console.error("Could not check for a repeated booking:", recentError);
+  const repeated = recent?.find((b) => normalizeEmail(b.email ?? "") === emailNorm);
+  if (repeated) return jsonResponse({ success: true, id: repeated.id }, 200);
 
   let customerId: string | null = null;
   let leadId: string | null = null;
