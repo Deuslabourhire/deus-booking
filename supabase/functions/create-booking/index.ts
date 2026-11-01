@@ -61,50 +61,50 @@ Deno.serve(async (req) => {
   try {
     body = await req.json();
   } catch {
-    return jsonResponse({ success: false, error: "Corpo da requisição inválido (JSON esperado)." }, 400);
+    return jsonResponse({ success: false, error: "We could not read your booking. Please reload the page and try again." }, 400);
   }
 
   const name = getString(body.name);
   if (!name || name.length === 0 || name.length > 200)
-    return jsonResponse({ success: false, error: "Nome deve ser texto, não vazio, até 200 caracteres." }, 400);
+    return jsonResponse({ success: false, error: "Please enter your name (up to 200 characters)." }, 400);
 
   const phone = getString(body.phone);
   if (!phone || !isValidPhone(phone))
-    return jsonResponse({ success: false, error: "Telefone inválido." }, 400);
+    return jsonResponse({ success: false, error: "Please enter a valid phone number." }, 400);
 
   const email = getString(body.email);
   if (!email || !isValidEmail(email))
-    return jsonResponse({ success: false, error: "Email inválido." }, 400);
+    return jsonResponse({ success: false, error: "Please enter a valid email address." }, 400);
 
   const date = getString(body.date);
   if (!date || !isValidCalendarDate(date))
-    return jsonResponse({ success: false, error: "Data inválida ou inexistente no calendário." }, 400);
+    return jsonResponse({ success: false, error: "Please choose a valid move date." }, 400);
 
   const startTime = getString(body.startTime);
   if (!startTime || !isValidTime(startTime))
-    return jsonResponse({ success: false, error: "Horário inválido." }, 400);
+    return jsonResponse({ success: false, error: "Please choose a valid start time." }, 400);
 
   const pickupAddress = getString(body.pickupAddress);
   if (!pickupAddress)
-    return jsonResponse({ success: false, error: "Endereço de retirada deve ser texto, não vazio." }, 400);
+    return jsonResponse({ success: false, error: "Please enter the pickup address." }, 400);
 
   const dropoffAddress = getString(body.dropoffAddress);
   if (!dropoffAddress)
-    return jsonResponse({ success: false, error: "Endereço de entrega deve ser texto, não vazio." }, 400);
+    return jsonResponse({ success: false, error: "Please enter the drop-off address." }, 400);
 
   const signatureName = getString(body.signatureName);
   if (!signatureName)
-    return jsonResponse({ success: false, error: "Assinatura deve ser texto, não vazia." }, 400);
+    return jsonResponse({ success: false, error: "Please sign with your full name." }, 400);
 
   const signedDate = getString(body.signedDate);
   if (!signedDate || isNaN(Date.parse(signedDate)))
-    return jsonResponse({ success: false, error: "Data de assinatura inválida." }, 400);
+    return jsonResponse({ success: false, error: "We could not confirm the signing date. Please reload the page and try again." }, 400);
 
   let notes = "";
   if (body.notes !== undefined && body.notes !== null) {
     const notesStr = getString(body.notes);
     if (notesStr === null)
-      return jsonResponse({ success: false, error: "Notes deve ser texto." }, 400);
+      return jsonResponse({ success: false, error: "We could not read your notes. Please check them and try again." }, 400);
     notes = notesStr.slice(0, 2000);
   }
 
@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
         }
       }
     } catch (err) {
-      console.error("Erro na validação de quote_id (ignorado, fail-open):", err);
+      console.error("Quote check failed (ignored, booking continues):", err);
     }
   }
 
@@ -227,8 +227,8 @@ Deno.serve(async (req) => {
     .single();
 
   if (error) {
-    console.error("Erro ao inserir booking:", error);
-    return jsonResponse({ success: false, error: "Erro ao salvar. Tente novamente." }, 500);
+    console.error("Could not insert booking:", error);
+    return jsonResponse({ success: false, error: "We could not save your booking. Please try again." }, 500);
   }
 
   // ── Marca a Quote como aceita (best-effort, não desfaz o booking se falhar) ──
@@ -238,7 +238,7 @@ Deno.serve(async (req) => {
       .update({ status: "accepted" })
       .eq("id", bookingQuoteId);
     if (quoteUpdateError) {
-      console.error("Erro ao atualizar status da quote (booking já criado, não revertido):", quoteUpdateError);
+      console.error("Could not update quote status (booking kept):", quoteUpdateError);
     }
   }
 
@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
       .update({ status: "booked" })
       .eq("id", validatedQuote.lead_id);
     if (leadUpdateError) {
-      console.error("Erro ao atualizar status do lead (booking já criado, não revertido):", leadUpdateError);
+      console.error("Could not update lead status (booking kept):", leadUpdateError);
     }
   }
 
