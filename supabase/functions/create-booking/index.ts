@@ -1,0 +1,257 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "https://deuslabourhire.github.io",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+function jsonResponse(body: unknown, status: number) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function getString(value: unknown): string | null {
+  return typeof value === "string" ? value.trim() : null;
+}
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+function isValidPhone(phone: string) {
+  return /^[\d\s+\-()]{8,}$/.test(phone);
+}
+function isValidTime(time: string) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
+}
+
+function isValidCalendarDate(dateStr: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12) return false;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  return day >= 1 && day <= daysInMonth;
+}
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+function normalizePhone(phone: string): string {
+  const digits = phone.trim().replace(/\D/g, "");
+  if (digits.length === 10 && digits.startsWith("0")) {
+    return "61" + digits.slice(1);
+  }
+  return digits;
+}
+
+function isValidUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return jsonResponse({ success: false, error: "Corpo da requisição inválido (JSON esperado)." }, 400);
+  }
+
+  const name = getString(body.name);
+  if (!name || name.length === 0 || name.length > 200)
+    return jsonResponse({ success: false, error: "Nome deve ser texto, não vazio, até 200 caracteres." }, 400);
+
+  const phone = getString(body.phone);
+  if (!phone || !isValidPhone(phone))
+    return jsonResponse({ success: false, error: "Telefone inválido." }, 400);
+
+  const email = getString(body.email);
+  if (!email || !isValidEmail(email))
+    return jsonResponse({ success: false, error: "Email inválido." }, 400);
+
+  const date = getString(body.date);
+  if (!date || !isValidCalendarDate(date))
+    return jsonResponse({ success: false, error: "Data inválida ou inexistente no calendário." }, 400);
+
+  const startTime = getString(body.startTime);
+  if (!startTime || !isValidTime(startTime))
+    return jsonResponse({ success: false, error: "Horário inválido." }, 400);
+
+  const pickupAddress = getString(body.pickupAddress);
+  if (!pickupAddress)
+    return jsonResponse({ success: false, error: "Endereço de retirada deve ser texto, não vazio." }, 400);
+
+  const dropoffAddress = getString(body.dropoffAddress);
+  if (!dropoffAddress)
+    return jsonResponse({ success: false, error: "Endereço de entrega deve ser texto, não vazio." }, 400);
+
+  const signatureName = getString(body.signatureName);
+  if (!signatureName)
+    return jsonResponse({ success: false, error: "Assinatura deve ser texto, não vazia." }, 400);
+
+  const signedDate = getString(body.signedDate);
+  if (!signedDate || isNaN(Date.parse(signedDate)))
+    return jsonResponse({ success: false, error: "Data de assinatura inválida." }, 400);
+
+  let notes = "";
+  if (body.notes !== undefined && body.notes !== null) {
+    const notesStr = getString(body.notes);
+    if (notesStr === null)
+      return jsonResponse({ success: false, error: "Notes deve ser texto." }, 400);
+    notes = notesStr.slice(0, 2000);
+  }
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  const emailNorm = normalizeEmail(email);
+  const phoneNorm = normalizePhone(phone);
+
+  let customerId: string | null = null;
+  let leadId: string | null = null;
+
+  // ── Validação de quote_id (fail-open) — antes da heurística ──
+  let bookingQuoteId: string | null = null;
+  let validatedQuote: { id: string; customer_id: string | null; lead_id: string | null } | null = null;
+  const quoteIdInput = getString(body.quoteId);
+
+  if (quoteIdInput && isValidUuid(quoteIdInput)) {
+    try {
+      const { data: quote } = await supabase
+        .from("quotes")
+        .select("id, contact_email, status, customer_id, lead_id")
+        .eq("id", quoteIdInput)
+        .maybeSingle();
+
+      if (quote && (quote.status === "sent" || quote.status === "accepted") && quote.contact_email) {
+        const quoteEmailNorm = normalizeEmail(quote.contact_email);
+        if (quoteEmailNorm === emailNorm) {
+          const { data: existingBooking } = await supabase
+            .from("bookings")
+            .select("id")
+            .eq("quote_id", quoteIdInput)
+            .limit(1)
+            .maybeSingle();
+
+          if (!existingBooking) {
+            bookingQuoteId = quoteIdInput;
+            validatedQuote = quote;
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Erro na validação de quote_id (ignorado, fail-open):", err);
+    }
+  }
+
+  // ── Prioridade: Quote validada com lead_id + customer_id preenchidos ──
+  if (validatedQuote && validatedQuote.lead_id && validatedQuote.customer_id) {
+    customerId = validatedQuote.customer_id;
+    leadId = validatedQuote.lead_id;
+  } else {
+    // ── Fallback: lógica heurística existente, sem alteração ──
+    const { data: byEmail } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("email_normalized", emailNorm)
+      .limit(1)
+      .maybeSingle();
+
+    const { data: byPhone } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("phone_normalized", phoneNorm)
+      .limit(1)
+      .maybeSingle();
+
+    if (byEmail && byPhone && byEmail.id !== byPhone.id) {
+      customerId = null;
+    } else if (byEmail) {
+      customerId = byEmail.id;
+    } else if (byPhone) {
+      customerId = byPhone.id;
+    } else {
+      const { data: newCustomer } = await supabase
+        .from("customers")
+        .insert({
+          name,
+          phone,
+          email,
+          phone_normalized: phoneNorm,
+          email_normalized: emailNorm,
+          source: "booking",
+        })
+        .select("id")
+        .single();
+      if (newCustomer) customerId = newCustomer.id;
+    }
+
+    if (customerId) {
+      const { data: lead } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("customer_id", customerId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lead) leadId = lead.id;
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .insert({
+      name, phone, email, date,
+      start_time: startTime,
+      pickup_address: pickupAddress,
+      dropoff_address: dropoffAddress,
+      notes,
+      signature_name: signatureName,
+      signed_date: signedDate,
+      status: "upcoming",
+      reminder_sent: false,
+      customer_id: customerId,
+      lead_id: leadId,
+      quote_id: bookingQuoteId,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("Erro ao inserir booking:", error);
+    return jsonResponse({ success: false, error: "Erro ao salvar. Tente novamente." }, 500);
+  }
+
+  // ── Marca a Quote como aceita (best-effort, não desfaz o booking se falhar) ──
+  if (bookingQuoteId) {
+    const { error: quoteUpdateError } = await supabase
+      .from("quotes")
+      .update({ status: "accepted" })
+      .eq("id", bookingQuoteId);
+    if (quoteUpdateError) {
+      console.error("Erro ao atualizar status da quote (booking já criado, não revertido):", quoteUpdateError);
+    }
+  }
+
+  // ── Caminho A apenas: marca o Lead como booked (best-effort, não desfaz o booking se falhar) ──
+  if (bookingQuoteId && validatedQuote?.lead_id) {
+    const { error: leadUpdateError } = await supabase
+      .from("leads")
+      .update({ status: "booked" })
+      .eq("id", validatedQuote.lead_id);
+    if (leadUpdateError) {
+      console.error("Erro ao atualizar status do lead (booking já criado, não revertido):", leadUpdateError);
+    }
+  }
+
+  return jsonResponse({ success: true, id: data.id }, 201);
+});
