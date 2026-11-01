@@ -3,7 +3,7 @@
 The files in this folder are the subcontractor module's migrations **exactly as production
 executed them**. Each file's name uses the version recorded in production
 (`supabase_migrations.schema_migrations`), and each file's bytes are identical to the statement
-stored there.
+stored there, except for the corrected header comments listed below.
 
 | Version | Name |
 |---|---|
@@ -19,7 +19,8 @@ stored there.
 
 ## Rules
 
-- **Do not edit a migration that production has already run.** Fix things in a new migration.
+- **Do not change the SQL of a migration that production has already run.** Fix things in a new
+  migration.
 - **Do not run `supabase db push` or `supabase db reset` against production from this repository.**
   Production has 49 earlier migrations (bookings, CRM, invoices, follow-ups) that are not in
   this folder, and the subcontractor migrations need objects created by them (for example
@@ -29,17 +30,29 @@ stored there.
 
 ## Comments that are out of date
 
-Some files still carry comments from before they were applied. They are kept because the file must
-match what production ran:
+Some files still carry other comments from before they were applied:
 
-- `20261020102601_…grouped_invoices.sql` says "TEST FIRST (deus-authtest); NOT on production" and
-  calls itself version 20261020120000. It is applied in production as 20261020102601.
+- `20261020102601_…grouped_invoices.sql` calls itself version 20261020120000. It is applied in
+  production as 20261020102601.
 - `20261020124229_…job_rate_correction.sql` refers to the grouped-invoice migration as
   20261020120000.
 - `20261027222146_…adjust_lock_order.sql` says "REVIEW DRAFT ONLY … No database changes have been
   applied". It is applied in production.
 - Some files refer to earlier files by their old local versions (20261016130000 … 20261017150000).
   So does `supabase/scheduled/sub_alert_retry_cron.sql`.
+
+## Corrected header comments
+
+The "TEST FIRST" and "NOT on production" headers were corrected on 01/11/2026 (audit decision 5).
+Only comments changed, so the SQL production ran is the same, but these files no longer match its
+stored statement byte for byte:
+
+- `20261018081255_subcontractor_invoices.sql`
+- `20261018081342_subcontractor_payments.sql`
+- `20261018081444_subcontractor_link_expiry_durations.sql`
+- `20261018081504_subcontractor_admin_corrections.sql`
+- `20261018081533_subcontractor_email_resend.sql`
+- `20261020102601_subcontractor_admin_grouped_invoices.sql`
 
 ## Checking a file against production (read-only)
 
@@ -50,4 +63,6 @@ where name like 'subcontractor%' or name = 'followups_fix_search_path'
 order by version;
 ```
 
-Compare with `md5sum supabase/migrations/*.sql`. Each pair must match.
+Compare with `md5sum supabase/migrations/*.sql`. Each pair must match, except for the six files
+above: compare those as they were at commit a5d1e5d, with
+`git show a5d1e5d:supabase/migrations/<file> | md5sum`.

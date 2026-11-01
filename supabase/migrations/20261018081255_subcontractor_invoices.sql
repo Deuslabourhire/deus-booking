@@ -1,6 +1,6 @@
 -- =====================================================================
--- Subcontractor invoices (operational payment record) — TEST FIRST.
--- Target: deus-authtest (aaafpfkwpdpfamfuimki). NOT for production yet.
+-- Subcontractor invoices (operational payment record).
+-- Applied on production as version 20261018081255.
 --
 -- Model
 --   * Same idea as the customer booking link: the Admin creates a personal
