@@ -327,8 +327,8 @@ document.getElementById('date').min=sydneyToday();
 function $(id){return document.getElementById(id);}
 function showToast(msg,dur=3500){const el=$('toast');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',dur);}
 function validateEmail(e){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);}
-// Same rule as create-booking: mobile 04 or +61 4, landline 02, 03, 07 or 08.
-function validatePhone(p){return /^(0[23478]\d{8}|\+614\d{8})$/.test(p.replace(/[\s\-()]/g,''));}
+// Same rule as create-booking: mobile 04, landline 02, 03, 07 or 08, each also with +61 in place of the 0.
+function validatePhone(p){return /^(0|\+61)[23478]\d{8}$/.test(p.replace(/[\s\-()]/g,''));}
 function setFieldError(id,hasErr){const f=$('f-'+id);if(f)f.classList.toggle('has-error',hasErr);}
 
 function goStep(n){

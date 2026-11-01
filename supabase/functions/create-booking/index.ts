@@ -22,8 +22,8 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 function isValidPhone(phone: string) {
-  // Same rule as booking.html: mobile 04 or +61 4, landline 02, 03, 07 or 08.
-  return /^(0[23478]\d{8}|\+614\d{8})$/.test(phone.replace(/[\s\-()]/g, ""));
+  // Same rule as booking.html: mobile 04, landline 02, 03, 07 or 08, each also with +61 in place of the 0.
+  return /^(0|\+61)[23478]\d{8}$/.test(phone.replace(/[\s\-()]/g, ""));
 }
 function isValidTime(time: string) {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
