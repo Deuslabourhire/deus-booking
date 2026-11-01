@@ -403,14 +403,14 @@ async function submitBooking(){
   const btn=$('btnSubmit');
   btn.textContent='Submitting...';btn.disabled=true;
   const booking={name:formData.name,phone:formData.phone,email:formData.email,date:formData.date,startTime:formData.startTime,pickupAddress:formData.pickupAddress,dropoffAddress:formData.dropoffAddress,notes:formData.notes||'',signatureName:formData.signatureName,signedDate:formData.signedDate,quoteId:quoteIdFromUrl};
-  let saved=false;
+  let saved=false,serverMessage='';
   try{
     const res=await fetch(EDGE_FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(booking)});
     const result=await res.json();
     if(res.ok&&result.success)saved=true;
-    else console.error('create-booking error:',res.status,result);
+    else{console.error('create-booking error:',res.status,result);if(result&&typeof result.error==='string')serverMessage=result.error;}
   }catch(err){console.error('Network error:',err);}
-  if(!saved){btn.textContent='✓ Confirm My Booking';btn.disabled=false;showToast('Could not save. Please try again or contact us via WhatsApp.',5000);return;}
+  if(!saved){btn.textContent='✓ Confirm My Booking';btn.disabled=false;showToast(serverMessage||'Could not save. Please try again or contact us via WhatsApp.',5000);return;}
   document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
   $('stepDone').classList.add('active');
   for(let i=1;i<=4;i++){const b=$('b'+i);if(b)b.className='bar done';}
