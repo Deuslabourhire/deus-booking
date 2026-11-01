@@ -37,6 +37,11 @@ function isValidCalendarDate(dateStr: string): boolean {
   return day >= 1 && day <= daysInMonth;
 }
 
+// Same rule as booking.html.
+function sydneyToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Sydney" }).format(new Date());
+}
+
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
@@ -79,6 +84,8 @@ Deno.serve(async (req) => {
   const date = getString(body.date);
   if (!date || !isValidCalendarDate(date))
     return jsonResponse({ success: false, error: "Please choose a valid move date." }, 400);
+  if (date < sydneyToday())
+    return jsonResponse({ success: false, error: "The move date cannot be in the past. Please choose today or a later date." }, 400);
 
   const startTime = getString(body.startTime);
   if (!startTime || !isValidTime(startTime))

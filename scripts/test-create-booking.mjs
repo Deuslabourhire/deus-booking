@@ -89,4 +89,25 @@ reset();
 out = await post(good());
 assert.deepEqual([out.status, out.body], [201, { success: true, id: "bookings-1" }]);
 
+// Past dates, with the day taken from Sydney and not from the server clock.
+const PAST = "The move date cannot be in the past. Please choose today or a later date.";
+reset();
+await refused({ date: sydneyDay(-1) }, PAST);
+await refused({ date: "2020-01-01" }, PAST);
+assert.equal(tables.bookings.length, 0);
+out = await post({ ...good(), date: sydneyDay() });
+assert.equal(out.status, 201);
+
+const RealDate = Date;
+const atInstant = (iso) => {
+  globalThis.Date = class extends RealDate {
+    constructor(...a) { if (a.length) super(...a); else super(iso); }
+    static now() { return new RealDate(iso).getTime(); }
+  };
+};
+atInstant("2030-01-01T14:00:00Z");   // 01:00 on 2 January in Sydney, still 1 January in UTC
+await refused({ date: "2030-01-01" }, PAST);
+assert.equal((await post({ ...good(), date: "2030-01-02" })).status, 201);
+globalThis.Date = RealDate;
+
 console.log("ok");
