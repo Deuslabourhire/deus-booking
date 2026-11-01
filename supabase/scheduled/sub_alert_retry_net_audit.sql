@@ -3,7 +3,7 @@
 -- READ-ONLY: changes nothing (runs in a read-only transaction that is rolled
 -- back) and never selects request headers or bodies, so it cannot print the
 -- secret. Run as `postgres` (SQL editor) after enabling pg_net and before
--- scheduling sub_alert_retry_cron.sql; keep the output with the change record.
+-- applying *_alert_retry_schedule.sql; keep the output with the change record.
 --
 -- Why an audit and not REVOKE
 --   On Supabase the pg_net objects (schema net, net.http_request_queue,
