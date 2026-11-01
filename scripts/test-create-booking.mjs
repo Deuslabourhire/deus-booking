@@ -70,7 +70,7 @@ let out = await post("not json");
 assert.deepEqual([out.status, out.body.error], [400, "We could not read your booking. Please reload the page and try again."]);
 await refused({ name: "" }, "Please enter your name (up to 200 characters).");
 await refused({ name: "a".repeat(201) }, "Please enter your name (up to 200 characters).");
-await refused({ phone: "12" }, "Please enter a valid phone number.");
+await refused({ phone: "12" }, "Please enter a valid Australian phone number.");
 await refused({ email: "nope" }, "Please enter a valid email address.");
 await refused({ date: "2030-02-31" }, "Please choose a valid move date.");
 await refused({ startTime: "25:00" }, "Please choose a valid start time.");
@@ -113,13 +113,13 @@ globalThis.Date = RealDate;
 // Size limits: the limit itself is accepted, one more is refused.
 const emailOf = (n) => "a".repeat(n - 5) + "@x.au";
 reset();
-await refused({ phone: "1".repeat(31) }, "The phone number must be 30 characters or fewer.");
+await refused({ phone: "04" + " ".repeat(21) + "12345678" }, "The phone number must be 30 characters or fewer.");
 await refused({ email: emailOf(255) }, "The email address must be 254 characters or fewer.");
 await refused({ pickupAddress: "p".repeat(301) }, "The pickup address must be 300 characters or fewer.");
 await refused({ dropoffAddress: "d".repeat(301) }, "The drop-off address must be 300 characters or fewer.");
 await refused({ signatureName: "s".repeat(201) }, "The signature must be 200 characters or fewer.");
 assert.equal(tables.bookings.length, 0);
-out = await post({ ...good(), phone: "1".repeat(30), email: emailOf(254), pickupAddress: "p".repeat(300), dropoffAddress: "d".repeat(300), signatureName: "s".repeat(200) });
+out = await post({ ...good(), phone: "04" + " ".repeat(20) + "12345678", email: emailOf(254), pickupAddress: "p".repeat(300), dropoffAddress: "d".repeat(300), signatureName: "s".repeat(200) });
 assert.equal(out.status, 201);
 // Spaces around a value do not count.
 assert.equal((await post({ ...good(), pickupAddress: "  " + "q".repeat(300) + "  " })).status, 201);
@@ -155,5 +155,21 @@ reset();
 failRead = true;
 assert.equal((await post(good())).status, 201);
 assert.equal(tables.bookings.length, 1);
+
+// Only Australian numbers: mobile 04xx xxx xxx or +61 4xx xxx xxx, landline 02, 03, 07 or 08 or the same after +61.
+reset();
+for (const phone of ["12", "041234567", "04123456789", "61412345678", "+61 412 345 67", "01 2345 6789", "05 1234 5678",
+  "+61 2 9000 000", "+61 2 9000 00000", "+61 02 9000 0000", "+61 1 9000 0000", "+61 5 9000 0000", "61 2 9000 0000",
+  "06 1234 5678", "09 1234 5678", "1300 123 456", "1800 123 456", "+55 11 91234 5678", "0412.345.678", "0412 345 67a", "04+12345678"]) {
+  await refused({ phone }, "Please enter a valid Australian phone number.");
+}
+assert.equal(tables.bookings.length, 0);
+for (const phone of ["0412345678", "0412 345 678", "04-1234-5678", "(04) 1234 5678", "+61412345678", "+61 412 345 678", "+61-412-345-678",
+  "+61 (412) 345 678", "02 9000 0000", "(02) 9000 0000", "03-9000-0000", "07 3000 0000", "08 8000 0000",
+  "+61 2 9000 0000", "+61 (2) 9000 0000", "+61-3-9000-0000", "+61 7 3000 0000", "+61 8 8000 0000"]) {
+  reset();
+  assert.equal((await post({ ...good(), phone })).status, 201, phone);
+  assert.equal(tables.bookings[0].phone, phone);
+}
 
 console.log("ok");

@@ -22,7 +22,8 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 function isValidPhone(phone: string) {
-  return /^[\d\s+\-()]{8,}$/.test(phone);
+  // Same rule as booking.html: mobile 04, landline 02, 03, 07 or 08, each also with +61 in place of the 0.
+  return /^(0|\+61)[23478]\d{8}$/.test(phone.replace(/[\s\-()]/g, ""));
 }
 function isValidTime(time: string) {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
@@ -77,7 +78,7 @@ Deno.serve(async (req) => {
 
   const phone = getString(body.phone);
   if (!phone || !isValidPhone(phone))
-    return jsonResponse({ success: false, error: "Please enter a valid phone number." }, 400);
+    return jsonResponse({ success: false, error: "Please enter a valid Australian phone number." }, 400);
   if (phone.length > 30)
     return jsonResponse({ success: false, error: "The phone number must be 30 characters or fewer." }, 400);
 
