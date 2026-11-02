@@ -29,7 +29,7 @@ const stub = `(() => {
       if (a.updateReply) return json(a.updateReply.body, a.updateReply.status);
       return json(user);
     }
-    if (url.pathname === '/auth/v1/logout') return new Response(null, { status: 204 });
+    if (url.pathname === '/auth/v1/logout') return a.logoutReply ? json(a.logoutReply.body, a.logoutReply.status) : new Response(null, { status: 204 });
     a.rest.push(url.pathname);
     if (url.pathname.endsWith('/user_roles')) return json(a.admin ? [{ role: 'admin' }] : []);
     return json([]);
@@ -225,6 +225,42 @@ module.exports = async ({ run, open, sleep, init }) => {
   assert.equal(await run(`__auth.updates.length`), 0);
   assert.equal(await shown('passwordOverlay'), false, 'forged link gets no form');
   assert.equal(await shown('pwNew'), false);
+
+  // A sign-out the server refuses leaves the session in the browser, so the recovery must stay pending.
+  await openRecovery('r=11');
+  await run(`__auth.logoutReply = { status: 500, body: { message: 'down' } }; window.__toasts = []; window.showToast = (m) => __toasts.push(m); 1`);
+  await run(`closePasswordForm()`);
+  await sleep(100);
+  assert.match((await run(`__toasts`)).join(), /Could not log out/);
+  assert.equal(await shown('pwNew'), true, 'form stays after a failed sign-out');
+  assert.equal(await shown('loginScreen'), false);
+  await open('admin.html?r=12');
+  await sleep(200);
+  assert.equal(await shown('app'), false, 'failed sign-out must not open the panel on reload');
+  assert.equal(await shown('pwNew'), true);
+
+  // Not being able to read the session does not mean there is none: the recovery stays pending.
+  await run(`db.auth.getSession = async () => ({ data: { session: null }, error: new Error('down') }); restoreSession()`);
+  await open('admin.html?r=13');
+  await sleep(200);
+  assert.equal(await shown('app'), false, 'a failed session read must not open the panel on reload');
+  assert.equal(await shown('pwNew'), true);
+  await run(`closePasswordForm()`);
+  await sleep(100);
+
+  // A marker left behind must not spare the next password login from the current password.
+  await open('admin.html?r=14');
+  await sleep(100);
+  await run(`localStorage.setItem('deusAdminPasswordRecovery', '1'); 1`);
+  await signIn();
+  await open('admin.html?r=15');
+  await sleep(200);
+  assert.equal(await shown('app'), true, 'a password login is a normal session');
+  assert.equal(await shown('passwordOverlay'), false);
+  await run(`$('btnChangePassword').click()`);
+  assert.equal(await shown('pwCurrent'), true, 'and it still asks for the current password');
+  await run(`closePasswordForm(); logout()`);
+  await sleep(100);
 
   // Phone: the three header buttons and the form stay on screen, and focus does not zoom the page.
   await open('admin.html?r=10', 320);
