@@ -2,13 +2,16 @@
 -- Scheduled retry of subcontractor alert e-mails: notes only, nothing to run here.
 -- The jobs are in migration *_alert_retry_schedule.sql; rollback in
 -- supabase/rollbacks/alert_retry_schedule.sql. Test on deus-authtest first, in this order:
---   1. create the secret in both places (below) and the URL in Vault;
---   2. apply *_alert_retry_extensions.sql;
+--   1. confirm sub-invoice-submit is deployed with verify_jwt = false (supabase/config.toml),
+--      or every call fails with 401; create the secret in both places (below) and the URL in Vault;
+--   2. apply *_alert_retry_extensions.sql and *_alert_retry_max_attempts.sql;
 --   3. check `net` is NOT in the Data API "Exposed schemas", then run
 --      sub_alert_retry_net_audit.sql (read-only) and review its output (who can
 --      read the pg_net request queue);
---   4. apply *_alert_retry_schedule.sql (it refuses to run if Vault is not ready);
---   5. after a run, scripts/test-alert-retry-no-leak.sql: the secret must not appear.
+--   4. count the alerts still pending, read or not: the first run sends them. Then apply
+--      *_alert_retry_schedule.sql (it refuses to run if the Vault values are missing or invalid);
+--   5. after a run, scripts/test-alert-retry-no-leak.sql: the last response must be 200 and the
+--      secret must not appear. cron says "succeeded" even when the function answers 401 or 403.
 --
 -- What it does
 --   Every 15 minutes pg_cron calls the Edge Function with
@@ -17,8 +20,8 @@
 --   pending (never sent, or a failed send) or whose 10-minute claim lease expired
 --   (interrupted attempt), and only within 23 h of their first attempt
 --   (sub_alert_retry_window), i.e. inside the provider's 24 h idempotency
---   window. With 15-minute runs and at most 5 attempts, retries normally
---   finish within about 75 minutes of the first attempt.
+--   window. With 15-minute runs, at most 92 attempts take about 23 h, so that
+--   window is the real limit.
 --
 -- Authentication of this request
 --   The request carries NO apikey and NO Authorization header. It is accepted
@@ -28,8 +31,8 @@
 --   and the endpoint is disabled while the secret is unset).
 --
 -- Why every 15 minutes (and what it does NOT guarantee)
---   * 5 attempts fit in about 75 minutes, far inside the 23 h window, leaving
---     room for an outage of almost a day before automatic retries stop;
+--   * retries continue through an outage of almost a day; after 23 h from the
+--     first attempt they stop, and the Admin alert says to contact the worker;
 --   * light load: one small HTTP call, at most 20 alerts per run.
 --   The interval does NOT prevent overlapping calls: pg_net sends requests
 --   asynchronously (the cron job only queues the request and returns), the
@@ -111,4 +114,8 @@
 -- (a run in between gets 403 and the next run retries; nothing is lost).
 --
 -- History: the job cron-history-cleanup deletes cron.job_run_details rows older than 30 days.
+--
+-- Known limit: a full batch of 20 alerts can outlast the 30 s pg_net timeout and the 150 s function
+-- limit. The response then shows a timeout though the function may still be working, and alerts it
+-- did not reach wait out their 10-minute lease. That costs an attempt, not the alert.
 -- =====================================================================

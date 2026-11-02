@@ -5,12 +5,19 @@ begin;
 
 do $$
 begin
-  if (select count(*) from vault.secrets where name in ('sub_alert_retry_secret', 'sub_alert_retry_url')) <> 2 then
-    raise exception 'alert_retry_precondition_failed: create both Vault secrets first';
+  if coalesce((select decrypted_secret from vault.decrypted_secrets where name = 'sub_alert_retry_secret'), '') !~ '^\S{32,}$' then
+    raise exception 'alert_retry_precondition_failed: Vault secret sub_alert_retry_secret is missing or invalid';
+  end if;
+  if coalesce((select decrypted_secret from vault.decrypted_secrets where name = 'sub_alert_retry_url'), '')
+     !~ '^https://[a-z0-9]+\.supabase\.co/functions/v1/sub-invoice-submit$' then
+    raise exception 'alert_retry_precondition_failed: Vault secret sub_alert_retry_url is missing or invalid';
   end if;
 end;
 $$;
 
+-- shortcut: a full batch of 20 alerts can outlast the 30 s timeout and the 150 s request limit, leaving
+-- the alerts it did not reach to wait for their lease; fine with about 3 subcontractors, lower p_limit
+-- in the function if alerts ever pile up.
 select cron.schedule(
   'sub-alert-retry',
   '*/15 * * * *',

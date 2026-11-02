@@ -54,9 +54,19 @@ begin
 end $$;
 
 create function pg_temp.t4_max_attempts_stop() returns void language plpgsql as $$
-declare i bigint := pg_temp.email_alert(); s text; r text;
+declare i bigint := pg_temp.email_alert(); a jsonb; s text; r text;
 begin
-  update public.sub_notifications set attempts = 5, first_claimed_at = now() - interval '2 hours' where id = i;
+  -- A long provider outage must not use up the retries before the 23 h window closes.
+  update public.sub_notifications set attempts = 91, first_claimed_at = now() - interval '2 hours' where id = i;
+  a := pg_temp.claimed(i);
+  perform pg_temp.check_that((a->>'attempt')::int = 92, 'attempt 92 still runs');
+  perform public.sub_record_alert_channel(i, (a->>'claim_token')::uuid, 'admin', 'failed_500');
+  perform public.sub_record_alert_channel(i, (a->>'claim_token')::uuid, 'worker', 'failed_500');
+  s := public.sub_finish_alert_claim(i, (a->>'claim_token')::uuid)->>'delivery_state';
+  perform pg_temp.check_that(s = 'gave_up', 'failed attempt 92 gives up');
+
+  i := pg_temp.email_alert();
+  update public.sub_notifications set attempts = 92, first_claimed_at = now() - interval '2 hours' where id = i;
   perform pg_temp.check_that(pg_temp.claimed(i) is null, 'not claimed');
   select delivery_state, gave_up_reason into s, r from public.sub_notifications where id = i;
   perform pg_temp.check_that(s = 'gave_up' and r = 'max_attempts', 'gave up: max attempts');

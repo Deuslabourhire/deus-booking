@@ -1,12 +1,17 @@
 -- Read-only check for the scheduled retry. Run on the project being checked, after a job has run.
--- It compares against the secret inside the database and returns only counts and lengths: it can
--- never print the value. Every *_with_secret count must be 0.
+-- It compares against the secret inside the database and returns only counts, lengths and statuses: it
+-- can never print the value. Expected: secret_found 1, secret_is_valid true, last_response_status 200,
+-- jobs_active 2, and every *_with_secret count 0. Without secret_found 1 those counts prove nothing.
+-- cron reports "succeeded" as soon as a request is queued: only the response status shows that it worked.
 with s as (
   select decrypted_secret as v from vault.decrypted_secrets where name = 'sub_alert_retry_secret'
 )
 select
+  (select count(*) from s) as secret_found,
+  (select v ~ '^\S{32,}$' from s) as secret_is_valid,
   (select length(v) from s) as secret_length,
-  (select v = btrim(v) from s) as secret_has_no_spaces,
+  (select status_code from net._http_response order by id desc limit 1) as last_response_status,
+  (select count(*) from net._http_response where status_code is distinct from 200) as responses_not_200,
   (select count(*) from cron.job j, s where position(s.v in j.command) > 0) as jobs_with_secret,
   (select count(*) from cron.job_run_details d, s where position(s.v in d.command) > 0
                                                      or position(s.v in coalesce(d.return_message, '')) > 0) as runs_with_secret,

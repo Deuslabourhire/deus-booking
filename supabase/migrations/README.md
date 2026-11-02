@@ -59,7 +59,7 @@ stored statement byte for byte:
 ```sql
 select version, name, md5(statements[1]) as md5, length(statements[1]) as chars
 from supabase_migrations.schema_migrations
-where name like 'subcontractor%' or name = 'followups_fix_search_path'
+where name like 'subcontractor%' or name like 'alert_retry%' or name = 'followups_fix_search_path'
 order by version;
 ```
 
