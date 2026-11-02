@@ -1,6 +1,5 @@
--- REVIEW DRAFT ONLY. Assign a real migration version in the repository before use.
+-- Applied on production as version 20261027222146.
 -- Replaces both admin day-correction functions so linked invoices are locked before days.
--- No database changes have been applied by preparing this file.
 begin;
 do $$
 begin
