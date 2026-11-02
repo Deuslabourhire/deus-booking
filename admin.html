@@ -125,6 +125,8 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
 .modal-btns .btn-cancel{flex:1;padding:12px;background:var(--bg);border:1.5px solid var(--border);color:var(--text-mid);font-weight:700;border-radius:9px}
 .modal-btns .btn-save{flex:2;padding:12px;background:var(--black);color:#fff;font-weight:700;border-radius:9px;border:none;cursor:pointer;font-family:inherit}
 .modal-btns .btn-save:hover{background:var(--dark)}
+.modal-btns .btn-save:disabled{opacity:.6;cursor:default}
+.pw-rules{font-size:12px;color:var(--text-mid);margin-bottom:6px}
 
 .toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:var(--black);color:#fff;border-radius:10px;padding:10px 20px;z-index:2000;font-size:13px;font-weight:600;box-shadow:var(--shadow-card);display:none;width:max-content;max-width:calc(100% - 32px);text-align:center;border:1px solid rgba(232,160,32,0.4)}
 
@@ -160,8 +162,9 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
       <img src="./logo.png" alt="Deus Labour Hire" class="logo-img" onerror="this.outerHTML=&#39;&lt;div style=\&#39;font-size:15px;color:#fff;font-weight:800\&#39;&gt;Deus Labour Hire&lt;/div&gt;&#39;">
       <div class="brand-sub">Admin Panel</div>
     </div>
-    <div class="hdr-btns">
+    <div class="hdr-btns" id="hdrBtns">
       <button class="btn btn-primary" onclick="openAddModal()">+ Add Job</button>
+      <button class="btn btn-outline" id="btnChangePassword" style="display:none" onclick="openPasswordForm()">Change password</button>
       <button class="btn btn-outline" onclick="logout()">Logout</button>
     </div>
   </div>
@@ -177,6 +180,21 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',system-ui,s
     <button class="btn-login" onclick="login()">Login →</button>
     <div class="login-err" id="loginErr">Invalid email, password, or access level. Please try again.</div>
   </div>
+</div>
+
+<div class="modal-overlay" id="passwordOverlay">
+  <form class="modal" role="dialog" aria-modal="true" aria-labelledby="pwTitle" onsubmit="submitPasswordForm(event)">
+    <h3 id="pwTitle">Change password</h3>
+    <div class="field" id="pwCurrentField"><label for="pwCurrent">Current password</label><input type="password" id="pwCurrent" autocomplete="current-password"></div>
+    <div class="field"><label for="pwNew">New password</label><input type="password" id="pwNew" autocomplete="new-password" aria-describedby="pwRules"></div>
+    <div class="field"><label for="pwConfirm">Confirm new password</label><input type="password" id="pwConfirm" autocomplete="new-password"></div>
+    <p class="pw-rules" id="pwRules">At least 12 characters, with an uppercase letter, a lowercase letter, a number and a symbol.</p>
+    <div class="login-err" id="pwError" role="alert"></div>
+    <div class="modal-btns">
+      <button type="button" class="btn-cancel" onclick="closePasswordForm()">Cancel</button>
+      <button type="submit" class="btn-save" id="pwSubmit">Save password</button>
+    </div>
+  </form>
 </div>
 
 <div id="app">
@@ -674,7 +692,13 @@ These Terms and Conditions are governed by the laws of Australia.</div>
 <script>
 const SUPABASE_URL='https://amnacoyjgdfykdfepkze.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtbmFjb3lqZ2RmeWtkZmVwa3plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxODI4MzAsImV4cCI6MjA5MDc1ODgzMH0.ma37AnfeaDdIN42TNUpt7EVoNYvT6nHQFJra-4XS_Pc';
+// supabase-js can return a recovery link's session before it fires PASSWORD_RECOVERY, so read the link before it does.
+const linkParams=new URLSearchParams(location.hash.slice(1));
+let recoveryLinkToken=linkParams.get('type')==='recovery'?(linkParams.get('access_token')||''):null;
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+// Kept across reloads and tabs, like the session itself: reopening the page must not skip the new password.
+const RECOVERY_KEY='deusAdminPasswordRecovery';
+db.auth.onAuthStateChange(function(event){if(event==='PASSWORD_RECOVERY')startRecovery();});
 
 let bookings=[],calDate=new Date();
 let currentInvoiceBookingId = null;
@@ -709,10 +733,75 @@ async function login(){
   const {data,error}=await db.auth.signInWithPassword({email,password});
   if(error||!data.user){$('loginErr').textContent='Invalid email or password. Please try again.';$('loginErr').style.display='block';$('passInput').value='';return;}
   if(!(await hasAdminRole(data.user.id))){await db.auth.signOut();$('loginErr').textContent='Access denied. This account is not an admin.';$('loginErr').style.display='block';$('passInput').value='';return;}
-  $('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();await loadInvoicesList();await loadQuotes();
+  showScreen('app');await loadBookings();await loadInvoicesList();await loadQuotes();
 }
-async function logout(){await db.auth.signOut();$('loginScreen').style.display='flex';$('app').style.display='none';$('passInput').value='';$('emailInput').value='';$('loginErr').style.display='none';}
-async function restoreSession(){if(await requireAdmin()){$('loginScreen').style.display='none';$('app').style.display='block';await loadBookings();await loadInvoicesList();await loadQuotes();}else{$('loginScreen').style.display='flex';$('app').style.display='none';}}
+async function logout(){localStorage.removeItem(RECOVERY_KEY);hidePasswordForm();await db.auth.signOut();showScreen('login');$('passInput').value='';$('emailInput').value='';$('loginErr').style.display='none';}
+async function restoreSession(){
+  const linkToken=recoveryLinkToken;recoveryLinkToken=null;
+  const {data:{session}}=await db.auth.getSession();
+  // The token must match: a crafted "#type=recovery" on a logged-in browser must not skip the current password.
+  if(session&&(inRecovery()||session.access_token===linkToken)){startRecovery();return;}
+  localStorage.removeItem(RECOVERY_KEY);
+  if(await requireAdmin()){showScreen('app');await loadBookings();await loadInvoicesList();await loadQuotes();return;}
+  showScreen('login');
+  if(linkToken!==null&&!session){$('loginErr').textContent='This password reset link is invalid or has expired.';$('loginErr').style.display='block';}
+}
+
+function showScreen(name){
+  $('loginScreen').style.display=name==='login'?'flex':'none';
+  $('app').style.display=name==='app'?'block':'none';
+  $('hdrBtns').style.display=name==='recovery'?'none':'';
+  $('btnChangePassword').style.display=name==='app'?'':'none';
+}
+function inRecovery(){return localStorage.getItem(RECOVERY_KEY)==='1';}
+function startRecovery(){localStorage.setItem(RECOVERY_KEY,'1');showScreen('recovery');openPasswordForm();}
+function setPasswordError(message){$('pwError').textContent=message;$('pwError').style.display=message?'block':'none';}
+function openPasswordForm(){
+  const recovery=inRecovery();
+  $('pwTitle').textContent=recovery?'Set a new password':'Change password';
+  $('pwCurrentField').style.display=recovery?'none':'';
+  $('passwordOverlay').classList.add('open');
+  $(recovery?'pwNew':'pwCurrent').focus();
+}
+function hidePasswordForm(){
+  ['pwCurrent','pwNew','pwConfirm'].forEach(function(id){$(id).value='';});
+  setPasswordError('');
+  $('passwordOverlay').classList.remove('open');
+}
+// Leaving a recovery means leaving its session: the panel stays closed until a password is set.
+function closePasswordForm(){if(inRecovery())return logout();hidePasswordForm();}
+function passwordProblem(next,again,current){
+  if(next.length<12)return 'New password must be at least 12 characters.';
+  if(!/\p{Lu}/u.test(next))return 'New password must include an uppercase letter.';
+  if(!/\p{Ll}/u.test(next))return 'New password must include a lowercase letter.';
+  if(!/\p{N}/u.test(next))return 'New password must include a number.';
+  if(!/[^\p{L}\p{N}\s]/u.test(next))return 'New password must include a symbol.';
+  if(next!==again)return 'New passwords do not match.';
+  if(next===current)return 'New password must be different from your current password.';
+  return '';
+}
+async function submitPasswordForm(event){
+  event.preventDefault();
+  const recovery=inRecovery(),current=$('pwCurrent').value,next=$('pwNew').value;
+  const problem=!recovery&&!current?'Enter your current password.':passwordProblem(next,$('pwConfirm').value,recovery?null:current);
+  setPasswordError(problem);
+  if(problem)return;
+  $('pwSubmit').disabled=true;
+  try{
+    if(!recovery){
+      const {data:{session}}=await db.auth.getSession();
+      if(!session){setPasswordError('Your session has expired. Please log in again.');return;}
+      const {error}=await db.auth.signInWithPassword({email:session.user.email,password:current});
+      if(error){setPasswordError(error.code==='invalid_credentials'?'Current password is incorrect.':'Could not verify your current password. Please try again.');return;}
+    }
+    const {error}=await db.auth.updateUser({password:next});
+    if(error){setPasswordError(error.message||'Could not change the password. Please try again.');return;}
+    localStorage.removeItem(RECOVERY_KEY);
+    hidePasswordForm();
+    showToast('Password changed successfully.',5000);
+    if(recovery)await restoreSession();
+  }finally{$('pwSubmit').disabled=false;}
+}
 
 async function loadBookings(){
   try{const {data,error}=await db.from('bookings').select('*').order('date',{ascending:false});if(error)throw error;bookings=Array.isArray(data)?data:[];}catch(e){bookings=[];showToast('Could not connect to database.',4000);}renderAll();

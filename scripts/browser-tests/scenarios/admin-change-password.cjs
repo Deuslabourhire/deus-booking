@@ -6,7 +6,7 @@ const stub = `(() => {
   const jwt = (sub) => [{ alg: 'HS256', typ: 'JWT' }, { sub, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 }]
     .map((p) => btoa(JSON.stringify(p))).join('.') + '.sig';
   const user = { id: 'u1', aud: 'authenticated', role: 'authenticated', email: 'admin@example.com', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' };
-  const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'X-Supabase-Api-Version': '2024-01-01' } });
   window.__jwt = jwt;
   window.__auth = { password: 'Old-Password-1!', admin: !/nonadmin/.test(location.search), logins: [], updates: [], rest: [], loginReply: null, updateReply: null };
   const real = window.fetch;
@@ -225,4 +225,19 @@ module.exports = async ({ run, open, sleep, init }) => {
   assert.equal(await run(`__auth.updates.length`), 0);
   assert.equal(await shown('passwordOverlay'), false, 'forged link gets no form');
   assert.equal(await shown('pwNew'), false);
+
+  // Phone: the three header buttons and the form stay on screen, and focus does not zoom the page.
+  await open('admin.html?r=10', 320);
+  await signIn();
+  await run(`$('btnChangePassword').click()`);
+  const phone = await run(`(() => {
+    const inside = (e) => { const r = e.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; };
+    return {
+      overflow: document.documentElement.scrollWidth - innerWidth,
+      buttons: [...$('hdrBtns').children].every(inside),
+      form: inside(document.querySelector('#passwordOverlay .modal')),
+      font: parseFloat(getComputedStyle($('pwNew')).fontSize),
+    };
+  })()`);
+  assert.deepEqual(phone, { overflow: 0, buttons: true, form: true, font: 16 });
 };
