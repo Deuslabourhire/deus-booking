@@ -53,13 +53,22 @@ const names = process.argv.slice(2).length ? process.argv.slice(2)
     await done; await sleep(300); errors = [];
   };
 
+  // A script from init() runs before the page's own on every load, until the scenario ends.
+  let preloads = [];
+  const init = async (source) => { preloads.push((await send('Page.addScriptToEvaluateOnNewDocument', { source })).result.identifier); };
+
   let failed = 0;
   for (const name of names) {
     try {
-      await require(path.join(dir, name + '.cjs'))({ run, open, sleep, errors: () => errors });
+      await require(path.join(dir, name + '.cjs'))({ run, open, sleep, init, errors: () => errors });
       if (errors.length) throw new Error('page errors: ' + errors.join(' | '));
       console.log('ok  ', name);
     } catch (e) { failed++; console.log('FAIL', name, '\n    ' + String(e.message).split('\n').slice(0, 12).join('\n    ')); }
+    if (preloads.length) {
+      for (const identifier of preloads) await send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+      preloads = [];
+      await run('localStorage.clear()');
+    }
   }
   ws.close(); chrome.kill(); server.close();
   console.log(failed ? `${failed} failed` : 'all passed');
