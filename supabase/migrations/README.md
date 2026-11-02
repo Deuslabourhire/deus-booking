@@ -40,7 +40,6 @@ Some files still carry other comments from before they were applied:
 - `20261027222146_…adjust_lock_order.sql` says "REVIEW DRAFT ONLY … No database changes have been
   applied". It is applied in production.
 - Some files refer to earlier files by their old local versions (20261016130000 … 20261017150000).
-  So does `supabase/scheduled/sub_alert_retry_cron.sql`.
 
 ## Corrected header comments
 
@@ -60,7 +59,7 @@ stored statement byte for byte:
 ```sql
 select version, name, md5(statements[1]) as md5, length(statements[1]) as chars
 from supabase_migrations.schema_migrations
-where name like 'subcontractor%' or name = 'followups_fix_search_path'
+where name like 'subcontractor%' or name like 'alert_retry%' or name = 'followups_fix_search_path'
 order by version;
 ```
 

@@ -22,8 +22,8 @@
 //          The worker changing the contact e-mail queues an alert the same way: same claim,
 //          same two channels, its own e-mails (kind email_changed_by_worker).
 //   {action: "retry_due"} + header x-retry-secret: <ALERT_RETRY_SECRET>
-//       -> rpc sub_claim_due_bank_alerts: retries alerts left pending (failed send)
-//          or whose claim expired (interrupted attempt). Meant for a scheduled job
+//       -> rpc sub_claim_due_bank_alerts: sends alerts left pending (never sent, or a failed
+//          send) or whose claim expired (interrupted attempt). Meant for a scheduled job
 //          (see supabase/scheduled/sub_alert_retry_cron.sql, every 15 minutes).
 //          Disabled (403) when ALERT_RETRY_SECRET is not set or shorter than 32 chars.
 //          The database only re-claims an alert within 23 h of its first attempt
