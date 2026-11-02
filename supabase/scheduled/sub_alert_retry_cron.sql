@@ -1,7 +1,7 @@
 -- =====================================================================
 -- Scheduled retry of subcontractor alert e-mails: notes only, nothing to run here.
 -- The jobs are in migration *_alert_retry_schedule.sql; rollback in
--- supabase/rollbacks/alert_retry_schedule.sql. Test on deus-authtest first, in this order:
+-- supabase/rollbacks/20261102080728_alert_retry_schedule.sql. Test on deus-authtest first, in this order:
 --   1. confirm sub-invoice-submit is deployed with verify_jwt = false (supabase/config.toml),
 --      or every call fails with 401; create the secret in both places (below) and the URL in Vault;
 --   2. apply *_alert_retry_extensions.sql and *_alert_retry_max_attempts.sql;

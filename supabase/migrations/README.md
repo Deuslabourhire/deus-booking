@@ -17,6 +17,9 @@ stored there, except for the corrected header comments listed below.
 | 20261027222146 | subcontractor_adjust_lock_order |
 | 20261101054154 | followups_fix_search_path (audit item P1, not part of the subcontractor module) |
 | 20261101105932 | subcontractor_email_change_alert (rollback: `supabase/rollbacks/`) |
+| 20261102080346 | alert_retry_extensions (rollback: level 3 of the schedule's file) |
+| 20261102080400 | alert_retry_max_attempts (kept by the rollback) |
+| 20261102080728 | alert_retry_schedule (rollback: `supabase/rollbacks/`) |
 
 ## Rules
 
