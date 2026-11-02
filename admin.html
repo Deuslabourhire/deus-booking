@@ -733,15 +733,17 @@ async function login(){
   const {data,error}=await db.auth.signInWithPassword({email,password});
   if(error||!data.user){$('loginErr').textContent='Invalid email or password. Please try again.';$('loginErr').style.display='block';$('passInput').value='';return;}
   if(!(await hasAdminRole(data.user.id))){await db.auth.signOut();$('loginErr').textContent='Access denied. This account is not an admin.';$('loginErr').style.display='block';$('passInput').value='';return;}
+  localStorage.removeItem(RECOVERY_KEY);
   showScreen('app');await loadBookings();await loadInvoicesList();await loadQuotes();
 }
-async function logout(){localStorage.removeItem(RECOVERY_KEY);hidePasswordForm();await db.auth.signOut();showScreen('login');$('passInput').value='';$('emailInput').value='';$('loginErr').style.display='none';}
+// signOut can return an error either way: a server refusal still removes the local session, a failed session read keeps it.
+async function logout(){const {error}=await db.auth.signOut();if(error){const check=await db.auth.getSession();if(check.error||check.data.session){showToast('Could not log out. Please try again.',4000);return;}}localStorage.removeItem(RECOVERY_KEY);hidePasswordForm();showScreen('login');$('passInput').value='';$('emailInput').value='';$('loginErr').style.display='none';}
 async function restoreSession(){
   const linkToken=recoveryLinkToken;recoveryLinkToken=null;
-  const {data:{session}}=await db.auth.getSession();
+  const {data:{session},error}=await db.auth.getSession();
   // The token must match: a crafted "#type=recovery" on a logged-in browser must not skip the current password.
   if(session&&(inRecovery()||session.access_token===linkToken)){startRecovery();return;}
-  localStorage.removeItem(RECOVERY_KEY);
+  if(!error)localStorage.removeItem(RECOVERY_KEY);
   if(await requireAdmin()){showScreen('app');await loadBookings();await loadInvoicesList();await loadQuotes();return;}
   showScreen('login');
   if(linkToken!==null&&!session){$('loginErr').textContent='This password reset link is invalid or has expired.';$('loginErr').style.display='block';}

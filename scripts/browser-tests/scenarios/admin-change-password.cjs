@@ -226,22 +226,41 @@ module.exports = async ({ run, open, sleep, init }) => {
   assert.equal(await shown('passwordOverlay'), false, 'forged link gets no form');
   assert.equal(await shown('pwNew'), false);
 
-  // A sign-out the server refuses leaves the session in the browser, so the recovery must stay pending.
+  // The server refuses the sign-out: supabase-js still removes the local session, so the page must say logged out.
   await openRecovery('r=11');
-  await run(`__auth.logoutReply = { status: 500, body: { message: 'down' } }; window.__toasts = []; window.showToast = (m) => __toasts.push(m); 1`);
+  await run(`__auth.logoutReply = { status: 500, body: { message: 'down' } }; 1`);
   await run(`closePasswordForm()`);
   await sleep(100);
+  assert.equal(await shown('loginScreen'), true, 'a refused sign-out still logs out here');
+  assert.equal(await shown('passwordOverlay'), false);
+  assert.equal(await run(`db.auth.getSession().then((r) => !!r.data.session)`), false);
+  await open('admin.html?r=12');
+  await sleep(200);
+  assert.equal(await shown('loginScreen'), true);
+  assert.equal(await shown('app'), false);
+
+  // The session could not be read, which is the case where it stays in the browser: stubbed, because the real
+  // one needs an expired token and about 30 s of retries. The recovery must stay pending.
+  await openRecovery('r=17');
+  await run(`(() => {
+    window.__toasts = []; window.showToast = (m) => __toasts.push(m);
+    const down = new Error('down');
+    db.auth.signOut = async () => ({ error: down });
+    db.auth.getSession = async () => ({ data: { session: null }, error: down });
+    return 1;
+  })()`);
+  await run(`closePasswordForm()`);
   assert.match((await run(`__toasts`)).join(), /Could not log out/);
   assert.equal(await shown('pwNew'), true, 'form stays after a failed sign-out');
   assert.equal(await shown('loginScreen'), false);
-  await open('admin.html?r=12');
+  await open('admin.html?r=13');
   await sleep(200);
   assert.equal(await shown('app'), false, 'failed sign-out must not open the panel on reload');
   assert.equal(await shown('pwNew'), true);
 
   // Not being able to read the session does not mean there is none: the recovery stays pending.
   await run(`db.auth.getSession = async () => ({ data: { session: null }, error: new Error('down') }); restoreSession()`);
-  await open('admin.html?r=13');
+  await open('admin.html?r=16');
   await sleep(200);
   assert.equal(await shown('app'), false, 'a failed session read must not open the panel on reload');
   assert.equal(await shown('pwNew'), true);
