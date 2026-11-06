@@ -40,15 +40,13 @@ Some files still carry other comments from before they were applied:
   production as 20261020102601.
 - `20261020124229_…job_rate_correction.sql` refers to the grouped-invoice migration as
   20261020120000.
-- `20261027222146_…adjust_lock_order.sql` says "REVIEW DRAFT ONLY … No database changes have been
-  applied". It is applied in production.
 - Some files refer to earlier files by their old local versions (20261016130000 … 20261017150000).
 
 ## Corrected header comments
 
-The "TEST FIRST" and "NOT on production" headers were corrected on 01/11/2026 (audit decision 5).
-Only comments changed, so the SQL production ran is the same, but these files no longer match its
-stored statement byte for byte:
+The "TEST FIRST" and "NOT on production" headers were corrected on 01/11/2026 (audit decision 5),
+and the "REVIEW DRAFT ONLY" header on 02/11/2026. Only comments changed, so the SQL production ran
+is the same, but these files no longer match its stored statement byte for byte:
 
 - `20261018081255_subcontractor_invoices.sql`
 - `20261018081342_subcontractor_payments.sql`
@@ -56,6 +54,7 @@ stored statement byte for byte:
 - `20261018081504_subcontractor_admin_corrections.sql`
 - `20261018081533_subcontractor_email_resend.sql`
 - `20261020102601_subcontractor_admin_grouped_invoices.sql`
+- `20261027222146_subcontractor_adjust_lock_order.sql`
 
 ## Checking a file against production (read-only)
 
@@ -66,6 +65,6 @@ where name like 'subcontractor%' or name like 'alert_retry%' or name = 'followup
 order by version;
 ```
 
-Compare with `md5sum supabase/migrations/*.sql`. Each pair must match, except for the six files
+Compare with `md5sum supabase/migrations/*.sql`. Each pair must match, except for the seven files
 above: compare those as they were at commit a5d1e5d, with
 `git show a5d1e5d:supabase/migrations/<file> | md5sum`.
