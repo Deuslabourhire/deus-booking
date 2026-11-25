@@ -8,5 +8,5 @@
 ## Regras
 
 - Nunca mexa no Supabase de produção (`amnacoyjgdfykdfepkze`).
-- Faça testes somente no `deus-authtest`.
+- Faça testes somente no `deus-staging` (`uowdkegyuuvyszytptci`). Nunca use a produção para testes.
 - Nunca faça push na branch `admin-auth-migration`.

@@ -1,4 +1,4 @@
-// sub-invoice-submit — TEST FIRST (deus-authtest).
+// sub-invoice-submit — TEST FIRST (deus-staging).
 // Platform JWT check OFF (supabase/config.toml: [functions.sub-invoice-submit]
 // verify_jwt = false). The worker page has no Supabase JWT: it sends the personal
 // link token (validated in the database), and the scheduled retry sends
